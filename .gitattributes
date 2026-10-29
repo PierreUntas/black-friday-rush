@@ -1,0 +1,11 @@
+# Fichiers Unity en YAML : fusion texte, fins de ligne normalisées
+*.cs text eol=lf
+*.unity text eol=lf
+*.prefab text eol=lf
+*.asset text eol=lf
+*.meta text eol=lf
+*.mat text eol=lf
+*.png binary
+*.jpg binary
+*.wav binary
+*.ogg binary

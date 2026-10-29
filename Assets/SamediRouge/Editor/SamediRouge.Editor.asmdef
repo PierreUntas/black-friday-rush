@@ -1,0 +1,26 @@
+{
+    "name": "SamediRouge.Editor",
+    "rootNamespace": "SamediRouge.EditorTools",
+    "references": [
+        "SamediRouge",
+        "Unity.RenderPipelines.Universal.Runtime",
+        "Unity.RenderPipelines.Core.Runtime"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [
+        {
+            "name": "com.unity.render-pipelines.universal",
+            "expression": "1.0.0",
+            "define": "SR_URP"
+        }
+    ],
+    "noEngineReferences": false
+}
