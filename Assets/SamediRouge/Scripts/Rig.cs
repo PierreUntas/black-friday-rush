@@ -268,6 +268,8 @@ namespace SamediRouge
         /// </summary>
         static void AddGear(Rig r, bool thief = false)
         {
+            r.gearThief = thief;
+            r.gearPreview = true;
             Material navy = Art.Mat(new Color(0.12f, 0.15f, 0.28f), 0.45f);
             Material dark = Art.Mat(new Color(0.16f, 0.18f, 0.22f), 0.5f);
             Material black = Art.Mat(Pal.Black, 0.5f);
@@ -518,6 +520,157 @@ namespace SamediRouge
                 s.gameObject.SetActive(false);
                 r.permShields[v] = s;
             }
+            WeaponModels(r, thief);
+            // boucliers 3D sanglés dans le dos : face décorée vers l'arrière
+            float[] shieldW = thief ? new[] { 0.56f, 0.6f, 0.5f } : new[] { 0.56f, 0.5f, 0.52f };
+            for (int v = 0; v < 3; v++)
+                ReplaceSlot(r.permShields[v], "bouclier_" + (thief ? "voleur" : "police") + "_niv" + (v + 1), shieldW[v], 0, Vector3.zero, 0f, 180f);
+        }
+
+        // ------------------------------------------------------------------ équipement en 3D (modèles Meshy)
+        bool gearThief;
+        /// <summary>TEST TEMPORAIRE : force ce niveau de casque 3D sur le policier joueur (0 = désactivé).</summary>
+        const int PreviewHelmetLv = 2;
+        bool gearPreview;
+        readonly Transform[] helmetModels = new Transform[4];
+
+        /// <summary>
+        /// Casque illustré en 3D (Resources/SamediRouge/Models/casque_&lt;camp&gt;_niv&lt;n&gt;) : s'il existe pour ce niveau,
+        /// il remplace les formes simples du casque ; sinon on garde le casque dessiné en code.
+        /// </summary>
+        void HelmetModel(int lv)
+        {
+            if (helmet == null) return;
+            string name = (gearThief ? "casque_voleur_niv" : "casque_police_niv") + lv;
+            Transform model = null;
+            if (lv >= 1 && lv <= 3)
+            {
+                if (helmetModels[lv] == null && GlbModel.Exists(name))
+                {
+                    helmetModels[lv] = GlbModel.Spawn(name, helmet);
+                    HelmetFit(helmetModels[lv], gearThief, lv);
+                }
+                model = helmetModels[lv];
+            }
+            for (int i = 0; i < helmetModels.Length; i++)
+                if (helmetModels[i] != null) helmetModels[i].gameObject.SetActive(helmetModels[i] == model);
+            for (int c = 0; c < helmet.childCount; c++)
+            {
+                Transform t = helmet.GetChild(c);
+                if (System.Array.IndexOf(helmetModels, t) >= 0) continue;
+                if (model != null) t.gameObject.SetActive(false);
+                else if (t == helmetVisor) t.gameObject.SetActive(lv >= 2);
+                else if (t == helmetCrest) t.gameObject.SetActive(lv >= 3);
+                else t.gameObject.SetActive(true);
+            }
+        }
+
+        /// <summary>
+        /// Place chaque casque 3D sur la tête : largeur, hauteur du centre, avancée, inclinaison (X) et orientation (Y).
+        /// Policier : 1 casquette, 2 casque à visière, 3 casque intégral. Voleur (par-dessus la cagoule) :
+        /// 1 bandana (nœud derrière), 2 lunettes de ski relevées sur le front, 3 casque de moto.
+        /// </summary>
+        static void HelmetFit(Transform m, bool thief, int lv)
+        {
+            if (!thief && lv == 1) Fit(m, 0.40f, 0, new Vector3(0f, 0.40f, -0.01f), 0f, 0f);
+            else if (thief && lv == 1) Fit(m, 0.36f, 0, new Vector3(0f, 0.27f, 0f), 0f, 180f);
+            else if (thief && lv == 2) Fit(m, 0.34f, 0, new Vector3(0f, 0.34f, 0.09f), -25f, 0f);
+            else Fit(m, 0.44f, 0, new Vector3(0f, 0.21f, 0f), 0f, 0f);
+        }
+
+        /// <summary>
+        /// Met un modèle à l'échelle (taille voulue le long de l'axe donné : 0 = largeur X, 1 = hauteur Y),
+        /// le tourne (X puis Y) et place son centre au point voulu du repère parent.
+        /// </summary>
+        static void Fit(Transform m, float size, int axis, Vector3 center, float rotX, float rotY)
+        {
+            Bounds b = new Bounds();
+            bool first = true;
+            foreach (MeshFilter f in m.GetComponentsInChildren<MeshFilter>())
+            {
+                if (first) { b = f.sharedMesh.bounds; first = false; } else b.Encapsulate(f.sharedMesh.bounds);
+            }
+            float k = size / Mathf.Max(0.001f, axis == 1 ? b.size.y : b.size.x);
+            Quaternion q = Quaternion.Euler(0f, rotY, 0f) * Quaternion.Euler(rotX, 0f, 0f);
+            m.localScale = Vector3.one * k;
+            m.localRotation = q;
+            m.localPosition = center - q * (b.center * k);
+        }
+
+        /// <summary>Remplace les formes simples d'un emplacement (matraque, pistolet…) par le modèle 3D s'il existe.</summary>
+        static Transform ReplaceSlot(Transform slot, string name, float size, int axis, Vector3 center, float rotX, float rotY)
+        {
+            if (slot == null || !GlbModel.Exists(name)) return null;
+            for (int c = 0; c < slot.childCount; c++)
+            {
+                Transform t = slot.GetChild(c);
+                if (t.name == "Cube" || t.name == "Sphere" || t.name == "Cylinder" || t.name == "Capsule") t.gameObject.SetActive(false);
+            }
+            Transform m = GlbModel.Spawn(name, slot);
+            Fit(m, size, axis, center, rotX, rotY);
+            return m;
+        }
+
+        /// <summary>Armes 3D : 1 matraque / batte en main droite, 2 pistolet en main gauche, 3 mitraillette à deux mains.</summary>
+        static void WeaponModels(Rig r, bool thief)
+        {
+            string f = thief ? "voleur" : "police";
+            if (r.batons[0] != null)
+            {
+                // tenue par la poignée (bas du modèle) : le modèle debout (Y) est couché vers l'avant (Z)
+                float len = thief ? 0.7f : 0.55f;
+                ReplaceSlot(r.batons[0], "arme_" + f + "_niv1", len, 1, new Vector3(0f, 0f, len * 0.5f - 0.08f), 90f, 0f);
+            }
+            // le pistolet à peinture du voleur est modélisé canon vers l'autre côté
+            ReplaceSlot(r.pistol, "arme_" + f + "_niv2", 0.3f, 0, new Vector3(0f, -0.03f, 0.1f), 0f, thief ? 90f : -90f);
+            ReplaceSlot(r.smg, "arme_" + f + "_niv3", 0.55f, 0, new Vector3(0f, -0.02f, 0.05f), 0f, -90f);
+        }
+
+        readonly Transform[] vestModels = new Transform[4];
+
+        /// <summary>Tenue à la taille du buste : largeur des épaules, bas sur les hanches, épaisseur du torse.</summary>
+        static void FitTorso(Transform m)
+        {
+            Bounds b = new Bounds();
+            bool first = true;
+            foreach (MeshFilter f in m.GetComponentsInChildren<MeshFilter>())
+            {
+                if (first) { b = f.sharedMesh.bounds; first = false; } else b.Encapsulate(f.sharedMesh.bounds);
+            }
+            float k = 0.68f / Mathf.Max(0.001f, b.size.x);
+            float kz = k * Mathf.Clamp(0.42f / Mathf.Max(0.001f, b.size.z * k), 0.8f, 1.8f);
+            m.localRotation = Quaternion.identity;
+            m.localScale = new Vector3(k, k, kz);
+            m.localPosition = new Vector3(-b.center.x * k, -0.04f - b.min.y * k, -b.center.z * kz);
+        }
+
+        /// <summary>Tenue 3D (gilet / sweat / blouson) du niveau acheté, portée sur le buste ; sinon la tenue dessinée en code.</summary>
+        void VestModel(int lv)
+        {
+            if (spine == null) return;
+            Transform model = null;
+            if (lv >= 1 && lv <= 3)
+            {
+                string name = (gearThief ? "gilet_voleur_niv" : "gilet_police_niv") + lv;
+                if (vestModels[lv] == null && GlbModel.Exists(name))
+                {
+                    vestModels[lv] = GlbModel.Spawn(name, spine);
+                    FitTorso(vestModels[lv]);
+                }
+                model = vestModels[lv];
+            }
+            for (int i = 0; i < vestModels.Length; i++)
+                if (vestModels[i] != null) vestModels[i].gameObject.SetActive(vestModels[i] == model);
+            // la tenue 3D remplace le buste dessiné en code (sinon elle disparaît dedans)
+            for (int c = 0; c < spine.childCount; c++)
+            {
+                Transform t = spine.GetChild(c);
+                if (t.name == "Cube" || t.name == "Sphere" || t.name == "Capsule" || t.name == "Cylinder") t.gameObject.SetActive(model == null);
+            }
+            if (model == null) return;
+            if (vestPerm != null) vestPerm.gameObject.SetActive(false);
+            if (padL != null) { padL.gameObject.SetActive(false); padR.gameObject.SetActive(false); }
+            if (vestTrim != null) vestTrim.gameObject.SetActive(false);
         }
 
         Transform[] permShields;
@@ -546,9 +699,11 @@ namespace SamediRouge
         {
             if (helmetVisor != null) helmetVisor.gameObject.SetActive(helmetLv >= 2);
             if (helmetCrest != null) helmetCrest.gameObject.SetActive(helmetLv >= 3);
+            HelmetModel(PreviewHelmetLv > 0 && !gearThief ? PreviewHelmetLv : helmetLv);
             if (vestPerm != null) vestPerm.gameObject.SetActive(vestLv >= 1);
             if (padL != null) { padL.gameObject.SetActive(vestLv >= 2); padR.gameObject.SetActive(vestLv >= 2); }
             if (vestTrim != null) vestTrim.gameObject.SetActive(vestLv >= 3);
+            VestModel(vestLv);
             if (batons[0] != null)
             {
                 foreach (Transform b in batons) b.gameObject.SetActive(false);
@@ -637,8 +792,9 @@ namespace SamediRouge
         public void SetGear(bool[] g)
         {
             bool smgOn = g.Length > 5 && g[5];
-            if (helmet != null) helmet.gameObject.SetActive(g[0]);
-            if (cap != null) cap.gameObject.SetActive(!g[0]);
+            bool hOn = g[0] || (PreviewHelmetLv > 0 && !gearThief && helmet != null && gearPreview);
+            if (helmet != null) helmet.gameObject.SetActive(hOn);
+            if (cap != null) cap.gameObject.SetActive(!hOn);
             if (gilet != null) gilet.gameObject.SetActive(g[1]);
             if (baton != null && batonTrail != null)
             {
