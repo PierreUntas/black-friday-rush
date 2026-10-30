@@ -469,7 +469,7 @@ namespace SamediRouge
             if (st != St.Menu) ToMenu();
             metaScreen = MetaScreen.Upgrades;
             menuFreeBottom = 1140f;
-            menuFill = 0.42f;   // cadrage sur la taille réelle : un peu de marge en haut et en bas
+            menuFill = 0.35f;   // cadrage sur la taille réelle : marge en haut (casque) et en bas
             menuDrop = 0f;
             menuFit = true;
             PreviewGear();
