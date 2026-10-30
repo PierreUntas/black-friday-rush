@@ -247,7 +247,7 @@ namespace SamediRouge
             rl.tip = rl.tipName != null ? Find(model, rl.tipName) : null;
             Vector3 k = rl.kind == 1 ? Vector3.one * headK : rl.kind == 2 ? new Vector3(wideK, tallK, wideK) : Vector3.one;
             // têtes des tenues du voleur : un peu plus grosses et plus en avant que celle du modèle de base
-            bool big = rl.kind == 1 && Name != null && Name.Contains("_niv");
+            bool big = rl.kind == 1 && Name != null && Name.StartsWith("voleur_niv");
             if (big) k *= 1.12f;
             rl.offset = big ? new Vector3(0f, 0f, 0.05f) : Vector3.zero;
             rl.proxy.localScale = Vector3.Scale(rl.baseScale, k);
