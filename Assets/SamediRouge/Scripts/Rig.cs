@@ -230,6 +230,7 @@ namespace SamediRouge
             }
             // passants : deux modèles (homme / femme) répartis selon la variante
             else if (Use3DEnemies && k == Kind.Shopper) r.skin3d = Skin3D.Attach(r, (variant & 1) == 0 ? "passant_1" : "passant_2");
+            if (k == Kind.Shopper && r.skin3d != null) r.skin3d.SetShadows(false);
             if (r.skin3d != null) ArmorModels(r, k == Kind.Guard);
             r.Tick(0f);
             return r;

@@ -97,6 +97,7 @@ namespace SamediRouge
             if (old != null) { old.gameObject.SetActive(false); Object.Destroy(old.gameObject); }
             foreach (Relay rl in relays) Bind(rl);
             SetVisible(visibleFlag);
+            SetShadows(shadowsOn);
             Apply();
             return true;
         }
@@ -140,7 +141,7 @@ namespace SamediRouge
             {
                 s.sharedMaterial = mat;
                 s.updateWhenOffscreen = true;
-                s.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                s.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;   // son ombre au sol : sans elle, le personnage semble flotter
             }
 
             hipsBind = body.InverseTransformPoint(hips.position);
@@ -259,6 +260,15 @@ namespace SamediRouge
         {
             foreach (Relay r in relays) if (r.code == code) return r.proxy;
             return code;
+        }
+
+        bool shadowsOn = true;
+        /// <summary>Ombre portée au sol (coupée pour la foule de passants, pour ménager le téléphone).</summary>
+        public void SetShadows(bool on)
+        {
+            shadowsOn = on;
+            foreach (SkinnedMeshRenderer s in skins)
+                if (s != null) s.shadowCastingMode = on ? UnityEngine.Rendering.ShadowCastingMode.On : UnityEngine.Rendering.ShadowCastingMode.Off;
         }
 
         public void SetVisible(bool v)
