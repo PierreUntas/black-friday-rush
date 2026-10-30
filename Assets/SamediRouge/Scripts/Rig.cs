@@ -702,7 +702,7 @@ namespace SamediRouge
                         Transform vm = vestModels[lv];
                         Vector3 f = lv == 3 ? new Vector3(1.25f, 1.45f, 1.6f) : new Vector3(1.4f, 1.15f, 1.5f), lp = vm.localPosition;
                         vm.localScale = Vector3.Scale(vm.localScale, f);
-                        vm.localPosition = new Vector3(lp.x * f.x, (lv == 3 ? -0.33f : -0.08f) + (lp.y + 0.04f) * f.y, lp.z * f.z + (lv == 3 ? 0.07f : 0f));
+                        vm.localPosition = new Vector3(lp.x * f.x, (lv == 3 ? -0.43f : -0.08f) + (lp.y + 0.04f) * f.y, lp.z * f.z + (lv == 3 ? 0.07f : 0f));
                     }
                 }
                 model = vestModels[lv];
