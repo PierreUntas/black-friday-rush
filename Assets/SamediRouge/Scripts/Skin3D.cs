@@ -15,7 +15,7 @@ namespace SamediRouge
         const float Height = 1.95f;
 
         class Pair { public Transform code, bone; public Quaternion bind, corr; }
-        class Relay { public Transform proxy, bone, code, tip; public string boneName, tipName; public int kind; public Vector3 baseScale, offset; }
+        class Relay { public Transform proxy, bone, code, tip; public string boneName, tipName; public int kind; public Vector3 baseScale, offset; public Quaternion rotOff; public bool needOff; }
         class Finger { public Transform bone; public Quaternion rest; public Vector3 axis; public bool right; public float angle; }
         readonly List<Finger> fingers = new List<Finger>();
 
@@ -24,6 +24,7 @@ namespace SamediRouge
         readonly List<Pair> pairs = new List<Pair>();
         readonly List<Relay> relays = new List<Relay>();
         readonly Vector3 codeHipsRest;
+        float soleRest = float.NaN, floor0;
         readonly Transform codeKnL, codeKnR;
         Transform hipsBone, footL, footR;
         Vector3 hipsBind;
@@ -241,6 +242,7 @@ namespace SamediRouge
         void Bind(Relay rl)
         {
             rl.bone = Find(model, rl.boneName);
+            rl.needOff = rl.tip != null || rl.tipName != null;
             rl.tip = rl.tipName != null ? Find(model, rl.tipName) : null;
             Vector3 k = rl.kind == 1 ? Vector3.one * headK : rl.kind == 2 ? new Vector3(wideK, tallK, wideK) : Vector3.one;
             // têtes des tenues du voleur : un peu plus grosses et plus en avant que celle du modèle de base
@@ -290,6 +292,10 @@ namespace SamediRouge
             {
                 float codeSole = Mathf.Min(body.InverseTransformPoint(codeKnL.TransformPoint(new Vector3(0f, -0.5f, 0f))).y,
                                            body.InverseTransformPoint(codeKnR.TransformPoint(new Vector3(0f, -0.5f, 0f))).y);
+                // la semelle du personnage en blocs n'est pas exactement au sol : on garde seulement ses variations
+                // (genoux pliés, accroupi) et on pose la semelle du modèle sur le sol réel au repos
+                if (float.IsNaN(soleRest)) { soleRest = codeSole; floor0 = body.InverseTransformPoint(rig.root.position).y; }
+                codeSole = codeSole - soleRest + floor0;
                 float modelSole = Mathf.Min(body.InverseTransformPoint(footL.position).y, body.InverseTransformPoint(footR.position).y) - footH;
                 hipsBone.position = body.TransformPoint(body.InverseTransformPoint(hipsBone.position) + new Vector3(0f, codeSole - modelSole, 0f));
             }
@@ -298,7 +304,9 @@ namespace SamediRouge
                 if (r.bone == null) continue;
                 // mains : l'objet tenu se place au creux de la paume (entre le poignet et la base des doigts), pas au poignet
                 r.proxy.position = r.tip != null ? Vector3.Lerp(r.bone.position, r.tip.position, 0.75f) : r.bone.position;
-                r.proxy.rotation = r.code.rotation;
+                // mains : l'arme suit l'orientation de la main du modèle (calée une fois sur celle du personnage en blocs)
+                if (r.needOff) { r.rotOff = Quaternion.Inverse(r.bone.rotation) * r.code.rotation; r.needOff = false; }
+                r.proxy.rotation = r.tipName != null ? r.bone.rotation * r.rotOff : r.code.rotation;
                 if (r.offset != Vector3.zero) r.proxy.position += r.proxy.TransformVector(r.offset);
             }
         }
