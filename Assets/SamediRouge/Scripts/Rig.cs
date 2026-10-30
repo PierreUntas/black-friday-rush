@@ -232,6 +232,14 @@ namespace SamediRouge
             else if (Use3DEnemies && k == Kind.Shopper) r.skin3d = Skin3D.Attach(r, (variant & 1) == 0 ? "passant_1" : "passant_2");
             if (k == Kind.Shopper && r.skin3d != null) r.skin3d.SetShadows(false);
             if (r.skin3d != null) ArmorModels(r, k == Kind.Guard);
+            // personnage 3D : la mitraillette se tient dans la main droite (comme le pistolet dans la gauche),
+            // et non plus devant la poitrine, où elle flottait quand les bras du modèle pendent
+            if (r.skin3d != null && r.smg != null && r.handR != null)
+            {
+                r.smg.SetParent(r.skin3d.RelayOf(r.handR), false);
+                r.smg.localPosition = Vector3.zero;
+                r.smg.localRotation = Quaternion.identity;
+            }
             r.Tick(0f);
             return r;
         }
