@@ -15,16 +15,21 @@ namespace SamediRouge
         const float Height = 1.95f;
 
         class Pair { public Transform code, bone; public Quaternion bind, corr; }
-        class Relay { public Transform proxy, bone, code, tip; public Vector3 offset; }
+        class Relay { public Transform proxy, bone, code, tip; public string boneName, tipName; public int kind; public Vector3 baseScale; }
 
-        readonly Transform body, codeHips, hipsBone;
+        readonly Rig rig;
+        readonly Transform body, codeHips, holder;
         readonly List<Pair> pairs = new List<Pair>();
         readonly List<Relay> relays = new List<Relay>();
-        readonly Vector3 hipsBind, codeHipsRest;
-        readonly Transform footL, footR, codeKnL, codeKnR;
-        readonly float footH;
-        readonly SkinnedMeshRenderer[] skins;
-        public readonly Transform model;
+        readonly Vector3 codeHipsRest;
+        readonly Transform codeKnL, codeKnR;
+        Transform hipsBone, footL, footR;
+        Vector3 hipsBind;
+        float footH, headK, wideK, tallK;
+        SkinnedMeshRenderer[] skins;
+        bool visibleFlag = true;
+        public Transform model;
+        public string Name { get; private set; }
 
         public static bool Available(string name) => Resources.Load<GameObject>("SamediRouge/Characters/" + name) != null;
 
@@ -45,42 +50,89 @@ namespace SamediRouge
 
         Skin3D(Rig r, GameObject prefab, string name)
         {
+            rig = r;
             body = r.body;
             codeHips = r.hips;
+            codeKnL = r.knL; codeKnR = r.knR;
+            codeHipsRest = codeHips.localPosition;
             // le modèle vit sous « body » : il suit déjà les bonds, roulades et écrasements du corps
-            var holder = new GameObject("skin3d").transform;
+            holder = new GameObject("skin3d").transform;
             holder.SetParent(body, false);
-            model = Object.Instantiate(prefab, holder, false).transform;
-            Quaternion q0 = model.localRotation;
-            Vector3 s0 = model.localScale;
-            model.localPosition = Vector3.zero;
-            foreach (Animator a in model.GetComponentsInChildren<Animator>(true)) Object.Destroy(a);
-            foreach (Animation a in model.GetComponentsInChildren<Animation>(true)) Object.Destroy(a);
+            Load(prefab, name);
 
-            Transform hips = Find(model, "Hips"), head = Find(model, "HeadTop_End") ?? Find(model, "Head");
-            Transform toe = Find(model, "LeftToe_End") ?? Find(model, "LeftFoot");
-            if (hips == null || head == null || toe == null) throw new System.Exception("squelette mixamorig introuvable");
+            // le corps dessiné en code disparaît (ses pièces directes) ; l'équipement reste et suit le modèle
+            var joints = new HashSet<Transform> { r.hips, r.spine, r.neck, r.shL, r.shR, r.elL, r.elR, r.hipL, r.hipR, r.knL, r.knR, r.handL, r.handR };
+            foreach (Transform j in joints)
+            {
+                if (j == null) continue;
+                for (int c = 0; c < j.childCount; c++)
+                {
+                    Transform t = j.GetChild(c);
+                    if (t.GetComponent<MeshRenderer>() != null) t.gameObject.SetActive(false);
+                }
+            }
+            if (r.cap != null) { r.cap.gameObject.SetActive(false); r.cap = null; }
+
+            jointSet = joints;
+            Relays(r.handR, "RightHand", "RightHandMiddle1", 0);
+            Relays(r.handL, "LeftHand", "LeftHandMiddle1", 0);
+            // tête et buste du modèle plus petits que ceux du personnage en blocs : l'équipement est réduit en proportion
+            Relays(r.neck, "Neck", null, 1);
+            Relays(r.spine, "Spine", null, 2);
+            Apply();
+        }
+
+        /// <summary>Remplace le modèle 3D (ex. le voleur avec sa tenue achetée) en gardant l'équipement et les relais.</summary>
+        public bool Swap(string name)
+        {
+            if (name == Name) return true;
+            GameObject prefab = Resources.Load<GameObject>("SamediRouge/Characters/" + name);
+            if (prefab == null) return false;
+            Transform old = model;
+            try { Load(prefab, name); }
+            catch (System.Exception e) { Debug.LogWarning("[Skin3D] " + e.Message); return false; }
+            if (old != null) { old.gameObject.SetActive(false); Object.Destroy(old.gameObject); }
+            foreach (Relay rl in relays) Bind(rl);
+            SetVisible(visibleFlag);
+            Apply();
+            return true;
+        }
+
+        void Load(GameObject prefab, string name)
+        {
+            Transform m = Object.Instantiate(prefab, holder, false).transform;
+            Quaternion q0 = m.localRotation;
+            Vector3 s0 = m.localScale;
+            m.localPosition = Vector3.zero;
+            foreach (Animator a in m.GetComponentsInChildren<Animator>(true)) Object.Destroy(a);
+            foreach (Animation a in m.GetComponentsInChildren<Animation>(true)) Object.Destroy(a);
+
+            Transform hips = Find(m, "Hips"), head = Find(m, "HeadTop_End") ?? Find(m, "Head");
+            Transform toe = Find(m, "LeftToe_End") ?? Find(m, "LeftFoot");
+            if (hips == null || head == null || toe == null) { Object.Destroy(m.gameObject); throw new System.Exception("squelette mixamorig introuvable"); }
+            model = m;
+            Name = name;
             hipsBone = hips;
 
             // face avant vers +Z, pieds au sol, taille du personnage du jeu
-            Transform la = Find(model, "LeftArm"), ra = Find(model, "RightArm");
+            Transform la = Find(m, "LeftArm"), ra = Find(m, "RightArm");
             if (la != null && ra != null && holder.InverseTransformPoint(la.position).x > holder.InverseTransformPoint(ra.position).x)
-                model.localRotation = Quaternion.Euler(0f, 180f, 0f) * q0;
+                m.localRotation = Quaternion.Euler(0f, 180f, 0f) * q0;
             float h = holder.InverseTransformPoint(head.position).y - holder.InverseTransformPoint(toe.position).y;
             float k = Height / Mathf.Max(0.01f, h);
-            model.localScale = s0 * k;
+            m.localScale = s0 * k;
             float foot = holder.InverseTransformPoint(toe.position).y;
             // les modèles Meshy ont le dessous des semelles à leur origine (y = 0), sous l'os de l'orteil
             // (semelles épaisses, rollers…) : c'est ce point qu'on pose au sol
-            float low = holder.InverseTransformPoint(model.position).y;
+            float low = holder.InverseTransformPoint(m.position).y;
             if (low < foot) foot = low;
             Vector3 mid = holder.InverseTransformPoint(hips.position);
-            model.localPosition = new Vector3(-mid.x, -foot, -mid.z);
+            m.localPosition = new Vector3(-mid.x, -foot, -mid.z);
 
             // texture du modèle (matériau du jeu, compatible URP)
             Texture2D tex = Resources.Load<Texture2D>("SamediRouge/Characters/" + name + "_tex");
             Material mat = tex != null ? Art.Tex(tex, Vector2.one, 0.35f) : Art.Mat(Color.white, 0.35f);
-            skins = model.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+            skins = m.GetComponentsInChildren<SkinnedMeshRenderer>(true);
             foreach (SkinnedMeshRenderer s in skins)
             {
                 s.sharedMaterial = mat;
@@ -89,12 +141,12 @@ namespace SamediRouge
             }
 
             hipsBind = body.InverseTransformPoint(hips.position);
-            footL = Find(model, "LeftFoot"); footR = Find(model, "RightFoot");
-            codeKnL = r.knL; codeKnR = r.knR;
+            footL = Find(m, "LeftFoot"); footR = Find(m, "RightFoot");
             if (footL != null) footH = body.InverseTransformPoint(footL.position).y;
-            codeHipsRest = codeHips.localPosition;
 
             // articulations du jeu → os du modèle (direction de repos des membres : vers le bas, un peu écartés)
+            pairs.Clear();
+            Rig r = rig;
             Map(r.hips, "Hips", null, Vector3.zero);
             Map(r.spine, "Spine", null, Vector3.zero);
             Map(r.neck, "Neck", null, Vector3.zero);
@@ -107,33 +159,13 @@ namespace SamediRouge
             Map(r.hipR, "RightUpLeg", "RightLeg", new Vector3(0.03f, -1f, 0f));
             Map(r.knR, "RightLeg", "RightFoot", new Vector3(0f, -1f, 0f));
 
-            // le corps dessiné en code disparaît (ses pièces directes) ; l'équipement reste et suit le modèle
-            var joints = new HashSet<Transform> { r.hips, r.spine, r.neck, r.shL, r.shR, r.elL, r.elR, r.hipL, r.hipR, r.knL, r.knR, r.handL, r.handR };
-            foreach (Transform j in joints)
-            {
-                if (j == null) continue;
-                for (int c = 0; c < j.childCount; c++)
-                {
-                    Transform t = j.GetChild(c);
-                    if (t.GetComponent<MeshRenderer>() != null) t.gameObject.SetActive(false);
-                }
-                // les limbes ont un nœud « joint » intermédiaire dont les pièces sont aussi le corps
-            }
-            if (r.cap != null) { r.cap.gameObject.SetActive(false); r.cap = null; }
-
-            jointSet = joints;
-            Relays(r.handR, Find(model, "RightHand"), true, Vector3.one, Find(model, "RightHandMiddle1"));
-            Relays(r.handL, Find(model, "LeftHand"), true, Vector3.one, Find(model, "LeftHandMiddle1"));
-            // tête et buste du modèle plus petits que ceux du personnage en blocs : l'équipement est réduit en proportion
-            Transform neckB = Find(model, "Neck"), spineB = Find(model, "Spine"), top = Find(model, "HeadTop_End");
-            Transform lArm = Find(model, "LeftArm"), rArm = Find(model, "RightArm");
+            // proportions de la tête et du buste, pour mettre l'équipement à l'échelle
+            Transform neckB = Find(m, "Neck"), spineB = Find(m, "Spine"), top = Find(m, "HeadTop_End");
+            Transform lArm = Find(m, "LeftArm"), rArm = Find(m, "RightArm");
             System.Func<Transform, Vector3> P = t => body.InverseTransformPoint(t.position);
-            float headK = neckB != null && top != null ? Mathf.Clamp((P(top).y - P(neckB).y) / 0.455f, 0.35f, 1.2f) : 0.6f;
-            float wideK = lArm != null && rArm != null ? Mathf.Clamp(Mathf.Abs(P(lArm).x - P(rArm).x) / 0.58f, 0.4f, 1.3f) : 0.8f;
-            float tallK = neckB != null && spineB != null ? Mathf.Clamp((P(neckB).y - P(spineB).y) / 0.5f, 0.4f, 1.3f) : 0.8f;
-            Relays(r.neck, neckB, false, Vector3.one * headK);
-            Relays(r.spine, spineB, false, new Vector3(wideK, tallK, wideK));
-            Apply();
+            headK = neckB != null && top != null ? Mathf.Clamp((P(top).y - P(neckB).y) / 0.455f, 0.35f, 1.2f) : 0.6f;
+            wideK = lArm != null && rArm != null ? Mathf.Clamp(Mathf.Abs(P(lArm).x - P(rArm).x) / 0.58f, 0.4f, 1.3f) : 0.8f;
+            tallK = neckB != null && spineB != null ? Mathf.Clamp((P(neckB).y - P(spineB).y) / 0.5f, 0.4f, 1.3f) : 0.8f;
         }
 
         void Map(Transform code, string bone, string child, Vector3 restDir)
@@ -151,23 +183,32 @@ namespace SamediRouge
         }
 
         /// <summary>Déplace l'équipement porté par une articulation sur un relais qui suit l'os du modèle.</summary>
-        void Relays(Transform code, Transform bone, bool keepAll, Vector3 k, Transform tip = null)
+        void Relays(Transform code, string boneName, string tipName, int kind)
         {
-            if (code == null || bone == null) return;
+            if (code == null || Find(model, boneName) == null) return;
             var proxy = new GameObject("relay_" + code.name).transform;
             proxy.SetParent(body, false);
-            proxy.localScale = Vector3.Scale(code.localScale, k);
             var move = new List<Transform>();
             for (int c = 0; c < code.childCount; c++)
             {
                 Transform t = code.GetChild(c);
-                if (!t.gameObject.activeSelf && t.GetComponent<MeshRenderer>() != null) continue;   // pièce du corps masquée
-                if (t.GetComponent<MeshRenderer>() != null) continue;
+                if (t.GetComponent<MeshRenderer>() != null) continue;   // pièce du corps (masquée)
                 if (t.name == "joint" || jointSet.Contains(t)) continue;
                 move.Add(t);
             }
             foreach (Transform t in move) t.SetParent(proxy, false);
-            relays.Add(new Relay { proxy = proxy, bone = bone, code = code, tip = tip, offset = Vector3.zero });
+            var rl = new Relay { proxy = proxy, code = code, boneName = boneName, tipName = tipName, kind = kind, baseScale = code.localScale };
+            Bind(rl);
+            relays.Add(rl);
+        }
+
+        /// <summary>Accroche un relais aux os du modèle courant (et le met à l'échelle de sa tête / son buste).</summary>
+        void Bind(Relay rl)
+        {
+            rl.bone = Find(model, rl.boneName);
+            rl.tip = rl.tipName != null ? Find(model, rl.tipName) : null;
+            Vector3 k = rl.kind == 1 ? Vector3.one * headK : rl.kind == 2 ? new Vector3(wideK, tallK, wideK) : Vector3.one;
+            rl.proxy.localScale = Vector3.Scale(rl.baseScale, k);
         }
 
         HashSet<Transform> jointSet;
@@ -181,6 +222,7 @@ namespace SamediRouge
 
         public void SetVisible(bool v)
         {
+            visibleFlag = v;
             foreach (SkinnedMeshRenderer s in skins) if (s != null) s.enabled = v;
         }
 
@@ -207,6 +249,7 @@ namespace SamediRouge
             }
             foreach (Relay r in relays)
             {
+                if (r.bone == null) continue;
                 // mains : l'objet tenu se place au creux de la paume (entre le poignet et la base des doigts), pas au poignet
                 r.proxy.position = r.tip != null ? Vector3.Lerp(r.bone.position, r.tip.position, 0.75f) : r.bone.position;
                 r.proxy.rotation = r.code.rotation;

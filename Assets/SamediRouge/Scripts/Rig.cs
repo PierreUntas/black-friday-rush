@@ -61,6 +61,8 @@ namespace SamediRouge
             "boss_voleur", "boss_flic"
         };
         Skin3D skin3d;
+        /// <summary>Héros 3D : nom de base du modèle ; « &lt;base&gt;_niv1..3 » = le même personnage portant sa tenue achetée.</summary>
+        string outfitBase;
         readonly TrailRenderer[] batonTrails = new TrailRenderer[3];
         readonly List<Transform> armor = new List<Transform>();
         readonly List<Transform> eyes = new List<Transform>(), whites = new List<Transform>();
@@ -207,7 +209,11 @@ namespace SamediRouge
             if (outline) Art.Outline(r.root, OutlineOverride != null ? 0.032f : k == Kind.Shopper ? 0.018f : 0.022f, OutlineOverride);
             r.renderers = r.root.GetComponentsInChildren<MeshRenderer>(true);
             // TEST : policier joué en personnage 3D complet (Meshy), animé par ce squelette
-            if (Use3DHero && (k == Kind.Guard || k == Kind.Thief) && variant < 0) r.skin3d = Skin3D.Attach(r, k == Kind.Thief ? "voleur" : "policier");
+            if (Use3DHero && (k == Kind.Guard || k == Kind.Thief) && variant < 0)
+            {
+                r.outfitBase = k == Kind.Thief ? "voleur" : "policier";
+                r.skin3d = Skin3D.Attach(r, r.outfitBase);
+            }
             // TEST : pillards adverses en 3D (un seul modèle partagé), ta bande de voleurs avec le modèle du héros
             else if (Use3DEnemies && k == Kind.Thief && variant >= 0) r.skin3d = Skin3D.Attach(r, variant == Crew ? "voleur" : "pillard");
             // policiers adverses et recrues du policier : modèle « flic » (uniforme marine)
@@ -689,7 +695,15 @@ namespace SamediRouge
         {
             if (spine == null) return;
             Transform model = null;
-            if (lv >= 1 && lv <= 3)
+            // héros 3D : un modèle complet par tenue (la tenue fait partie du personnage, elle suit ses mouvements)
+            bool outfit = false;
+            if (skin3d != null && outfitBase != null)
+            {
+                string want = lv >= 1 && lv <= 3 ? outfitBase + "_niv" + lv : outfitBase;
+                outfit = lv >= 1 && lv <= 3 && Skin3D.Available(want) && skin3d.Swap(want);
+                if (!outfit) skin3d.Swap(outfitBase);
+            }
+            if (lv >= 1 && lv <= 3 && !outfit)
             {
                 string name = (gearThief ? "gilet_voleur_niv" : "gilet_police_niv") + lv;
                 if (vestModels[lv] == null && GlbModel.Exists(name))
