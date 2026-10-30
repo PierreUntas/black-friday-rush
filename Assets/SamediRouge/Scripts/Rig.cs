@@ -62,6 +62,8 @@ namespace SamediRouge
         };
         Skin3D skin3d;
         /// <summary>Orientation de la mitraillette tenue à la main par un modèle 3D, par rapport au buste.</summary>
+        /// <summary>Position de la poignée de la mitraillette dans son propre repère (unités du personnage).</summary>
+        public static Vector3 SmgGrip = new Vector3(0f, -0.1f, -0.06f);
         public static Quaternion SmgTilt = Quaternion.Euler(40f, 0f, 0f);   // canon vers l'avant, un peu baissé (prêt à tirer)
         /// <summary>Héros 3D : nom de base du modèle ; « &lt;base&gt;_niv1..3 » = le même personnage portant sa tenue achetée.</summary>
         string outfitBase;
@@ -1358,7 +1360,12 @@ namespace SamediRouge
                 skin3d.Apply();
                 // mitraillette tenue dans la main du modèle 3D : canon toujours vers l'avant du buste,
                 // quelle que soit l'orientation de la main (bras ballants, modèles sans os de doigts…)
-                if (smg != null && smg.gameObject.activeInHierarchy && spine != null) smg.rotation = body.rotation * SmgTilt;
+                if (smg != null && smg.gameObject.activeInHierarchy && smg.parent != null)
+                {
+                    smg.rotation = body.rotation * SmgTilt;
+                    // la poignée (sous et derrière le centre de l'arme) vient dans la paume, pas le milieu de l'arme
+                    smg.localPosition = Quaternion.Inverse(smg.parent.rotation) * (smg.rotation * -SmgGrip);
+                }
             }
         }
 

@@ -254,8 +254,9 @@ namespace SamediRouge
             bool big = rl.kind == 1 && Name != null && Name.StartsWith("voleur_niv");
             if (big) k *= 1.12f;
             // tenues du policier : tête plus petite que celle du modèle de base, casque réduit
-            if (rl.kind == 1 && Name != null && Name.StartsWith("policier_niv")) k *= 0.88f;
-            rl.offset = big ? new Vector3(0f, 0f, 0.05f) : Vector3.zero;
+            bool cop = rl.kind == 1 && Name != null && Name.StartsWith("policier_niv");
+            if (cop) k *= 0.94f;
+            rl.offset = big ? new Vector3(0f, 0f, 0.05f) : cop ? new Vector3(0f, -0.03f, 0.02f) : Vector3.zero;
             rl.proxy.localScale = Vector3.Scale(rl.baseScale, k);
         }
 
