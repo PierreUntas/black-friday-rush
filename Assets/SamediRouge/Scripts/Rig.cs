@@ -49,6 +49,9 @@ namespace SamediRouge
         TrailRenderer heavyTrail;
         /// <summary>Matraque renforcée (map 2) : coups plus amples et plus lourds.</summary>
         public bool heavy;
+        /// <summary>TEST : remplace le corps du policier joué par le modèle 3D Resources/SamediRouge/Characters/policier.</summary>
+        public static bool Use3DHero = true;
+        Skin3D skin3d;
         readonly TrailRenderer[] batonTrails = new TrailRenderer[3];
         readonly List<Transform> armor = new List<Transform>();
         readonly List<Transform> eyes = new List<Transform>(), whites = new List<Transform>();
@@ -194,6 +197,8 @@ namespace SamediRouge
             r.skin = r.root.GetComponentsInChildren<MeshRenderer>(true);
             if (outline) Art.Outline(r.root, OutlineOverride != null ? 0.032f : k == Kind.Shopper ? 0.018f : 0.022f, OutlineOverride);
             r.renderers = r.root.GetComponentsInChildren<MeshRenderer>(true);
+            // TEST : policier joué en personnage 3D complet (Meshy), animé par ce squelette
+            if (Use3DHero && k == Kind.Guard && variant < 0) r.skin3d = Skin3D.Attach(r, "policier");
             r.Tick(0f);
             return r;
         }
@@ -530,7 +535,7 @@ namespace SamediRouge
         // ------------------------------------------------------------------ équipement en 3D (modèles Meshy)
         bool gearThief;
         /// <summary>TEST TEMPORAIRE : force ce niveau de casque 3D sur le policier joueur (0 = désactivé).</summary>
-        const int PreviewHelmetLv = 2;
+        const int PreviewHelmetLv = 0;
         bool gearPreview;
         readonly Transform[] helmetModels = new Transform[4];
 
@@ -572,7 +577,9 @@ namespace SamediRouge
         /// </summary>
         static void HelmetFit(Transform m, bool thief, int lv)
         {
-            if (!thief && lv == 1) Fit(m, 0.40f, 0, new Vector3(0f, 0.40f, -0.01f), 0f, 0f);
+            // policier (corps 3D) : casquette enfoncée sur les cheveux, casques remontés pour dégager les yeux
+            if (!thief && lv == 1) Fit(m, 0.37f, 0, new Vector3(0f, 0.31f, -0.01f), 0f, 0f);
+            else if (!thief) Fit(m, 0.39f, 0, new Vector3(0f, lv == 2 ? 0.25f : 0.23f, -0.01f), 0f, 0f);
             else if (thief && lv == 1) Fit(m, 0.36f, 0, new Vector3(0f, 0.27f, 0f), 0f, 180f);
             else if (thief && lv == 2) Fit(m, 0.34f, 0, new Vector3(0f, 0.34f, 0.09f), -25f, 0f);
             else Fit(m, 0.44f, 0, new Vector3(0f, 0.21f, 0f), 0f, 0f);
@@ -637,8 +644,8 @@ namespace SamediRouge
             {
                 if (first) { b = f.sharedMesh.bounds; first = false; } else b.Encapsulate(f.sharedMesh.bounds);
             }
-            float k = 0.68f / Mathf.Max(0.001f, b.size.x);
-            float kz = k * Mathf.Clamp(0.42f / Mathf.Max(0.001f, b.size.z * k), 0.8f, 1.8f);
+            float k = 0.74f / Mathf.Max(0.001f, b.size.x);
+            float kz = k * Mathf.Clamp(0.5f / Mathf.Max(0.001f, b.size.z * k), 0.8f, 1.9f);
             m.localRotation = Quaternion.identity;
             m.localScale = new Vector3(k, k, kz);
             m.localPosition = new Vector3(-b.center.x * k, -0.04f - b.min.y * k, -b.center.z * kz);
@@ -654,7 +661,7 @@ namespace SamediRouge
                 string name = (gearThief ? "gilet_voleur_niv" : "gilet_police_niv") + lv;
                 if (vestModels[lv] == null && GlbModel.Exists(name))
                 {
-                    vestModels[lv] = GlbModel.Spawn(name, spine);
+                    vestModels[lv] = GlbModel.Spawn(name, skin3d != null ? skin3d.RelayOf(spine) : spine);
                     FitTorso(vestModels[lv]);
                 }
                 model = vestModels[lv];
@@ -665,7 +672,7 @@ namespace SamediRouge
             for (int c = 0; c < spine.childCount; c++)
             {
                 Transform t = spine.GetChild(c);
-                if (t.name == "Cube" || t.name == "Sphere" || t.name == "Capsule" || t.name == "Cylinder") t.gameObject.SetActive(model == null);
+                if (t.name == "Cube" || t.name == "Sphere" || t.name == "Capsule" || t.name == "Cylinder") t.gameObject.SetActive(model == null && skin3d == null);
             }
             if (model == null) return;
             if (vestPerm != null) vestPerm.gameObject.SetActive(false);
@@ -1235,9 +1242,16 @@ namespace SamediRouge
             if (v == visible || renderers == null) return;
             visible = v;
             foreach (MeshRenderer mr in renderers) if (mr != null) mr.enabled = v;
+            if (skin3d != null) skin3d.SetVisible(v);
         }
 
         public void Tick(float dt)
+        {
+            TickCore(dt);
+            if (skin3d != null) skin3d.Apply();
+        }
+
+        void TickCore(float dt)
         {
             t += dt;
             if (shieldPunch > 0f && permShields != null)
