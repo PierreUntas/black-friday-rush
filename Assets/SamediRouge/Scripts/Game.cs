@@ -2523,6 +2523,8 @@ namespace SamediRouge
         /// <summary>Rayonnage renversé en travers du couloir, marchandise éparpillée (à sauter).</summary>
         void ToppledShelf(Transform t)
         {
+            // rayon renversé 3D (télé fêlée tournée vers le joueur), en travers du couloir
+            if (ObstacleModel(t, "obs_rayon", 2.3f, Vector3.zero, 180f + Random.Range(-8f, 8f))) return;
             Material metal = Art.Mat(new Color(0.62f, 0.64f, 0.68f), 0.7f, 0.6f);
             Material red = Art.Mat(new Color(0.8f, 0.15f, 0.15f), 0.4f);
             Transform s = Art.Node(t, "shelf", new Vector3(0f, 0.32f, 0f));
