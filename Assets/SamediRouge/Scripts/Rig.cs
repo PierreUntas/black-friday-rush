@@ -219,7 +219,7 @@ namespace SamediRouge
                 r.skin3d = Skin3D.Attach(r, r.outfitBase);
             }
             // TEST : pillards adverses en 3D (un seul modèle partagé), ta bande de voleurs avec le modèle du héros
-            else if (Use3DEnemies && k == Kind.Thief && variant >= 0) r.skin3d = Skin3D.Attach(r, variant == Crew ? "voleur" : "pillard");
+            else if (Use3DEnemies && k == Kind.Thief && variant >= 0) r.skin3d = Skin3D.Attach(r, variant == Crew ? (Skin3D.Available("voleur_lo") ? "voleur_lo" : "voleur") : "pillard");
             // policiers adverses et recrues du policier : modèle « flic » (uniforme marine)
             else if (Use3DEnemies && k == Kind.Guard && variant >= 0) r.skin3d = Skin3D.Attach(r, "flic");
             // boss : un modèle costaud par camp (tenues 6-11 et 13 = boss policiers, les autres = boss voleurs)
@@ -234,7 +234,8 @@ namespace SamediRouge
             }
             // passants : deux modèles (homme / femme) répartis selon la variante
             else if (Use3DEnemies && k == Kind.Shopper) r.skin3d = Skin3D.Attach(r, (variant & 1) == 0 ? "passant_1" : "passant_2");
-            if (k == Kind.Shopper && r.skin3d != null) r.skin3d.SetShadows(false);
+            // seuls le héros et le boss gardent ombre portée et boîte englobante recalculée
+            if (r.skin3d != null && k != Kind.Boss && !(variant < 0 && (k == Kind.Guard || k == Kind.Thief))) r.skin3d.SetSecondary();
             if (r.skin3d != null) ArmorModels(r, k == Kind.Guard);
             // personnage 3D : la mitraillette se tient dans la main droite (comme le pistolet dans la gauche),
             // et non plus devant la poitrine, où elle flottait quand les bras du modèle pendent
@@ -1355,7 +1356,7 @@ namespace SamediRouge
         public void Tick(float dt)
         {
             TickCore(dt);
-            if (skin3d != null)
+            if (skin3d != null && !skin3d.Hidden)
             {
                 skin3d.Apply();
                 // mitraillette tenue dans la main du modèle 3D : canon toujours vers l'avant du buste,

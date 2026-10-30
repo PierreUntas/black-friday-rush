@@ -93,9 +93,17 @@ namespace SamediRouge
         float devCmdT = -1f;
 
         /// <summary>Outil de dev (éditeur) : exécute la commande de Logs/sr-screen.txt un peu après le démarrage.</summary>
+        float devTrisAt = -1f;
+
         void DevTick(float udt)
         {
+#if UNITY_EDITOR
+            if (devTrisAt > 0f && Time.realtimeSinceStartup > devTrisAt) { devTrisAt = Time.realtimeSinceStartup + 6f; DevTris(); }
+#endif
             if (devCmdT < 0f) return;
+#if UNITY_EDITOR
+            if (devCmd.Contains("tris")) devTrisAt = Time.realtimeSinceStartup + 5f;
+#endif
             devCmdT = -1f; // une seule fois, à la première image
             hud.HideTitleNow();
             if (devCmd.Contains("thief")) OnFaction(true);
@@ -109,6 +117,33 @@ namespace SamediRouge
             var sm = System.Text.RegularExpressions.Regex.Match(devCmd, @"street\s+(\d+)");
             if (sm.Success) StartStreet(int.Parse(sm.Groups[1].Value));
         }
+
+#if UNITY_EDITOR
+        /// <summary>Outil de dev : triangles visibles regroupés par objet, dans Logs/sr-tris.txt.</summary>
+        void DevTris()
+        {
+            var sum = new System.Collections.Generic.Dictionary<string, int>();
+            var cnt = new System.Collections.Generic.Dictionary<string, int>();
+            int total = 0;
+            foreach (Renderer r in Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None))
+            {
+                if (!r.enabled || !r.isVisible) continue;
+                Mesh m = r is SkinnedMeshRenderer sk ? sk.sharedMesh : r.GetComponent<MeshFilter>() != null ? r.GetComponent<MeshFilter>().sharedMesh : null;
+                if (m == null) continue;
+                int t = 0;
+                for (int i = 0; i < m.subMeshCount; i++) t += (int)m.GetIndexCount(i) / 3;
+                string key = (r is SkinnedMeshRenderer ? "skin:" : "") + m.name;
+                sum[key] = (sum.TryGetValue(key, out int a) ? a : 0) + t;
+                cnt[key] = (cnt.TryGetValue(key, out int c) ? c : 0) + 1;
+                total += t;
+            }
+            var keys = new System.Collections.Generic.List<string>(sum.Keys);
+            keys.Sort((x, y) => sum[y].CompareTo(sum[x]));
+            var sb = new System.Text.StringBuilder("total " + total + "\n");
+            for (int i = 0; i < keys.Count && i < 40; i++) sb.Append(sum[keys[i]] + "\t" + cnt[keys[i]] + "x\t" + keys[i] + "\n");
+            try { System.IO.File.WriteAllText(System.IO.Path.Combine(Application.dataPath, "../Logs/sr-tris.txt"), sb.ToString()); } catch (System.Exception) { }
+        }
+#endif
 
         void StartStreet(int i)
         {

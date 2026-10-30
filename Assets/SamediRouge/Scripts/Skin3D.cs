@@ -269,6 +269,31 @@ namespace SamediRouge
             return code;
         }
 
+        /// <summary>
+        /// Personnage secondaire (ennemi, passant, coéquipier) : pas d'ombre portée et pas de recalcul de la boîte
+        /// englobante à chaque image (seuls le héros et le boss gardent ces réglages coûteux).
+        /// </summary>
+        bool secondary;
+
+        /// <summary>Personnage secondaire hors de l'écran : inutile de recopier sa pose (économise le processeur).</summary>
+        public bool Hidden
+        {
+            get
+            {
+                if (!secondary) return false;
+                foreach (SkinnedMeshRenderer s in skins) if (s != null && s.isVisible) return false;
+                return true;
+            }
+        }
+
+        public void SetSecondary()
+        {
+            secondary = true;
+            SetShadows(false);
+            foreach (SkinnedMeshRenderer s in skins)
+                if (s != null) { s.updateWhenOffscreen = false; s.localBounds = new Bounds(new Vector3(0f, 1f, 0f), new Vector3(3f, 3f, 3f)); }
+        }
+
         bool shadowsOn = true;
         /// <summary>Ombre portée au sol (coupée pour la foule de passants, pour ménager le téléphone).</summary>
         public void SetShadows(bool on)

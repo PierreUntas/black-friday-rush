@@ -212,7 +212,7 @@ namespace SamediRouge
             }
 
             // vie du centre commercial : promeneurs à l'étage, lèche-vitrines au rez-de-chaussée
-            int nUp = Random.Range(1, 4);
+            int nUp = Random.Range(0, 3);   // promeneurs de l'étage : peu nombreux (chaque personnage coûte au téléphone)
             for (int i = 0; i < nUp; i++)
             {
                 int s = Random.value < 0.5f ? -1 : 1;

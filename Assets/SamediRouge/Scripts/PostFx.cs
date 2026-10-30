@@ -26,6 +26,7 @@ namespace SamediRouge
             pulse = 0f;
 #if SR_URP
             if (GraphicsSettings.currentRenderPipeline == null) return;
+            MobileQuality();
             UniversalAdditionalCameraData data = cam.GetUniversalAdditionalCameraData();
             data.renderPostProcessing = true;
             data.antialiasing = UnityEngine.Rendering.Universal.AntialiasingMode.FastApproximateAntialiasing;
@@ -35,6 +36,10 @@ namespace SamediRouge
             bloom.intensity.Override(0.55f);
             bloom.threshold.Override(1.05f);
             bloom.scatter.Override(0.72f);
+            // bloom allégé : départ au quart de la résolution, moins de passes
+            bloom.highQualityFiltering.Override(false);
+            bloom.downscale.Override(BloomDownscaleMode.Quarter);
+            bloom.maxIterations.Override(4);
             Tonemapping tone = profile.Add<Tonemapping>(true);
             tone.mode.Override(UnityEngine.Rendering.Universal.TonemappingMode.Neutral);
             ColorAdjustments adj = profile.Add<ColorAdjustments>(true);
@@ -59,6 +64,26 @@ namespace SamediRouge
             Active = true;
 #endif
         }
+
+#if SR_URP
+        /// <summary>
+        /// Réglages de rendu pour téléphone (pas dans l'éditeur, où l'asset modifié serait sauvegardé) :
+        /// résolution de rendu réduite, pas de MSAA (le FXAA de la caméra suffit), ombres plus courtes et plus légères,
+        /// peu de lumières ponctuelles par objet.
+        /// </summary>
+        static void MobileQuality()
+        {
+#if !UNITY_EDITOR
+            var urp = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
+            if (urp == null) return;
+            urp.renderScale = 0.8f;
+            urp.msaaSampleCount = 1;
+            urp.shadowDistance = 30f;
+            urp.mainLightShadowmapResolution = 1024;
+            urp.maxAdditionalLightsCount = 2;
+#endif
+        }
+#endif
 
         public static void Hit(float k) { pulse = Mathf.Max(pulse, k); }
 

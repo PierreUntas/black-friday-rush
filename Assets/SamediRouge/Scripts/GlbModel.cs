@@ -18,6 +18,13 @@ namespace SamediRouge
 
         public static bool Exists(string name) => Load(name) != null;
 
+        /// <summary>Lit et prépare tous les modèles d'avance (pendant l'écran titre) : plus d'à-coups en pleine course.</summary>
+        public static void PreloadAll()
+        {
+            foreach (TextAsset ta in Resources.LoadAll<TextAsset>("SamediRouge/Models"))
+                if (ta != null) Load(ta.name);
+        }
+
         /// <summary>Instancie le modèle sous parent (null si le fichier manque ou est illisible).</summary>
         /// <summary>Comme Spawn, mais le modèle brille de sa propre couleur (pièces, objets à repérer de loin).</summary>
         public static Transform SpawnGlow(string name, Transform parent, float glow)
@@ -149,7 +156,10 @@ namespace SamediRouge
             var data = new byte[v.byteLength];
             Buffer.BlockCopy(b, bin + v.byteOffset, data, 0, v.byteLength);
             var tex = new Texture2D(2, 2, TextureFormat.RGBA32, true) { name = name, wrapMode = TextureWrapMode.Clamp };
-            if (!tex.LoadImage(data, true)) return null;
+            if (!tex.LoadImage(data, false)) return null;
+            // compressée (ETC2 / ASTC selon le téléphone) puis libérée côté processeur : ~8 fois moins de mémoire vidéo
+            try { tex.Compress(false); } catch (Exception) { }
+            tex.Apply(false, true);
             return tex;
         }
 

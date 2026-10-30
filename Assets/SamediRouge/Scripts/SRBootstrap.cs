@@ -41,6 +41,7 @@ namespace SamediRouge
 #endif
             if (Loc.Fr) Debug.Log("Samedi Rouge: FR"); // langue lue ici une fois (PlayerPrefs interdit dans les constructeurs)
             Art.Init(litMaterial, emissiveMaterial, particleMaterial);
+            GlbModel.PreloadAll();
             var game = new GameObject("Game").AddComponent<Game>();
             game.transform.SetParent(transform, false);
         }
