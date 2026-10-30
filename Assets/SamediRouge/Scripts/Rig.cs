@@ -53,6 +53,13 @@ namespace SamediRouge
         public static bool Use3DHero = true;
         /// <summary>TEST : pillards (et bande du voleur) en personnages 3D.</summary>
         public static bool Use3DEnemies = true;
+        /// <summary>Modèle 3D propre à chaque tenue de boss (Resources/SamediRouge/Characters/…), dans l'ordre des tenues.</summary>
+        static readonly string[] BossModels =
+        {
+            "boss_voleur", "boss_brute", "boss_chef_bande", "boss_pere_noel", "boss_roller", "boss_ours",
+            "boss_chef_securite", "boss_videur", "boss_flic", "boss_directeur", "boss_gyropode", "boss_chien",
+            "boss_voleur", "boss_flic"
+        };
         Skin3D skin3d;
         readonly TrailRenderer[] batonTrails = new TrailRenderer[3];
         readonly List<Transform> armor = new List<Transform>();
@@ -210,7 +217,10 @@ namespace SamediRouge
             {
                 int look = variant >= BossLook ? variant - BossLook : -1;
                 bool copBoss = look >= 6 && look != 12;
-                r.skin3d = Skin3D.Attach(r, copBoss ? "boss_flic" : "boss_voleur");
+                // modèle propre au boss s'il existe (boss_brute, boss_pere_noel…), sinon le modèle costaud de son camp
+                string own = look >= 0 && look < BossModels.Length ? BossModels[look] : null;
+                if (own != null && Skin3D.Available(own)) r.skin3d = Skin3D.Attach(r, own);
+                else r.skin3d = Skin3D.Attach(r, copBoss ? "boss_flic" : "boss_voleur");
             }
             // passants : deux modèles (homme / femme) répartis selon la variante
             else if (Use3DEnemies && k == Kind.Shopper) r.skin3d = Skin3D.Attach(r, (variant & 1) == 0 ? "passant_1" : "passant_2");
