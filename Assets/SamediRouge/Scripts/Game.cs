@@ -676,7 +676,7 @@ namespace SamediRouge
             foreach (Vector2 tap in inp.taps)
             {
                 if (hud.Click(tap)) continue;
-                if (st == St.Play) Swing();
+                if (st == St.Play && !Tuning.Arcade) Swing();
             }
             if (inp.keyPause)
             {
@@ -685,7 +685,7 @@ namespace SamediRouge
             }
             if (inp.keyStart && st == St.Menu && metaScreen == MetaScreen.Map) hud.onPlayStreet?.Invoke();
             if (st != St.Play) return;
-            if (inp.keySwing) Swing();
+            if (inp.keySwing && !Tuning.Arcade) Swing();
             if (inp.taps.Count > 0 || inp.keySwing) actSwing = true;
             if (inputDebug)
             {
@@ -696,6 +696,7 @@ namespace SamediRouge
             foreach (int s in inp.swipes)
             {
                 hintT = 0f;
+                if (Tuning.Arcade && (s == InputCtl.Up || s == InputCtl.Down)) continue;   // arcade : un seul geste, gauche / droite
                 if (s == InputCtl.Left || s == InputCtl.Right) actLane = true;
                 else if (s == InputCtl.Up) actJump = true;
                 else actSlide = true;
@@ -840,7 +841,7 @@ namespace SamediRouge
                     hud.Float(new Vector3(px, 2.8f, pz + 2f), L("RANK: ", "GRADE : ") + ranks[Mathf.Min(m, ranks.Length - 1)], thief ? Hud.ThiefRed : Hud.GuardBlue, true);
                 }
             }
-            if (!demo && !tutorialMode) UpdateTips();
+            if (!demo && !tutorialMode && !Tuning.Arcade) UpdateTips();
             if (demo)
             {
                 demoT += Time.unscaledDeltaTime;
@@ -1330,6 +1331,7 @@ namespace SamediRouge
 
         void ShowTip(int id, int kind, string title, string sub, Ent target, bool slow)
         {
+            if (Tuning.Arcade && !tutorialMode) return;   // arcade : pas de bulles d'explication, le jeu se comprend en jouant
             tip = id;
             tipShownT = 0f;
             tipEnt = target;
@@ -1528,6 +1530,7 @@ namespace SamediRouge
                     // armé de l'attaque : on voit venir le coup
                     bossWind = 0f;
                     bossMove = BossMove();
+                    if (Tuning.Arcade && bossMove == 1) bossMove = 3;   // onde de choc (à sauter) remplacée par deux caisses
                     bossTargetLane = lane;
                     bossThrow = bossMove == 0 || bossMove == 3;
                     switch (bossMove)
@@ -1923,7 +1926,8 @@ namespace SamediRouge
         /// <summary>La mitraillette tire toute seule sur l'adversaire le plus proche devant toi.</summary>
         void UpdateSmg(float dt)
         {
-            if (!gear[GSmg]) return;
+            if (Tuning.Arcade) AutoMelee();
+            if (!gear[GSmg] && !Tuning.Arcade) return;
             smgT -= dt;
             if (smgT > 0f) return;
             Ent best = null;
@@ -1932,7 +1936,7 @@ namespace SamediRouge
             {
                 if (e.hit || e.dead) continue;
                 if (e.type != ET.Casseur && e.type != ET.Loup) continue;
-                if (Mathf.Abs(e.x - px) > 1.7f) continue;
+                if (Mathf.Abs(e.x - px) > 1.7f && e.type != ET.Loup) continue;   // le boss est visé où qu'il soit
                 float d = e.z - pz;
                 if (d < 1.5f || d > 30f) continue;
                 bool taken = false;
@@ -1941,8 +1945,26 @@ namespace SamediRouge
                 if (d < bd) { bd = d; best = e; }
             }
             if (best == null) return;
-            smgT = 0.11f;
-            Shoot(best, true);
+            // cadence : mitraillette en rafale, pistolet régulier, à mains nues un lancer plus lent
+            smgT = gear[GSmg] ? 0.11f : gear[GPistol] ? Tuning.AutoPistolRate : Tuning.AutoBareRate;
+            Shoot(best, gear[GSmg]);
+        }
+
+        /// <summary>Arcade : dès qu'un adversaire arrive à portée de bras dans le couloir, le coup part tout seul.</summary>
+        void AutoMelee()
+        {
+            if (swingCd > 0f || pendings.Count > 0) return;
+            float reach = Heavy ? 6.3f : gear[GBaton] ? 5.8f : 3.4f;
+            foreach (Ent e in ents)
+            {
+                if (e.hit || e.dead) continue;
+                if (e.type != ET.Casseur && e.type != ET.Loup) continue;
+                if (Mathf.Abs(e.x - px) > 1.4f) continue;
+                float d = e.z - pz;
+                if (d < -0.8f || d > reach * 0.8f) continue;
+                Swing();
+                return;
+            }
         }
 
         float ComboMult() => 1f + Mathf.Min(4, combo / 3) * 0.5f;
@@ -2340,7 +2362,7 @@ namespace SamediRouge
             if (r < 0.1f && (!campaign || Allowed(Tuning.IntroBarriers) || Random.value < 0.4f))
             {
                 ET t = Random.value < 0.55f ? ET.Barricade : ET.Banderole;
-                for (int l = 0; l < 3; l++) Spawn(t, l, z);
+                for (int l = 0; l < 3; l++) if (!Tuning.Arcade || l != lanes[0]) Spawn(t, l, z);
                 if (t == ET.Barricade)
                     for (int i = 0; i < 3; i++) Spawn(ET.Piece, lanes[0], z + (i - 1) * 1.4f).y = 1.6f - Mathf.Abs(i - 1) * 0.4f;
                 return 11f;
@@ -2606,7 +2628,7 @@ namespace SamediRouge
                 case Balance.Kind.Barrier:
                 {
                     ET t = ObsType(g.obs == Balance.Obs.Sign ? Balance.Obs.Sign : Balance.Obs.Carts);
-                    for (int l = 0; l < 3; l++) Spawn(t, l, z);
+                    for (int l = 0; l < 3; l++) if (!Tuning.Arcade || l != lanes[0]) Spawn(t, l, z);
                     if (t == ET.Barricade)
                         for (int i = 0; i < 3; i++) Spawn(ET.Piece, lanes[0], z + (i - 1) * 1.4f).y = 1.6f - Mathf.Abs(i - 1) * 0.4f;
                     break;

@@ -72,7 +72,7 @@ namespace SamediRouge
             LoadBalance();
             Balance.PrecomputeAsync(Mathf.Max(0, Progress.NextStreet(Progress.Thief)));
             thief = Progress.Thief;
-            if (!Progress.TutorialDone) StartTutorial(0);
+            if (!Progress.TutorialDone && !Tuning.Arcade) StartTutorial(0);   // arcade : pas de tutoriel, le jeu se comprend seul
             else
             {
                 ToMenu();

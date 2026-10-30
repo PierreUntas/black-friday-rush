@@ -8,6 +8,14 @@ namespace SamediRouge
     /// </summary>
     public static class Tuning
     {
+        /// <summary>
+        /// Mode « arcade » (retours de l'éditeur YSO) : tir automatique dès le départ, coups de près automatiques,
+        /// un seul geste (glisser à gauche / à droite), plus de saut ni de glissade, moins de texte.
+        /// </summary>
+        public const bool Arcade = true;
+        /// <summary>Arcade : délai entre deux tirs automatiques (s) avec le pistolet, et à mains nues.</summary>
+        public const float AutoPistolRate = 0.28f, AutoBareRate = 0.45f;
+
         // ------------------------------------------------------------------ maps (quartiers)
 
         /// <summary>
