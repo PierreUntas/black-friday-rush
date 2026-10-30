@@ -15,7 +15,7 @@ namespace SamediRouge
         const float Height = 1.95f;
 
         class Pair { public Transform code, bone; public Quaternion bind, corr; }
-        class Relay { public Transform proxy, bone, code, tip; public string boneName, tipName; public int kind; public Vector3 baseScale, offset; public Quaternion rotOff; public bool needOff; }
+        class Relay { public Transform proxy, bone, code, tip, fore; public string boneName, tipName; public int kind; public Vector3 baseScale, offset; public Quaternion rotOff; public bool needOff; }
         class Finger { public Transform bone; public Quaternion rest; public Vector3 axis; public bool right; public float angle; }
         readonly List<Finger> fingers = new List<Finger>();
 
@@ -217,8 +217,10 @@ namespace SamediRouge
                       pk = Find(m, side + "HandPinky1"), th = Find(m, side + "HandThumb2");
             if (hand == null || idx == null || mid == null || pk == null) return;
             Vector3 n = Vector3.Cross(idx.position - pk.position, mid.position - hand.position).normalized;
-            // le pouce part du côté de la paume : il donne le sens de la normale
-            if (th != null && Vector3.Dot(th.position - hand.position, n) < 0f) n = -n;
+            // pose en A : les paumes regardent les cuisses, donc le bassin donne le côté de la paume
+            Transform hp = Find(m, "Hips");
+            if (hp != null) { if (Vector3.Dot(hp.position - hand.position, n) < 0f) n = -n; }
+            else if (th != null && Vector3.Dot(th.position - hand.position, n) < 0f) n = -n;
             foreach (string f in new[] { "Index", "Middle", "Ring", "Pinky", "Thumb" })
                 for (int i = 1; i <= 3; i++)
                 {
@@ -228,7 +230,7 @@ namespace SamediRouge
                     Vector3 ax = Vector3.Cross(dir, n);
                     if (ax.sqrMagnitude < 1e-6f) continue;
                     fingers.Add(new Finger { bone = b, rest = b.localRotation, axis = Quaternion.Inverse(b.rotation) * ax.normalized, right = right,
-                                             angle = f == "Thumb" ? 25f : i == 1 ? 70f : 80f });
+                                             angle = f == "Thumb" ? 30f : i == 1 ? 75f : 90f });
                 }
         }
 
@@ -245,10 +247,14 @@ namespace SamediRouge
             rl.bone = Find(model, rl.boneName);
             rl.needOff = rl.tip != null || rl.tipName != null;
             rl.tip = rl.tipName != null ? Find(model, rl.tipName) : null;
+            // modèle sans os de doigts : la paume est estimée dans le prolongement de l'avant-bras
+            rl.fore = rl.tipName != null && rl.tip == null ? Find(model, rl.boneName.Replace("Hand", "ForeArm")) : null;
             Vector3 k = rl.kind == 1 ? Vector3.one * headK : rl.kind == 2 ? new Vector3(wideK, tallK, wideK) : Vector3.one;
             // têtes des tenues du voleur : un peu plus grosses et plus en avant que celle du modèle de base
             bool big = rl.kind == 1 && Name != null && Name.StartsWith("voleur_niv");
             if (big) k *= 1.12f;
+            // tenues du policier : tête plus petite que celle du modèle de base, casque réduit
+            if (rl.kind == 1 && Name != null && Name.StartsWith("policier_niv")) k *= 0.88f;
             rl.offset = big ? new Vector3(0f, 0f, 0.05f) : Vector3.zero;
             rl.proxy.localScale = Vector3.Scale(rl.baseScale, k);
         }
@@ -313,7 +319,9 @@ namespace SamediRouge
             {
                 if (r.bone == null) continue;
                 // mains : l'objet tenu se place au creux de la paume (entre le poignet et la base des doigts), pas au poignet
-                r.proxy.position = r.tip != null ? Vector3.Lerp(r.bone.position, r.tip.position, 0.75f) : r.bone.position;
+                r.proxy.position = r.tip != null ? Vector3.Lerp(r.bone.position, r.tip.position, 0.75f)
+                                 : r.fore != null ? r.bone.position + (r.bone.position - r.fore.position) * 0.18f
+                                 : r.bone.position;
                 // mains : l'arme suit l'orientation de la main du modèle (calée une fois sur celle du personnage en blocs)
                 if (r.needOff) { r.rotOff = Quaternion.Inverse(r.bone.rotation) * r.code.rotation; r.needOff = false; }
                 r.proxy.rotation = r.tipName != null ? r.bone.rotation * r.rotOff : r.code.rotation;
