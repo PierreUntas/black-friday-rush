@@ -15,7 +15,9 @@ namespace SamediRouge
         const float Height = 1.95f;
 
         class Pair { public Transform code, bone; public Quaternion bind, corr; }
-        class Relay { public Transform proxy, bone, code, tip; public string boneName, tipName; public int kind; public Vector3 baseScale; }
+        class Relay { public Transform proxy, bone, code, tip; public string boneName, tipName; public int kind; public Vector3 baseScale, offset; }
+        class Finger { public Transform bone; public Quaternion rest; public Vector3 axis; public bool right; public float angle; }
+        readonly List<Finger> fingers = new List<Finger>();
 
         readonly Rig rig;
         readonly Transform body, codeHips, holder;
@@ -166,6 +168,9 @@ namespace SamediRouge
             headK = neckB != null && top != null ? Mathf.Clamp((P(top).y - P(neckB).y) / 0.455f, 0.35f, 1.2f) : 0.6f;
             wideK = lArm != null && rArm != null ? Mathf.Clamp(Mathf.Abs(P(lArm).x - P(rArm).x) / 0.58f, 0.4f, 1.3f) : 0.8f;
             tallK = neckB != null && spineB != null ? Mathf.Clamp((P(neckB).y - P(spineB).y) / 0.5f, 0.4f, 1.3f) : 0.8f;
+            fingers.Clear();
+            Fingers(m, "Right", true);
+            Fingers(m, "Left", false);
         }
 
         void Map(Transform code, string bone, string child, Vector3 restDir)
@@ -203,11 +208,45 @@ namespace SamediRouge
         }
 
         /// <summary>Accroche un relais aux os du modèle courant (et le met à l'échelle de sa tête / son buste).</summary>
+        /// <summary>Doigts d'une main : axe de flexion vers la paume, pour refermer le poing sur l'objet tenu.</summary>
+        void Fingers(Transform m, string side, bool right)
+        {
+            Transform hand = Find(m, side + "Hand"), idx = Find(m, side + "HandIndex1"), mid = Find(m, side + "HandMiddle1"),
+                      pk = Find(m, side + "HandPinky1"), th = Find(m, side + "HandThumb2");
+            if (hand == null || idx == null || mid == null || pk == null) return;
+            Vector3 n = Vector3.Cross(idx.position - pk.position, mid.position - hand.position).normalized;
+            // le pouce part du côté de la paume : il donne le sens de la normale
+            if (th != null && Vector3.Dot(th.position - hand.position, n) < 0f) n = -n;
+            foreach (string f in new[] { "Index", "Middle", "Ring", "Pinky", "Thumb" })
+                for (int i = 1; i <= 3; i++)
+                {
+                    Transform b = Find(m, side + "Hand" + f + i), c = Find(m, side + "Hand" + f + (i + 1));
+                    if (b == null || c == null) continue;
+                    Vector3 dir = (c.position - b.position).normalized;
+                    Vector3 ax = Vector3.Cross(dir, n);
+                    if (ax.sqrMagnitude < 1e-6f) continue;
+                    fingers.Add(new Finger { bone = b, rest = b.localRotation, axis = Quaternion.Inverse(b.rotation) * ax.normalized, right = right,
+                                             angle = f == "Thumb" ? 25f : i == 1 ? 70f : 80f });
+                }
+        }
+
+        bool Holding(Transform code)
+        {
+            foreach (Relay r in relays)
+                if (r.code == code)
+                    for (int c = 0; c < r.proxy.childCount; c++) if (r.proxy.GetChild(c).gameObject.activeInHierarchy) return true;
+            return false;
+        }
+
         void Bind(Relay rl)
         {
             rl.bone = Find(model, rl.boneName);
             rl.tip = rl.tipName != null ? Find(model, rl.tipName) : null;
             Vector3 k = rl.kind == 1 ? Vector3.one * headK : rl.kind == 2 ? new Vector3(wideK, tallK, wideK) : Vector3.one;
+            // têtes des tenues du voleur : un peu plus grosses et plus en avant que celle du modèle de base
+            bool big = rl.kind == 1 && Name != null && Name.Contains("_niv");
+            if (big) k *= 1.12f;
+            rl.offset = big ? new Vector3(0f, 0f, 0.05f) : Vector3.zero;
             rl.proxy.localScale = Vector3.Scale(rl.baseScale, k);
         }
 
@@ -238,6 +277,13 @@ namespace SamediRouge
                 Quaternion delta = Quaternion.Inverse(bodyRot) * p.code.rotation;
                 p.bone.rotation = bodyRot * (delta * p.corr * p.bind);
             }
+            // poings fermés sur l'arme tenue, mains ouvertes sinon
+            if (fingers.Count > 0)
+            {
+                bool hr = Holding(rig.handR), hl = Holding(rig.handL);
+                foreach (Finger f in fingers)
+                    f.bone.localRotation = (f.right ? hr : hl) ? f.rest * Quaternion.AngleAxis(f.angle, f.axis) : f.rest;
+            }
             // pieds au sol : le modèle a des jambes plus longues que le personnage en blocs ; quand celui-ci
             // plie les genoux (garde, accroupi), on recale le bassin pour que les semelles restent au niveau des siennes
             if (footL != null && footR != null && codeKnL != null && codeKnR != null)
@@ -253,6 +299,7 @@ namespace SamediRouge
                 // mains : l'objet tenu se place au creux de la paume (entre le poignet et la base des doigts), pas au poignet
                 r.proxy.position = r.tip != null ? Vector3.Lerp(r.bone.position, r.tip.position, 0.75f) : r.bone.position;
                 r.proxy.rotation = r.code.rotation;
+                if (r.offset != Vector3.zero) r.proxy.position += r.proxy.TransformVector(r.offset);
             }
         }
     }

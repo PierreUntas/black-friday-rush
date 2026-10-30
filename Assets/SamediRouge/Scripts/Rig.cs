@@ -703,6 +703,13 @@ namespace SamediRouge
                 outfit = lv >= 1 && lv <= 3 && Skin3D.Available(want) && skin3d.Swap(want);
                 if (!outfit) skin3d.Swap(outfitBase);
             }
+            if (outfit)
+            {
+                // la tenue est dans le modèle : plus de gilet, d'épaulières ni de liserés dessinés en code
+                if (vestPerm != null) vestPerm.gameObject.SetActive(false);
+                if (padL != null) { padL.gameObject.SetActive(false); padR.gameObject.SetActive(false); }
+                if (vestTrim != null) vestTrim.gameObject.SetActive(false);
+            }
             if (lv >= 1 && lv <= 3 && !outfit)
             {
                 string name = (gearThief ? "gilet_voleur_niv" : "gilet_police_niv") + lv;
