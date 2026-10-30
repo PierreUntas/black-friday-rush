@@ -930,6 +930,7 @@ namespace SamediRouge
                 Art.Part(r.baton, Art.Cylinder, wood, new Vector3(0f, 0f, 0.2f), new Vector3(0.05f, 0.2f, 0.05f), new Vector3(90f, 0f, 0f));
                 Art.Part(r.baton, Art.Cylinder, wood, new Vector3(0f, 0f, 0.5f), new Vector3(0.085f, 0.16f, 0.085f), new Vector3(90f, 0f, 0f));
                 r.trail = Trail(Art.Node(r.baton, "tip", new Vector3(0f, 0f, 0.66f)), new Color(1f, 0.45f, 0.35f), 0.16f);
+                ReplaceSlot(r.baton, "arme_voleur_niv1", 0.7f, 1, new Vector3(0f, 0f, 0.27f), 90f, 0f);
                 Art.Part(r.shL, Art.Cylinder, Art.Glow(new Color(0.2f, 0.5f, 1f), new Color(0.1f, 0.35f, 1f)), new Vector3(0f, -0.14f, 0f), new Vector3(0.16f, 0.04f, 0.16f), default, false);
             }
             if (!boss && variant % 2 == 1)
@@ -937,6 +938,7 @@ namespace SamediRouge
                 // boîte de produit à lancer (chaussures, téléphone…)
                 r.bar = Art.Node(r.handR, "box", Vector3.zero);
                 Art.Part(r.bar, Art.Cube, Art.Mat(new Color(0.95f, 0.55f, 0.15f), 0.3f), new Vector3(0f, -0.05f, 0.08f), new Vector3(0.28f, 0.16f, 0.2f));
+                ReplaceSlot(r.bar, "obs_caisse", 0.26f, 0, new Vector3(0f, -0.05f, 0.08f), 0f, 0f);
             }
         }
 
@@ -1166,6 +1168,7 @@ namespace SamediRouge
                     Transform sh = Art.Node(r.elL, "riot", new Vector3(-0.05f, -0.15f, 0.18f));
                     Art.Part(sh, Art.Cube, Art.Mat(new Color(0.7f, 0.85f, 0.95f), 0.92f, 0.1f), Vector3.zero, new Vector3(0.05f, 1.1f, 0.62f));
                     Art.Part(sh, Art.Cube, yellow, new Vector3(-0.03f, 0.3f, 0f), new Vector3(0.02f, 0.08f, 0.5f), default, false);
+                    ReplaceSlot(sh, "bouclier_police_niv2", 1.1f, 1, Vector3.zero, 0f, -90f);
                     foreach (Transform e in r.eyes) e.gameObject.SetActive(true);
                     break;
                 }
@@ -1209,6 +1212,9 @@ namespace SamediRouge
                         Art.Part(nn, titan ? Art.Cylinder : Art.Sphere, nail, Vector3.zero, titan ? new Vector3(0.22f, 0.02f, 0.22f) : Vector3.one * 0.06f, titan ? new Vector3(90f, 0f, 0f) : default, false);
                     }
                     r.trail = Trail(Art.Node(bat, "tip", new Vector3(0f, 0f, 1.35f)), titan ? new Color(0.5f, 0.8f, 1f) : new Color(1f, 0.4f, 0.2f), 0.4f);
+                    // arme géante 3D : batte (Big Bat) ou matraque cloutée (Riot Titan), à l'échelle
+                    if (ReplaceSlot(bat, titan ? "arme_heavy_police" : "arme_voleur_niv1", 1.4f, 1, new Vector3(0f, 0f, 0.6f), 90f, 0f) != null)
+                        for (int c = 0; c < bat.childCount; c++) if (bat.GetChild(c).name == "nail") bat.GetChild(c).gameObject.SetActive(false);
                     break;
                 }
                 case 10:
