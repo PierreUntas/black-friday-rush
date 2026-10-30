@@ -15,7 +15,7 @@ namespace SamediRouge
         const float Height = 1.95f;
 
         class Pair { public Transform code, bone; public Quaternion bind, corr; }
-        class Relay { public Transform proxy, bone, code; public Vector3 offset; }
+        class Relay { public Transform proxy, bone, code, tip; public Vector3 offset; }
 
         readonly Transform body, codeHips, hipsBone;
         readonly List<Pair> pairs = new List<Pair>();
@@ -122,8 +122,8 @@ namespace SamediRouge
             if (r.cap != null) { r.cap.gameObject.SetActive(false); r.cap = null; }
 
             jointSet = joints;
-            Relays(r.handR, Find(model, "RightHand"), true, Vector3.one);
-            Relays(r.handL, Find(model, "LeftHand"), true, Vector3.one);
+            Relays(r.handR, Find(model, "RightHand"), true, Vector3.one, Find(model, "RightHandMiddle1"));
+            Relays(r.handL, Find(model, "LeftHand"), true, Vector3.one, Find(model, "LeftHandMiddle1"));
             // tête et buste du modèle plus petits que ceux du personnage en blocs : l'équipement est réduit en proportion
             Transform neckB = Find(model, "Neck"), spineB = Find(model, "Spine"), top = Find(model, "HeadTop_End");
             Transform lArm = Find(model, "LeftArm"), rArm = Find(model, "RightArm");
@@ -151,7 +151,7 @@ namespace SamediRouge
         }
 
         /// <summary>Déplace l'équipement porté par une articulation sur un relais qui suit l'os du modèle.</summary>
-        void Relays(Transform code, Transform bone, bool keepAll, Vector3 k)
+        void Relays(Transform code, Transform bone, bool keepAll, Vector3 k, Transform tip = null)
         {
             if (code == null || bone == null) return;
             var proxy = new GameObject("relay_" + code.name).transform;
@@ -167,7 +167,7 @@ namespace SamediRouge
                 move.Add(t);
             }
             foreach (Transform t in move) t.SetParent(proxy, false);
-            relays.Add(new Relay { proxy = proxy, bone = bone, code = code, offset = Vector3.zero });
+            relays.Add(new Relay { proxy = proxy, bone = bone, code = code, tip = tip, offset = Vector3.zero });
         }
 
         HashSet<Transform> jointSet;
@@ -207,7 +207,8 @@ namespace SamediRouge
             }
             foreach (Relay r in relays)
             {
-                r.proxy.position = r.bone.position;
+                // mains : l'objet tenu se place au creux de la paume (entre le poignet et la base des doigts), pas au poignet
+                r.proxy.position = r.tip != null ? Vector3.Lerp(r.bone.position, r.tip.position, 0.75f) : r.bone.position;
                 r.proxy.rotation = r.code.rotation;
             }
         }
