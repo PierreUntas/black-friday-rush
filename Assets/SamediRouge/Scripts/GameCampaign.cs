@@ -20,6 +20,8 @@ namespace SamediRouge
         float menuFill = 0.38f;
         /// <summary>Décalage vers le bas du personnage (en hauteur d'écran, -1 à 1) pour le centrer dans la zone libre.</summary>
         float menuDrop;
+        /// <summary>Cadrage du menu sur la taille réelle du personnage (page Équipement).</summary>
+        bool menuFit;
         int pendingUnlockMap = -1;
 
         /// <summary>Difficulté effective de la rue (avec le décalage debug).</summary>
@@ -387,6 +389,7 @@ namespace SamediRouge
             menuFreeBottom = 1760f;
             menuFill = 0.38f;
             menuDrop = 0f;
+            menuFit = false;
             campaign = false;
             tutorialMode = false;
             var conq = new bool[Tuning.Streets];
@@ -466,8 +469,9 @@ namespace SamediRouge
             if (st != St.Menu) ToMenu();
             metaScreen = MetaScreen.Upgrades;
             menuFreeBottom = 1140f;
-            menuFill = 0.24f;   // un peu de marge : casque et armes ne sortent plus du cadre
-            menuDrop = 0.12f;
+            menuFill = 0.42f;   // cadrage sur la taille réelle : un peu de marge en haut et en bas
+            menuDrop = 0f;
+            menuFit = true;
             PreviewGear();
             RefreshUpgrades();
         }

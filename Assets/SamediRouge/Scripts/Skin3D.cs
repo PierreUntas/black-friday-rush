@@ -70,8 +70,9 @@ namespace SamediRouge
             float k = Height / Mathf.Max(0.01f, h);
             model.localScale = s0 * k;
             float foot = holder.InverseTransformPoint(toe.position).y;
-            // le bas réel du maillage (semelles épaisses, rollers…) est sous l'os de l'orteil : c'est lui qu'on pose au sol
-            float low = SoleOf(model, holder);
+            // les modèles Meshy ont le dessous des semelles à leur origine (y = 0), sous l'os de l'orteil
+            // (semelles épaisses, rollers…) : c'est ce point qu'on pose au sol
+            float low = holder.InverseTransformPoint(model.position).y;
             if (low < foot) foot = low;
             Vector3 mid = holder.InverseTransformPoint(hips.position);
             model.localPosition = new Vector3(-mid.x, -foot, -mid.z);
@@ -133,26 +134,6 @@ namespace SamediRouge
             Relays(r.neck, neckB, false, Vector3.one * headK);
             Relays(r.spine, spineB, false, new Vector3(wideK, tallK, wideK));
             Apply();
-        }
-
-        /// <summary>Point le plus bas du maillage en pose de repos, dans le repère de « space ».</summary>
-        static float SoleOf(Transform model, Transform space)
-        {
-            float low = float.MaxValue;
-            var m = new Mesh();
-            foreach (SkinnedMeshRenderer s in model.GetComponentsInChildren<SkinnedMeshRenderer>(true))
-            {
-                s.BakeMesh(m, true);
-                Vector3[] v = m.vertices;
-                Transform t = s.transform;
-                for (int i = 0; i < v.Length; i++)
-                {
-                    float y = space.InverseTransformPoint(t.position + t.rotation * v[i]).y;
-                    if (y < low) low = y;
-                }
-            }
-            Object.Destroy(m);
-            return low;
         }
 
         void Map(Transform code, string bone, string child, Vector3 restDir)

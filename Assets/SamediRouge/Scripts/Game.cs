@@ -3080,6 +3080,28 @@ namespace SamediRouge
 
         // ================================================================== caméra, ambiance
 
+        float fitHalf = 0.85f, fitMid = 0.8f;
+        bool fitInit;
+
+        /// <summary>Hauteur réelle du personnage du menu (boîte englobante de tout ce qui est affiché), lissée.</summary>
+        void MenuBounds(float udt)
+        {
+            float lo = float.MaxValue, hi = float.MinValue;
+            foreach (Renderer r in P.root.GetComponentsInChildren<Renderer>())
+            {
+                if (!r.enabled || !r.gameObject.activeInHierarchy || !(r is MeshRenderer || r is SkinnedMeshRenderer)) continue;
+                Bounds b = r.bounds;
+                if (b.min.y < lo) lo = b.min.y;
+                if (b.max.y > hi) hi = b.max.y;
+            }
+            if (hi <= lo) return;
+            float h = (hi - lo) * 0.5f, m = (hi + lo) * 0.5f;
+            float k = fitInit ? 1f - Mathf.Exp(-4f * udt) : 1f;
+            fitInit = true;
+            fitHalf = Mathf.Lerp(fitHalf, h, k);
+            fitMid = Mathf.Lerp(fitMid, m, k);
+        }
+
         void UpdateCamera(float udt)
         {
             bool portrait = Screen.height >= Screen.width;
@@ -3096,11 +3118,18 @@ namespace SamediRouge
                     float y0 = Mathf.Clamp(2f * menuFreeBottom / canvasH - 1f, -0.2f, 0.75f);  // bas de la zone libre (écran de -1 à 1)
                     float half = (1f - y0) * menuFill;                                    // demi-hauteur occupée par le personnage
                     float t = Mathf.Tan(32f * Mathf.Deg2Rad);
-                    float d = Mathf.Clamp(0.85f / (t * half), 3f, 14f);
+                    float halfH = 0.85f, midY = 0.8f;
+                    if (menuFit)
+                    {
+                        // page Équipement : cadrage sur la taille réelle du personnage (modèle 3D, casque, armes, bouclier)
+                        MenuBounds(udt);
+                        halfH = fitHalf; midY = fitMid - target.y;
+                    }
+                    float d = Mathf.Clamp(halfH / (t * half), 3f, 14f);
                     float tilt = (1f + y0) * 0.5f * t;                                 // tangente de l'inclinaison vers le bas
                     Vector3 dir = new Vector3(0.22f, 0f, 1f).normalized;
-                    want = target + dir * d + Vector3.up * 0.8f;
-                    look = target + Vector3.up * (0.8f - d * tilt + menuDrop * d * t);
+                    want = target + dir * d + Vector3.up * midY;
+                    look = target + Vector3.up * (midY - d * tilt + menuDrop * d * t);
                 }
                 else
                 {
