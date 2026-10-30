@@ -605,7 +605,7 @@ namespace SamediRouge
             // voleur (corps 3D, cagoule) : bandana sur le front, lunettes relevées, casque de moto
             else if (thief && lv == 1) Fit(m, 0.27f, 0, new Vector3(0f, 0.20f, 0f), 0f, 180f);
             else if (thief && lv == 2) Fit(m, 0.31f, 0, new Vector3(0f, 0.31f, 0.07f), -25f, 0f);
-            else Fit(m, 0.39f, 0, new Vector3(0f, 0.23f, 0f), 0f, 0f);
+            else Fit(m, 0.33f, 0, new Vector3(0f, 0.22f, 0f), 0f, 0f);
         }
 
         /// <summary>
@@ -686,6 +686,14 @@ namespace SamediRouge
                 {
                     vestModels[lv] = GlbModel.Spawn(name, skin3d != null ? skin3d.RelayOf(spine) : spine);
                     FitTorso(vestModels[lv]);
+                    // voleur 3D : son sweat est épais, la tenue doit l'englober (sinon elle disparaît dedans)
+                    if (skin3d != null && gearThief)
+                    {
+                        Transform vm = vestModels[lv];
+                        Vector3 f = new Vector3(1.4f, 1.15f, 1.5f), lp = vm.localPosition;
+                        vm.localScale = Vector3.Scale(vm.localScale, f);
+                        vm.localPosition = new Vector3(lp.x * f.x, -0.08f + (lp.y + 0.04f) * f.y, lp.z * f.z);
+                    }
                 }
                 model = vestModels[lv];
             }

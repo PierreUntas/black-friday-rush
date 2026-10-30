@@ -165,6 +165,7 @@ namespace SamediRouge
             if (Random.value < 0.5f)
             {
                 float zb = Random.Range(8f, Chunk - 8f);
+                if (Prop(t, "dec_tableau", 6.4f, new Vector3(0f, 6.4f, zb), 180f)) goto boardDone;
                 Art.Part(t, Art.Cube, board, new Vector3(0f, 7.4f, zb), new Vector3(6.4f, 1.9f, 0.25f), default, false);
                 for (int row = 0; row < 4; row++)
                 {
@@ -173,16 +174,20 @@ namespace SamediRouge
                 }
                 Art.Part(t, Art.Cube, clockHand, new Vector3(-2.6f, 9.6f, zb), new Vector3(0.05f, 2.6f, 0.05f), default, false);
                 Art.Part(t, Art.Cube, clockHand, new Vector3(2.6f, 9.6f, zb), new Vector3(0.05f, 2.6f, 0.05f), default, false);
+                boardDone:;
             }
             // horloge à double cadran
             else if (Random.value < 0.6f)
             {
                 float zc = Random.Range(8f, Chunk - 8f);
+                // horloge 3D accrochée à une colonne, cadran vers le couloir
+                if (PropH(t, "dec_horloge", 2f, new Vector3(-(ShopX - 0.9f), 6.2f, zc), 90f)) goto clockDone;
                 Art.Part(t, Art.Cylinder, iron, new Vector3(0f, 8.2f, zc), new Vector3(1.6f, 0.14f, 1.6f), new Vector3(90f, 0f, 0f), false);
                 Art.Part(t, Art.Cylinder, clockFace, new Vector3(0f, 8.2f, zc), new Vector3(1.4f, 0.16f, 1.4f), new Vector3(90f, 0f, 0f), false);
                 Art.Part(t, Art.Cube, clockHand, new Vector3(0f, 8.38f, zc - 0.17f), new Vector3(0.07f, 0.45f, 0.02f), default, false);
                 Art.Part(t, Art.Cube, clockHand, new Vector3(0.18f, 8.2f, zc - 0.17f), new Vector3(0.38f, 0.06f, 0.02f), new Vector3(0f, 0f, -20f), false);
                 Art.Part(t, Art.Cube, clockHand, new Vector3(0f, 9.6f, zc), new Vector3(0.06f, 1.4f, 0.06f), default, false);
+                clockDone:;
             }
 
             SideWalkers(t, cd, Random.Range(1, 3), 1.6f);
@@ -191,6 +196,7 @@ namespace SamediRouge
         void Luggage(Transform t, int s, float z)
         {
             float x = s * (ShopX - 1.3f);
+            if (PropH(t, "dec_chariot", 1.25f, new Vector3(x, 0f, z), Random.Range(0f, 360f))) return;
             // chariot : plateau, poignée, deux valises dessus
             Art.Part(t, Art.Cube, steel, new Vector3(x, 0.25f, z), new Vector3(0.7f, 0.06f, 1.2f));
             Art.Part(t, Art.Cube, steel, new Vector3(x, 0.7f, z - 0.62f), new Vector3(0.7f, 0.9f, 0.05f), default, false);
@@ -237,6 +243,7 @@ namespace SamediRouge
                 float zp = Random.Range(3f, Chunk - 3f);
                 if (r < 0.35f) Crates(t, s, zp);
                 else if (r < 0.65f) Barrels(t, s, zp);
+                else if (r < 0.85f && Prop(t, "dec_futs", 1.6f, new Vector3(s * (ShopX - 1.3f), 0f, zp), s < 0 ? 90f : -90f)) { }
                 else if (r < 0.85f)
                 {
                     Art.Part(t, Art.Cylinder, bollard, new Vector3(s * (ShopX - 0.9f), 0.35f, zp), new Vector3(0.45f, 0.35f, 0.45f));
@@ -248,6 +255,12 @@ namespace SamediRouge
             {
                 int s = k % 2 == 0 ? -1 : 1;
                 float z = 6f + k * 12f;
+                // lampadaire 3D : la tête penche au-dessus du couloir
+                if (PropH(t, "dec_lampadaire", 7.3f, new Vector3(s * (ShopX - 1.3f), 0f, z), s < 0 ? 180f : 0f))
+                {
+                    Art.Part(t, Art.Quad, Art.Particle(Art.SoftDot, new Color(1f, 0.7f, 0.35f, 0.35f)), new Vector3(s * (ShopX - 2f), 6.6f, z), new Vector3(3.2f, 3.2f, 1f), default, false);
+                    continue;
+                }
                 Art.Part(t, Art.Cylinder, steel, new Vector3(s * (ShopX - 0.5f), 3.6f, z), new Vector3(0.14f, 3.6f, 0.14f));
                 Art.Part(t, Art.Cube, steel, new Vector3(s * (ShopX - 1.3f), 7.15f, z), new Vector3(1.7f, 0.1f, 0.12f), default, false);
                 Art.Part(t, Art.Cube, sodium, new Vector3(s * (ShopX - 2f), 7.02f, z), new Vector3(0.6f, 0.12f, 0.32f), default, false);
@@ -257,6 +270,7 @@ namespace SamediRouge
             if (counter % 2 == 0)
             {
                 float zc = Random.Range(8f, Chunk - 8f);
+                if (Prop(t, "dec_grue", 2f * ShopX + 6f, new Vector3(0f, 0f, zc + 2f), 0f)) goto craneDone;
                 for (int s = -1; s <= 1; s += 2)
                     for (int k = 0; k < 2; k++)
                         Art.Part(t, Art.Cube, crane, new Vector3(s * (ShopX + 1.6f), 8.5f, zc + k * 4f), new Vector3(0.7f, 17f, 0.7f));
@@ -265,6 +279,7 @@ namespace SamediRouge
                 Art.Part(t, Art.Cube, craneDark, new Vector3(-2f, 15.4f, zc + 2f), new Vector3(2.2f, 1.6f, 2.4f), default, false);
                 Art.Part(t, Art.Cube, craneDark, new Vector3(-2f, 13.6f, zc + 2f), new Vector3(0.05f, 3.4f, 0.05f), default, false);
                 Art.Part(t, Art.Cube, boxes[Random.Range(0, boxes.Length)], new Vector3(-2f, 10.6f, zc + 2f), new Vector3(2.5f, 2.55f, 6.1f), default, false);
+                craneDone:;
             }
             SideWalkers(t, cd, Random.Range(0, 2), 1.4f);
         }
@@ -289,6 +304,12 @@ namespace SamediRouge
         void Crates(Transform t, int s, float z)
         {
             float x = s * (ShopX - 1.3f);
+            if (Prop(t, "obs_caisse", 1.1f, new Vector3(x, 0f, z), Random.Range(-15f, 15f)))
+            {
+                Prop(t, "obs_caisse", 0.9f, new Vector3(x, 1.08f, z + 0.05f), Random.Range(-25f, 25f));
+                Prop(t, "obs_caisse", 1f, new Vector3(x, 0f, z + 1.2f), Random.Range(-15f, 15f));
+                return;
+            }
             for (int k = 0; k < 3; k++)
             {
                 Vector3 p = new Vector3(x + Random.Range(-0.3f, 0.3f), 0.45f + (k == 2 ? 0.9f : 0f), z + (k == 1 ? 1f : 0f));
@@ -300,6 +321,7 @@ namespace SamediRouge
         void Barrels(Transform t, int s, float z)
         {
             float x = s * (ShopX - 1.2f);
+            if (Prop(t, "dec_futs", 1.6f, new Vector3(x, 0f, z), Random.Range(0f, 360f))) return;
             Material m = Random.value < 0.5f ? boxes[1] : boxes[0];
             for (int k = 0; k < 3; k++)
                 Art.Part(t, Art.Cylinder, m, new Vector3(x + (k % 2) * 0.6f * -s, 0.5f, z + k * 0.55f), new Vector3(0.55f, 0.5f, 0.55f));
@@ -358,6 +380,11 @@ namespace SamediRouge
                 int s = k % 2 == 0 ? 1 : -1;
                 float z = 4f + k * 12f;
                 float x = s * (ShopX - 1.9f);
+                if (PropH(t, "dec_reverbere", 4.9f, new Vector3(x, 0f, z), 0f))
+                {
+                    Art.Part(t, Art.Quad, Art.Particle(Art.SoftDot, new Color(1f, 0.85f, 0.55f, 0.32f)), new Vector3(x, 4.3f, z), new Vector3(3.4f, 3.4f, 1f), default, false);
+                    continue;
+                }
                 Art.Part(t, Art.Cylinder, lampPole, new Vector3(x, 2.1f, z), new Vector3(0.14f, 2.1f, 0.14f));
                 Art.Part(t, Art.Cylinder, lampPole, new Vector3(x, 0.2f, z), new Vector3(0.36f, 0.2f, 0.36f));
                 Art.Part(t, Art.Sphere, lampWarm, new Vector3(x, 4.45f, z), new Vector3(0.48f, 0.56f, 0.48f), default, false);
@@ -382,6 +409,7 @@ namespace SamediRouge
         void Topiary(Transform t, int s, float z)
         {
             float x = s * (ShopX - 1.1f);
+            if (Prop(t, "dec_arbuste", 0.95f, new Vector3(x, 0f, z), 0f)) return;
             Art.Part(t, Art.Cube, awning, new Vector3(x, 0.35f, z), new Vector3(0.8f, 0.7f, 0.8f));
             Art.Part(t, Art.Cube, gold, new Vector3(x, 0.72f, z), new Vector3(0.84f, 0.05f, 0.84f), default, false);
             Art.Part(t, Art.Sphere, topiary, new Vector3(x, 1.3f, z), Vector3.one * 0.95f);
@@ -391,6 +419,7 @@ namespace SamediRouge
         void Limo(Transform t, int s, float z)
         {
             float x = s * (ShopX - 1.5f);
+            if (Prop(t, "dec_limo", 5.2f, new Vector3(x, 0f, z), 90f)) return;
             Art.Part(t, Art.Cube, carBody, new Vector3(x, 0.55f, z), new Vector3(1.7f, 0.6f, 4.4f));
             Art.Part(t, Art.Cube, carGlass, new Vector3(x, 1.08f, z - 0.2f), new Vector3(1.5f, 0.5f, 2.4f));
             Art.Part(t, Art.Cube, lampWarm, new Vector3(x, 0.6f, z + 2.21f), new Vector3(1.3f, 0.12f, 0.02f), default, false);

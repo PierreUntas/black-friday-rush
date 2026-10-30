@@ -264,6 +264,7 @@ namespace SamediRouge
             {
                 int s = Random.value < 0.5f ? -1 : 1;
                 Vector3 b = new Vector3(s * (ShopX - 1.2f), 0f, Random.Range(3f, Chunk - 3f));
+                if (PropH(t, "dec_ballons", 3.4f, b, Random.Range(0f, 360f))) goto balloonsDone;
                 Material[] bm = { balloon1, balloon2, balloon3 };
                 for (int i = 0; i < 5; i++)
                 {
@@ -273,6 +274,7 @@ namespace SamediRouge
                 }
                 Art.Part(t, Art.Cube, planter, b + new Vector3(0f, 0.15f, 0f), new Vector3(0.4f, 0.3f, 0.4f));
             }
+            balloonsDone:;
         }
 
         static readonly System.Collections.Generic.Dictionary<string, System.Collections.Generic.List<Texture2D>> shopArt =
@@ -326,7 +328,8 @@ namespace SamediRouge
             // éclats de verre devant la vitrine
             Art.Decal(t, Art.Particle(Art.Shards, new Color(0.85f, 0.9f, 1f, 0.9f)), new Vector3(s * (x - 1.1f), 0.02f, cz), new Vector2(2.2f, 3.2f));
             // rideau métallique à moitié descendu, tordu
-            if (Random.value < 0.55f)
+            if (Random.value < 0.55f && PropH(t, "dec_rideau", 4.3f, new Vector3(s * (x - 0.2f), 0f, zc + Random.Range(-1.5f, 1.5f)), s < 0 ? 90f : -90f)) { }
+            else if (Random.value < 0.55f)
             {
                 Material shutter = Art.Mat(new Color(0.48f, 0.5f, 0.53f), 0.55f, 0.6f);
                 Transform sh = Art.Node(t, "shutter", new Vector3(s * (x - 0.12f), 3.9f, zc + Random.Range(-1.5f, 1.5f)));
@@ -393,6 +396,25 @@ namespace SamediRouge
                 if (first) { b = f.sharedMesh.bounds; first = false; } else b.Encapsulate(f.sharedMesh.bounds);
             }
             float k = size / Mathf.Max(0.001f, Mathf.Max(b.size.x, b.size.z));
+            Quaternion q = Quaternion.Euler(0f, yaw, 0f);
+            m.localScale = Vector3.one * k;
+            m.localRotation = q;
+            m.localPosition = pos - q * (new Vector3(b.center.x, b.min.y, b.center.z) * k);
+            return true;
+        }
+
+        /// <summary>Comme Prop, mais la taille donnée est la HAUTEUR (lampadaires, réverbères).</summary>
+        public static bool PropH(Transform t, string name, float height, Vector3 pos, float yaw)
+        {
+            if (!GlbModel.Exists(name)) return false;
+            Transform m = GlbModel.Spawn(name, t);
+            Bounds b = new Bounds();
+            bool first = true;
+            foreach (MeshFilter f in m.GetComponentsInChildren<MeshFilter>())
+            {
+                if (first) { b = f.sharedMesh.bounds; first = false; } else b.Encapsulate(f.sharedMesh.bounds);
+            }
+            float k = height / Mathf.Max(0.001f, b.size.y);
             Quaternion q = Quaternion.Euler(0f, yaw, 0f);
             m.localScale = Vector3.one * k;
             m.localRotation = q;

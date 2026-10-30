@@ -335,6 +335,17 @@ namespace SamediRouge
             }
             Art.Part(drone, Art.Sphere, dark, new Vector3(0f, -0.14f, 0.15f), Vector3.one * 0.16f);
             droneLed = Art.Part(drone, Art.Sphere, Art.Glow(Pal.Rouge, Pal.Rouge * 5f), new Vector3(0f, 0.05f, 0.32f), Vector3.one * 0.09f, default, false);
+            // drone 3D (Meshy) : les formes simples sont masquées, le gyrophare et la lumière restent
+            if (GlbModel.Exists("dec_drone"))
+            {
+                foreach (MeshRenderer mr in drone.GetComponentsInChildren<MeshRenderer>()) if (mr != droneLed) mr.enabled = false;
+                Transform dm = GlbModel.Spawn("dec_drone", drone);
+                Bounds db = dm.GetComponentsInChildren<MeshFilter>()[0].sharedMesh.bounds;
+                float dk = 1.5f / Mathf.Max(0.001f, Mathf.Max(db.size.x, db.size.z));
+                dm.localScale = Vector3.one * dk;
+                dm.localRotation = Quaternion.Euler(0f, 180f, 0f);
+                dm.localPosition = -(dm.localRotation * (db.center * dk));
+            }
             droneLight = Art.Node(drone, "led", new Vector3(0f, -0.2f, 0.4f)).gameObject.AddComponent<Light>();
             droneLight.type = LightType.Point;
             droneLight.color = new Color(1f, 0.15f, 0.1f);

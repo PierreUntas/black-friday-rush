@@ -466,8 +466,8 @@ namespace SamediRouge
             if (st != St.Menu) ToMenu();
             metaScreen = MetaScreen.Upgrades;
             menuFreeBottom = 1140f;
-            menuFill = 0.27f;
-            menuDrop = 0.15f;
+            menuFill = 0.24f;   // un peu de marge : casque et armes ne sortent plus du cadre
+            menuDrop = 0.12f;
             PreviewGear();
             RefreshUpgrades();
         }
