@@ -97,6 +97,7 @@ namespace SamediRouge
         {
             if (devCmdT < 0f) return;
             devCmdT = -1f; // une seule fois, à la première image
+            hud.HideTitleNow();
             if (devCmd.Contains("thief")) OnFaction(true);
             if (devCmd.Contains("cop")) OnFaction(false);
             // « gear 3231 » : niveaux casque / tenue / arme / bouclier du camp choisi (éditeur seulement)

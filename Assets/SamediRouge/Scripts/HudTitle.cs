@@ -57,6 +57,9 @@ namespace SamediRouge
             titleDone?.Invoke();
         }
 
+        /// <summary>Outil de dev : ferme l'écran titre sans attendre de tap.</summary>
+        public void HideTitleNow() { if (titleRoot != null) titleRoot.SetActive(false); }
+
         public bool TitleOpen => titleRoot != null && titleRoot.activeSelf;
 
         /// <summary>Animation : le logo arrive en rebondissant, le texte pulse.</summary>
