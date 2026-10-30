@@ -603,6 +603,13 @@ namespace SamediRouge
                     HelmetFit(helmetModels[lv], gearThief, lv);
                 }
                 model = helmetModels[lv];
+                if (model != null)
+                {
+                    HelmetFit(model, gearThief, lv);
+                    // policier en tenue 3D : sa casquette descendait sur les yeux, on la remonte sur le crâne
+                    if (!gearThief && lv == 1 && skin3d != null && skin3d.Name != null && skin3d.Name.StartsWith("policier_niv"))
+                        model.localPosition += new Vector3(0f, 0.07f, -0.01f);
+                }
             }
             for (int i = 0; i < helmetModels.Length; i++)
                 if (helmetModels[i] != null) helmetModels[i].gameObject.SetActive(helmetModels[i] == model);
@@ -777,11 +784,11 @@ namespace SamediRouge
         {
             if (helmetVisor != null) helmetVisor.gameObject.SetActive(helmetLv >= 2);
             if (helmetCrest != null) helmetCrest.gameObject.SetActive(helmetLv >= 3);
-            HelmetModel(PreviewHelmetLv > 0 && !gearThief ? PreviewHelmetLv : helmetLv);
             if (vestPerm != null) vestPerm.gameObject.SetActive(vestLv >= 1);
             if (padL != null) { padL.gameObject.SetActive(vestLv >= 2); padR.gameObject.SetActive(vestLv >= 2); }
             if (vestTrim != null) vestTrim.gameObject.SetActive(vestLv >= 3);
-            VestModel(vestLv);
+            VestModel(vestLv);   // d'abord la tenue (elle peut changer le modèle 3D), puis le casque ajusté à sa tête
+            HelmetModel(PreviewHelmetLv > 0 && !gearThief ? PreviewHelmetLv : helmetLv);
             if (batons[0] != null)
             {
                 foreach (Transform b in batons) b.gameObject.SetActive(false);
@@ -1344,7 +1351,13 @@ namespace SamediRouge
         public void Tick(float dt)
         {
             TickCore(dt);
-            if (skin3d != null) skin3d.Apply();
+            if (skin3d != null)
+            {
+                skin3d.Apply();
+                // mitraillette tenue dans la main du modèle 3D : canon toujours vers l'avant du buste,
+                // quelle que soit l'orientation de la main (bras ballants, modèles sans os de doigts…)
+                if (smg != null && smg.gameObject.activeInHierarchy && spine != null) smg.rotation = spine.rotation;
+            }
         }
 
         void TickCore(float dt)
