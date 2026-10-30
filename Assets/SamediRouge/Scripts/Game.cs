@@ -2767,7 +2767,13 @@ namespace SamediRouge
                     break;
                 case ET.Poubelle:
                     e.depth = 0.45f;
-                    if (Looting) { LootPile(t); break; }
+                    if (Looting) { if (!ObstacleModel(t, "obs_butin", 1.6f, Vector3.zero, Random.Range(-15f, 15f))) LootPile(t); break; }
+                    // pile de cartons 3D (deux piles côte à côte), sinon les cartons dessinés
+                    if (ObstacleModel(t, "obs_cartons", 0.72f, new Vector3(-0.4f, 0f, 0f), Random.Range(-12f, 12f)))
+                    {
+                        ObstacleModel(t, "obs_cartons", 0.66f, new Vector3(0.42f, 0f, 0.05f), Random.Range(-20f, 20f));
+                        break;
+                    }
                     // pile de cartons de livraison (à sauter)
                     Material card = Art.Mat(new Color(0.72f, 0.55f, 0.36f), 0.15f), tape = Art.Mat(new Color(0.85f, 0.75f, 0.55f), 0.4f);
                     Art.Part(t, Art.Cube, card, new Vector3(-0.35f, 0.3f, 0f), new Vector3(0.75f, 0.6f, 0.7f), new Vector3(0f, 6f, 0f));
@@ -2798,6 +2804,8 @@ namespace SamediRouge
                 case ET.Voiture:
                 {
                     e.depth = 1.9f;
+                    // kiosque de démonstration 3D, dans l'axe du couloir
+                    if (ObstacleModel(t, "obs_kiosque", 3.6f, Vector3.zero, 90f)) break;
                     // kiosque de démonstration (à sauter, 2 cœurs)
                     Material wood = Art.Mat(new Color(0.95f, 0.95f, 0.96f), 0.6f), top = Art.Mat(new Color(0.15f, 0.15f, 0.18f), 0.85f);
                     Art.Part(t, Art.Cube, wood, new Vector3(0f, 0.55f, 0f), new Vector3(1.9f, 1.1f, 3.6f));
@@ -2861,8 +2869,34 @@ namespace SamediRouge
         }
 
         /// <summary>Caddie en fil métallique.</summary>
+        /// <summary>
+        /// Obstacle 3D (Meshy) posé au sol : « size » = plus grande dimension au sol, position et orientation données.
+        /// Renvoie faux si le modèle manque (on garde alors l'obstacle dessiné).
+        /// </summary>
+        static bool ObstacleModel(Transform t, string name, float size, Vector3 pos, float yaw)
+        {
+            if (!GlbModel.Exists(name)) return false;
+            Transform m = GlbModel.Spawn(name, t);
+            Bounds b = new Bounds();
+            bool first = true;
+            foreach (MeshFilter f in m.GetComponentsInChildren<MeshFilter>())
+            {
+                if (first) { b = f.sharedMesh.bounds; first = false; } else b.Encapsulate(f.sharedMesh.bounds);
+            }
+            float k = size / Mathf.Max(0.001f, Mathf.Max(b.size.x, b.size.z));
+            Quaternion q = Quaternion.Euler(0f, yaw, 0f);
+            m.localScale = Vector3.one * k;
+            m.localRotation = q;
+            Vector3 c = new Vector3(b.center.x, b.min.y, b.center.z) * k;
+            m.localPosition = pos - q * c;
+            foreach (MeshRenderer r in m.GetComponentsInChildren<MeshRenderer>()) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+            return true;
+        }
+
         static void Cart(Transform parent, Vector3 pos)
         {
+            // caddie 3D : poussé dans l'axe du couloir (côté long le long de la course)
+            if (ObstacleModel(parent, "obs_caddie", 1.05f, pos, 90f + Random.Range(-12f, 12f))) return;
             Transform c = Art.Node(parent, "cart", pos);
             c.localRotation = Quaternion.Euler(0f, Random.Range(-12f, 12f), 0f);
             Material wire = Art.Mat(new Color(0.78f, 0.8f, 0.83f), 0.85f, 0.9f);
