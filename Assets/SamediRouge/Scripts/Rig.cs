@@ -51,6 +51,8 @@ namespace SamediRouge
         public bool heavy;
         /// <summary>TEST : remplace le corps du policier joué par le modèle 3D Resources/SamediRouge/Characters/policier.</summary>
         public static bool Use3DHero = true;
+        /// <summary>TEST : pillards (et bande du voleur) en personnages 3D.</summary>
+        public static bool Use3DEnemies = true;
         Skin3D skin3d;
         readonly TrailRenderer[] batonTrails = new TrailRenderer[3];
         readonly List<Transform> armor = new List<Transform>();
@@ -198,7 +200,11 @@ namespace SamediRouge
             if (outline) Art.Outline(r.root, OutlineOverride != null ? 0.032f : k == Kind.Shopper ? 0.018f : 0.022f, OutlineOverride);
             r.renderers = r.root.GetComponentsInChildren<MeshRenderer>(true);
             // TEST : policier joué en personnage 3D complet (Meshy), animé par ce squelette
-            if (Use3DHero && k == Kind.Guard && variant < 0) r.skin3d = Skin3D.Attach(r, "policier");
+            if (Use3DHero && (k == Kind.Guard || k == Kind.Thief) && variant < 0) r.skin3d = Skin3D.Attach(r, k == Kind.Thief ? "voleur" : "policier");
+            // TEST : pillards adverses en 3D (un seul modèle partagé), ta bande de voleurs avec le modèle du héros
+            else if (Use3DEnemies && k == Kind.Thief && variant >= 0) r.skin3d = Skin3D.Attach(r, variant == Crew ? "voleur" : "pillard");
+            // policiers adverses et recrues du policier : modèle « flic » (uniforme marine)
+            else if (Use3DEnemies && k == Kind.Guard && variant >= 0) r.skin3d = Skin3D.Attach(r, "flic");
             r.Tick(0f);
             return r;
         }
@@ -580,9 +586,10 @@ namespace SamediRouge
             // policier (corps 3D) : casquette enfoncée sur les cheveux, casques remontés pour dégager les yeux
             if (!thief && lv == 1) Fit(m, 0.37f, 0, new Vector3(0f, 0.31f, -0.01f), 0f, 0f);
             else if (!thief) Fit(m, 0.39f, 0, new Vector3(0f, lv == 2 ? 0.25f : 0.23f, -0.01f), 0f, 0f);
-            else if (thief && lv == 1) Fit(m, 0.36f, 0, new Vector3(0f, 0.27f, 0f), 0f, 180f);
-            else if (thief && lv == 2) Fit(m, 0.34f, 0, new Vector3(0f, 0.34f, 0.09f), -25f, 0f);
-            else Fit(m, 0.44f, 0, new Vector3(0f, 0.21f, 0f), 0f, 0f);
+            // voleur (corps 3D, cagoule) : bandana sur le front, lunettes relevées, casque de moto
+            else if (thief && lv == 1) Fit(m, 0.27f, 0, new Vector3(0f, 0.20f, 0f), 0f, 180f);
+            else if (thief && lv == 2) Fit(m, 0.31f, 0, new Vector3(0f, 0.31f, 0.07f), -25f, 0f);
+            else Fit(m, 0.39f, 0, new Vector3(0f, 0.23f, 0f), 0f, 0f);
         }
 
         /// <summary>

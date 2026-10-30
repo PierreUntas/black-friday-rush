@@ -21,6 +21,8 @@ namespace SamediRouge
         readonly List<Pair> pairs = new List<Pair>();
         readonly List<Relay> relays = new List<Relay>();
         readonly Vector3 hipsBind, codeHipsRest;
+        readonly Transform footL, footR, codeKnL, codeKnR;
+        readonly float footH;
         readonly SkinnedMeshRenderer[] skins;
         public readonly Transform model;
 
@@ -83,6 +85,9 @@ namespace SamediRouge
             }
 
             hipsBind = body.InverseTransformPoint(hips.position);
+            footL = Find(model, "LeftFoot"); footR = Find(model, "RightFoot");
+            codeKnL = r.knL; codeKnR = r.knR;
+            if (footL != null) footH = body.InverseTransformPoint(footL.position).y;
             codeHipsRest = codeHips.localPosition;
 
             // articulations du jeu → os du modèle (direction de repos des membres : vers le bas, un peu écartés)
@@ -186,6 +191,15 @@ namespace SamediRouge
             {
                 Quaternion delta = Quaternion.Inverse(bodyRot) * p.code.rotation;
                 p.bone.rotation = bodyRot * (delta * p.corr * p.bind);
+            }
+            // pieds au sol : le modèle a des jambes plus longues que le personnage en blocs ; quand celui-ci
+            // plie les genoux (garde, accroupi), on recale le bassin pour que les semelles restent au niveau des siennes
+            if (footL != null && footR != null && codeKnL != null && codeKnR != null)
+            {
+                float codeSole = Mathf.Min(body.InverseTransformPoint(codeKnL.TransformPoint(new Vector3(0f, -0.5f, 0f))).y,
+                                           body.InverseTransformPoint(codeKnR.TransformPoint(new Vector3(0f, -0.5f, 0f))).y);
+                float modelSole = Mathf.Min(body.InverseTransformPoint(footL.position).y, body.InverseTransformPoint(footR.position).y) - footH;
+                hipsBone.position = body.TransformPoint(body.InverseTransformPoint(hipsBone.position) + new Vector3(0f, codeSole - modelSole, 0f));
             }
             foreach (Relay r in relays)
             {

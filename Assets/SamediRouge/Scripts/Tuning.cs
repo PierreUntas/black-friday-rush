@@ -144,7 +144,7 @@ namespace SamediRouge
             string[][] rob =
             {
                 new[] { L("HEADBAND", "BANDEAU"), L("SKI GOGGLES", "LUNETTES DE SKI"), L("MOTO HELMET", "CASQUE DE MOTO") },
-                new[] { L("HOODIE", "SWEAT"), L("LEATHER JACKET", "BLOUSON DE CUIR"), L("STOLEN VEST", "GILET VOLÉ") },
+                new[] { L("PUFFER VEST", "DOUDOUNE"), L("LEATHER JACKET", "BLOUSON DE CUIR"), L("STOLEN VEST", "GILET VOLÉ") },
                 new[] { L("BAT", "BATTE"), L("PAINT PISTOL", "PISTOLET À PEINTURE"), L("PAINT MINIGUN", "MITRAILLEUSE À PEINTURE") },
                 new[] { L("TRASH CAN LID", "COUVERCLE DE POUBELLE"), L("STOP SIGN", "PANNEAU STOP"), L("STOLEN SHIELD", "BOUCLIER VOLÉ") },
             };
