@@ -2811,8 +2811,19 @@ namespace SamediRouge
                     e.depth = 0.45f;
                     e.y = 0f;
                 {
-                    // étoile de police : 6 branches à boules, médaillon central, dorée et brillante
                     e.spin = Art.Node(t, "star", Vector3.zero);
+                    // pièce dollar 3D (Meshy) dressée face au joueur, qui tourne ; sinon l'étoile de police dessinée
+                    if (GlbModel.Exists("piece"))
+                    {
+                        Transform c = GlbModel.SpawnGlow("piece", e.spin, 0.55f);
+                        Bounds cb = c.GetComponentsInChildren<MeshFilter>()[0].sharedMesh.bounds;
+                        float ck = 0.8f / Mathf.Max(0.001f, Mathf.Max(cb.size.x, cb.size.y));
+                        c.localScale = Vector3.one * ck;
+                        c.localPosition = new Vector3(0f, 1.05f, 0f) - cb.center * ck;
+                        Art.Decal(t, Art.Particle(Art.SoftDot, new Color(1f, 0.85f, 0.3f, 0.35f)), new Vector3(0f, 0.03f, 0f), new Vector2(1.3f, 1.3f));
+                        break;
+                    }
+                    // étoile de police : 6 branches à boules, médaillon central, dorée et brillante
                     Material gold = Art.Glow(Pal.Gold, Pal.Gold * 0.7f, 0.85f);
                     Material dark = Art.Glow(new Color(0.75f, 0.5f, 0.1f), new Color(0.4f, 0.25f, 0.05f), 0.8f);
                     Art.Part(e.spin, Art.Star, gold, new Vector3(0f, 1.05f, 0f), new Vector3(0.9f, 0.9f, 0.9f), default, false);
@@ -2828,7 +2839,7 @@ namespace SamediRouge
                 default:
                     e.depth = 0.6f;
                     e.spin = Art.Node(t, "pickup", Vector3.zero);
-                    BuildPickup(e.spin, type);
+                    BuildPickup(e.spin, type, thief);
                     {
                         Color pc = PickupColor(type);
                         Art.Decal(t, Art.Particle(Art.SoftDot, new Color(pc.r, pc.g, pc.b, 0.7f)), new Vector3(0f, 0.04f, 0f), new Vector2(2.4f, 2.4f));
@@ -2907,10 +2918,43 @@ namespace SamediRouge
             Art.Decal(r.root, Art.Particle(Art.SoftDot, new Color(0.2f, 0.55f, 1f, 0.7f)), new Vector3(0f, 0.035f, 0f), new Vector2(1.5f, 1.5f));
         }
 
-        static void BuildPickup(Transform t, ET type)
+        /// <summary>Bonus 3D : modèle d'équipement (Meshy) du camp joué, à la place des formes dorées.</summary>
+        static bool PickupModel(Transform t, string name, float size)
+        {
+            if (!GlbModel.Exists(name)) return false;
+            Transform m = GlbModel.Spawn(name, t);
+            Bounds b = new Bounds();
+            bool first = true;
+            foreach (MeshFilter f in m.GetComponentsInChildren<MeshFilter>())
+            {
+                if (first) { b = f.sharedMesh.bounds; first = false; } else b.Encapsulate(f.sharedMesh.bounds);
+            }
+            float k = size / Mathf.Max(0.001f, Mathf.Max(b.size.x, Mathf.Max(b.size.y, b.size.z)));
+            m.localScale = Vector3.one * k;
+            m.localRotation = Quaternion.Euler(0f, 180f, 0f);
+            m.localPosition = new Vector3(0f, 1.05f, 0f) - m.localRotation * (b.center * k);
+            return true;
+        }
+
+        static void BuildPickup(Transform t, ET type, bool thief)
         {
             Color pcol = PickupColor(type);
             Material ring = Art.Glow(pcol, pcol * 1.4f, 0.5f);
+            string f = thief ? "voleur" : "police";
+            string model = type == ET.Casque ? (thief ? "casque_voleur_niv3" : "casque_police_niv2")
+                         : type == ET.Gilet ? (thief ? "gilet_voleur_niv3" : "gilet_police_niv2")
+                         : type == ET.Matraque ? "arme_" + f + "_niv1"
+                         : type == ET.Pistolet ? "arme_" + f + "_niv2"
+                         : type == ET.Mitraillette ? "arme_" + f + "_niv3"
+                         : type == ET.Bouclier ? "bouclier_" + f + "_niv2"
+                         : type == ET.Renfort ? (thief ? "casque_voleur_niv1" : "casque_police_niv1")   // renfort : casquette / bandana de la bande
+                         : type == ET.Cafe ? "trousse_soin" : null;
+            float size = type == ET.Matraque || type == ET.Mitraillette ? 1.0f : type == ET.Bouclier || type == ET.Gilet ? 0.9f : 0.75f;
+            if (model != null && PickupModel(t, model, size))
+            {
+                Art.Part(t, Art.Cylinder, ring, new Vector3(0f, 0.12f, 0f), new Vector3(1f, 0.02f, 1f), default, false);
+                return;
+            }
             // équipement : doré et brillant (plus de « mallettes noires ») ; le renfort en bleu
             Material item = type == ET.Renfort ? Art.Glow(new Color(0.2f, 0.45f, 1f), new Color(0.1f, 0.3f, 0.9f), 0.7f)
                                                : Art.Glow(new Color(1f, 0.8f, 0.3f), new Color(0.55f, 0.38f, 0.05f), 0.85f);

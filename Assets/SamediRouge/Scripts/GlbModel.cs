@@ -13,12 +13,24 @@ namespace SamediRouge
     /// </summary>
     public static class GlbModel
     {
-        class Part { public Mesh mesh; public Material mat; }
+        class Part { public Mesh mesh; public Material mat; public Texture2D tex; }
         static readonly Dictionary<string, List<Part>> cache = new Dictionary<string, List<Part>>();
 
         public static bool Exists(string name) => Load(name) != null;
 
         /// <summary>Instancie le modèle sous parent (null si le fichier manque ou est illisible).</summary>
+        /// <summary>Comme Spawn, mais le modèle brille de sa propre couleur (pièces, objets à repérer de loin).</summary>
+        public static Transform SpawnGlow(string name, Transform parent, float glow)
+        {
+            Transform t = Spawn(name, parent);
+            if (t == null) return null;
+            List<Part> parts = Load(name);
+            MeshRenderer[] rs = t.GetComponentsInChildren<MeshRenderer>();
+            for (int i = 0; i < rs.Length && i < parts.Count; i++)
+                if (parts[i].tex != null) rs[i].sharedMaterial = Art.Tex(parts[i].tex, Vector2.one, 0.7f, parts[i].tex, Color.white * glow);
+            return t;
+        }
+
         public static Transform Spawn(string name, Transform parent)
         {
             List<Part> parts = Load(name);
@@ -108,6 +120,7 @@ namespace SamediRouge
                     mesh.RecalculateBounds();
 
                     Material mat = null;
+                    Texture2D ptex = null;
                     if (p.material >= 0 && j.materials != null && p.material < j.materials.Length)
                     {
                         JPbr pbr = j.materials[p.material].pbrMetallicRoughness;
@@ -119,11 +132,12 @@ namespace SamediRouge
                                 tex = ReadImage(j, b, binStart, j.textures[ti].source, name + "_" + ti);
                                 texCache[ti] = tex;
                             }
+                            ptex = tex;
                             if (tex != null) mat = Art.Tex(tex, Vector2.one, 0.55f);
                         }
                     }
                     if (mat == null) mat = Art.Mat(Color.white, 0.4f);
-                    parts.Add(new Part { mesh = mesh, mat = mat });
+                    parts.Add(new Part { mesh = mesh, mat = mat, tex = ptex });
                 }
             return parts;
         }
