@@ -99,6 +99,10 @@ namespace SamediRouge
             devCmdT = -1f; // une seule fois, à la première image
             if (devCmd.Contains("thief")) OnFaction(true);
             if (devCmd.Contains("cop")) OnFaction(false);
+            // « gear 3231 » : niveaux casque / tenue / arme / bouclier du camp choisi (éditeur seulement)
+            var gm = System.Text.RegularExpressions.Regex.Match(devCmd, @"gear\s+(\d)(\d)(\d)(\d)");
+            if (gm.Success)
+                for (int g = 0; g < 4; g++) Progress.SetGearLevel(thief, g, int.Parse(gm.Groups[g + 1].Value));
             if (devCmd.Contains("upgrades")) OpenUpgrades();
             if (devCmd.Contains("tutorial")) StartTutorial(0);
             var sm = System.Text.RegularExpressions.Regex.Match(devCmd, @"street\s+(\d+)");
@@ -470,7 +474,7 @@ namespace SamediRouge
             metaScreen = MetaScreen.Upgrades;
             menuFreeBottom = 1140f;
             menuFill = 0.35f;   // cadrage sur la taille réelle : marge en haut (casque) et en bas
-            menuDrop = 0f;
+            menuDrop = 0.1f;    // personnage un peu plus bas, plus près des cartes
             menuFit = true;
             PreviewGear();
             RefreshUpgrades();
