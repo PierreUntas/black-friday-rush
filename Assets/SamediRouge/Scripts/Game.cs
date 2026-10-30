@@ -2762,6 +2762,13 @@ namespace SamediRouge
                 case ET.Pave:
                     e.depth = 0.35f;
                     e.spin = Art.Node(t, "pave", Vector3.zero);
+                    // caisse en bois 3D (projectile qui tourne : centrée sur son pivot)
+                    if (ObstacleModel(e.spin, "obs_caisse", 0.34f, Vector3.zero, 0f))
+                    {
+                        Transform cm = e.spin.GetChild(e.spin.childCount - 1);
+                        cm.localPosition += new Vector3(0f, -0.17f, 0f);
+                        break;
+                    }
                     Art.Part(e.spin, Art.Cube, Art.Mat(new Color(0.95f, 0.55f, 0.15f), 0.3f), Vector3.zero, new Vector3(0.36f, 0.22f, 0.26f));
                     Art.Part(e.spin, Art.Cube, Art.Mat(Color.white, 0.3f), new Vector3(0f, 0.112f, 0f), new Vector3(0.2f, 0.01f, 0.27f), default, false);
                     break;
@@ -2792,6 +2799,14 @@ namespace SamediRouge
                 case ET.Banderole:
                 {
                     e.depth = 0.25f;
+                    // portique SALE 3D : étiré en hauteur pour que la banderole passe au-dessus de la glissade
+                    if (ObstacleModel(t, "obs_portique", 2.5f, Vector3.zero, 0f))
+                    {
+                        Transform pm = t.GetChild(t.childCount - 1);
+                        pm.localScale = Vector3.Scale(pm.localScale, new Vector3(1f, 2.0f, 1f));
+                        pm.localPosition = new Vector3(pm.localPosition.x, pm.localPosition.y * 2.0f, pm.localPosition.z);
+                        break;
+                    }
                     // panneau SALE sur portique (à passer en glissant)
                     Material pole = Art.Mat(new Color(0.8f, 0.82f, 0.85f), 0.8f, 0.9f);
                     Art.Part(t, Art.Cylinder, pole, new Vector3(-1.15f, 1.3f, 0f), new Vector3(0.07f, 1.3f, 0.07f));
