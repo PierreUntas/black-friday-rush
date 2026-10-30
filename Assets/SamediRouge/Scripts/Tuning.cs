@@ -13,6 +13,8 @@ namespace SamediRouge
         /// un seul geste (glisser à gauche / à droite), plus de saut ni de glissade, moins de texte.
         /// </summary>
         public const bool Arcade = true;
+        /// <summary>Version de test pour l'éditeur : un seul camp, les voleurs (le choix du camp est masqué).</summary>
+        public const bool OnlyThief = true;
         /// <summary>Arcade : délai entre deux tirs automatiques (s) avec le pistolet, et à mains nues.</summary>
         public const float AutoPistolRate = 0.28f, AutoBareRate = 0.45f;
 

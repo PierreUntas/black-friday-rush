@@ -76,7 +76,7 @@ namespace SamediRouge
         int planIdx, runVariant, squadLv, debugVariant = -1;
         float shieldT;
         readonly Queue<int> hpQueue = new Queue<int>();
-        int MaxSquad => campaign && !tutorialMode ? BalanceConfig.I.maxSquad[Mathf.Clamp(squadLv, 0, 3)] : 10;
+        int MaxSquad => Tuning.Arcade ? ArcadeMaxSquad : campaign && !tutorialMode ? BalanceConfig.I.maxSquad[Mathf.Clamp(squadLv, 0, 3)] : 10;
         int MateDmg => campaign && !tutorialMode ? BalanceConfig.I.mateDamage[Mathf.Clamp(squadLv, 0, 3)] : 1;
         int MateArmor => campaign && !tutorialMode ? (squadLv >= 3 ? 2 : squadLv >= 2 ? 1 : 0) : 0;
         static readonly Vector2[] Slots =
@@ -105,7 +105,7 @@ namespace SamediRouge
         class StoreRaid { public int left; public bool lost, perfect, told; public float z; public int side; public Transform beacon; }
         readonly List<StoreRaid> raids = new List<StoreRaid>();
         bool superHitNow, meleeHitNow;
-        bool Looting => campaign && !tutorialMode && !demo && Tuning.MapTheme[Tuning.MapOf(streetIdx)] == 1;
+        bool Looting => !Tuning.Arcade && campaign && !tutorialMode && !demo && Tuning.MapTheme[Tuning.MapOf(streetIdx)] == 1;
         bool Heavy => weaponTier >= 1 && !tutorialMode;
         int BaseDmg => Heavy ? Tuning.HeavyDamage[weaponLv] : Tuning.WeaponDamage[weaponLv];
         string BossName => (thief ? BossThief : BossGuard)[bossType];
@@ -178,6 +178,7 @@ namespace SamediRouge
         /// <summary>Interface (recréée quand le joueur change de langue).</summary>
         void CreateHud()
         {
+            Hud.Quiet = Tuning.Arcade;
             hud = new GameObject("HUD", typeof(RectTransform)).AddComponent<Hud>();
             hud.Init(cam);
 
@@ -536,6 +537,7 @@ namespace SamediRouge
 
             // équipement permanent, cœurs, rue et difficulté (voir GameCampaign)
             ApplyRunConfig();
+            if (Tuning.Arcade) ArcadeStart();
             gearGap = campaign && !tutorialMode ? BalanceConfig.I.gearGap[Diff] : 110f;
             nextSpawnZ = pz + 60f;
             nextGearZ = pz + 55f;
@@ -657,6 +659,9 @@ namespace SamediRouge
             UpdateCamera(udt);
             UpdateAmbience(dt);
             PostFx.Tick(udt);
+            hud.BeginTags();
+            if (st == St.Play && Tuning.Arcade) ArcadeTags();
+            hud.EndTags();
             hud.Tick(udt);
             if (st == St.Play)
             {
@@ -928,13 +933,18 @@ namespace SamediRouge
             UpdateSmg(dt);
             UpdateSquad(dt, h);
             if (st != St.Play) return;
+            if (Tuning.Arcade) ArcadeTick(dt);
 
             UpdateStage(dt);
             if (st != St.Play) return;
 
             // génération devant
             if (tutorialMode) TutorialTick();
-            else while (nextSpawnZ < pz + 110f) nextSpawnZ += SpawnRow(nextSpawnZ);
+            else while (nextSpawnZ < pz + 110f)
+            {
+                float a = Tuning.Arcade ? ArcadeSpawn(nextSpawnZ) : 0f;
+                nextSpawnZ += a > 0f ? a : SpawnRow(nextSpawnZ);
+            }
             if (st != St.Play) return;
 
             for (int i = 0; i < ents.Count; i++)
@@ -1210,9 +1220,18 @@ namespace SamediRouge
             PlayerPrefs.SetInt("sr_perfect_learned", 1);
         }
 
-        void Shoot(Ent target, bool smg)
+        void Shoot(Ent target, bool smg, Vector3? from = null)
         {
             Vector3 muzzle;
+            if (from.HasValue)
+            {
+                // tir d'un membre de la bande : discret (pas de son ni de traînée, il y en a beaucoup)
+                Transform mt = Art.Node(world, "bolt", from.Value);
+                Color mc = Random.value < 0.5f ? new Color(1f, 0.31f, 0.64f) : new Color(0.25f, 0.85f, 0.45f);
+                Art.Part(mt, Art.Sphere, Art.Glow(mc, mc * 2f, 0.6f), Vector3.zero, Vector3.one * 0.12f, default, false);
+                bolts.Add(new Bolt { tr = mt, target = target, smg = true });
+                return;
+            }
             if (smg)
             {
                 P.Recoil();
@@ -1282,7 +1301,7 @@ namespace SamediRouge
                     bolts.RemoveAt(i);
                     Fx.Sparkle(aim);
                     if (e.type == ET.Manif) Bavure(e);
-                    else HitCasseur(e, false, b.smg ? 0.9f : 1.2f, b.smg);
+                    else HitCasseur(e, false, b.smg ? 0.9f : 1.2f, b.smg, Tuning.Arcade && runTier >= 3 ? 2 : 1);
                     if (st != St.Play) return;
                     continue;
                 }
@@ -1816,7 +1835,7 @@ namespace SamediRouge
         {
             for (int i = 0; i < n && squad.Count < MaxSquad; i++)
             {
-                Vector2 sl = Slots[squad.Count];
+                Vector2 sl = SlotAt(squad.Count);
                 Rig.OutlineOverride = Art.OutlineTint(AllyBlue);
                 Rig r = Rig.Build(thief ? Kind.Thief : Kind.Guard, world, new Vector3(px + sl.x, 0f, pz + sl.y), 0f, thief ? Rig.Crew : 0, true, MateArmor);
                 Rig.OutlineOverride = null;
@@ -1860,7 +1879,7 @@ namespace SamediRouge
             for (int i = squad.Count - 1; i >= 0; i--)
             {
                 Mate m = squad[i];
-                Vector2 sl = Slots[m.slot];
+                Vector2 sl = SlotAt(m.slot);
                 float tx = Mathf.Clamp(px + sl.x, -3.5f, 3.5f), tz = pz + sl.y;
                 bool charge = threats.Count > 0;
                 if (charge)
@@ -2058,7 +2077,7 @@ namespace SamediRouge
                 // palier de combo : ralenti et zoom sur le voleur qui s'envole
                 slowMo = Mathf.Max(slowMo, 0.45f);
                 zoom = 0.7f;
-                hud.Toast("COMBO x" + combo + "!");
+                if (!Tuning.Arcade) hud.Toast("COMBO x" + combo + "!");
                 Fx.Confetti(chest + Vector3.up * 0.4f);
             }
             float side = Mathf.Abs(e.x - px) < 0.3f ? (Random.value < 0.5f ? -1f : 1f) : Mathf.Sign(e.x - px);
@@ -2261,6 +2280,8 @@ namespace SamediRouge
 
         void Pickup(ET t, Vector3 p)
         {
+            // arcade : les armes ramassées sont des caisses qui fusionnent (voir GameArcade)
+            if (Tuning.Arcade && (t == ET.Pistolet || t == ET.Mitraillette)) { Fx.Pickup(p); WeaponCrate(p); return; }
             Fx.Pickup(p);
             Fx.Sparkle(p + Vector3.up * 0.5f);
             P.Flash(new Color(1f, 0.95f, 0.6f), 0.1f);
@@ -3170,6 +3191,12 @@ namespace SamediRouge
             else
             {
                 want = new Vector3(px * 0.55f, portrait ? 4.9f : 4.1f, pz - (portrait ? 7.6f : 6.8f));
+                if (Tuning.Arcade)
+                {
+                    // grosse bande : la caméra prend de la hauteur pour voir la foule et la route devant
+                    float ck = Mathf.Clamp01(squad.Count / (float)ArcadeMaxSquad);
+                    want += new Vector3(0f, 2.4f * ck, -2.2f * ck);
+                }
                 look = new Vector3(px * 0.4f, 1.25f, pz + 9f);
                 wantFov = (portrait ? 66f : 54f) + Mathf.InverseLerp(12f, 26f, speed) * 7f;
                 // pendant un ralenti : la caméra se rapproche et resserre le cadre

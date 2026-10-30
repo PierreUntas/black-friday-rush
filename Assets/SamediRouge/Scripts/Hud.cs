@@ -770,6 +770,7 @@ namespace SamediRouge
 
         public void Ticker(string msg, bool alert)
         {
+            if (Quiet) return;
             ticker.text = msg;
             ticker.color = alert ? Yellow : Color.white;
             tickerIn = 1f;
@@ -788,8 +789,58 @@ namespace SamediRouge
         public void Gas(float a) { gas.color = new Color(0.95f, 0.93f, 0.96f, a); }
         public void ComboPop() { comboPop = 1f; }
 
+        // étiquettes posées dans la scène (valeurs des portes, taille de la bande), redessinées à chaque image
+        readonly List<Text> tags = new List<Text>();
+        int tagN;
+
+        public void BeginTags() { tagN = 0; }
+
+        /// <summary>Étiquette à une position du monde ; size : hauteur approximative en mètres.</summary>
+        public void Tag(Vector3 world, string text, Color c, float size)
+        {
+            if (cam == null) return;
+            Vector3 sp = cam.WorldToScreenPoint(world);
+            if (sp.z < 0.5f) return;
+            if (tagN >= tags.Count)
+            {
+                Text nt = Label(canvasRt, "", 60, c, TextAnchor.MiddleCenter, true);
+                Shadowed(nt);
+                Place(nt.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(420f, 200f));
+                nt.transform.SetAsFirstSibling();
+                tags.Add(nt);
+            }
+            Text t = tags[tagN++];
+            if (!t.gameObject.activeSelf) t.gameObject.SetActive(true);
+            t.text = text;
+            t.color = c;
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRt, sp, null, out Vector2 lp);
+            t.rectTransform.anchoredPosition = lp;
+            // taille à l'écran : hauteur en pixels d'un objet de « size » mètres à cette distance
+            float px = size * Screen.height / (2f * sp.z * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad));
+            float k = canvasRt.rect.height / Mathf.Max(1f, Screen.height);
+            t.fontSize = Mathf.Clamp(Mathf.RoundToInt(px * k * 0.5f), 18, 140);
+        }
+
+        public void EndTags()
+        {
+            for (int i = tagN; i < tags.Count; i++) if (tags[i].gameObject.activeSelf) tags[i].gameObject.SetActive(false);
+        }
+
+        /// <summary>Mode arcade : pas de textes flottants ni de bandeau défilant, seulement les infos utiles (portes, fusions).</summary>
+        public static bool Quiet;
+        bool forceFloat;
+
+        /// <summary>Texte flottant qui s'affiche même en mode silencieux (portes, fusions d'armes).</summary>
+        public void FloatKey(Vector3 world, string text, Color c, bool big = true)
+        {
+            forceFloat = true;
+            Float(world, text, c, big);
+            forceFloat = false;
+        }
+
         public void Float(Vector3 world, string text, Color c, bool big = false)
         {
+            if (Quiet && !forceFloat) return;
             Floater f = null;
             foreach (Floater x in floaters) if (x.life <= 0f) { f = x; break; }
             if (f == null) f = floaters[0];
@@ -822,7 +873,7 @@ namespace SamediRouge
                 if (hearts[i].gameObject.activeSelf) hearts[i].gameObject.SetActive(false);
             SetHealth(heartsLeft, maxHearts);
             koT.text = ko + " " + (ko == 1 ? koNoun : koNouns);
-            bool combo = comboMult > 1f;
+            bool combo = comboMult > 1f && !Quiet;
             if (comboBg.gameObject.activeSelf != combo) comboBg.gameObject.SetActive(combo);
             if (combo) comboT.text = "COMBO x" + comboMult.ToString("0.#").Replace('.', ',');
             bool recOn = rec && Mathf.Repeat(Time.unscaledTime, 1f) < 0.65f;

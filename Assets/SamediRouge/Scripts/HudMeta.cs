@@ -649,6 +649,7 @@ namespace SamediRouge
             facThief = Button(sa, L("ROBBERS", "VOLEURS"), ThiefRed, new Vector2(0.5f, 0f), new Vector2(255f, 1660f), new Vector2(490f, 96f), 40, () => onFaction?.Invoke(true), out _);
             FactionIcon(facGuard.rectTransform, false, new Vector2(0f, 0.5f), new Vector2(52f, 0f), 70f);
             FactionIcon(facThief.rectTransform, true, new Vector2(0f, 0.5f), new Vector2(52f, 0f), 74f);
+            if (Tuning.OnlyThief) { facGuard.gameObject.SetActive(false); facThief.gameObject.SetActive(false); }
 
             // onglets des maps (quartiers)
             tabBg = new Image[Tuning.Maps];

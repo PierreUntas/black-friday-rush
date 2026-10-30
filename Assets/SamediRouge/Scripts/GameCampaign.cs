@@ -71,6 +71,7 @@ namespace SamediRouge
         {
             LoadBalance();
             Balance.PrecomputeAsync(Mathf.Max(0, Progress.NextStreet(Progress.Thief)));
+            if (Tuning.OnlyThief) Progress.Thief = true;
             thief = Progress.Thief;
             if (!Progress.TutorialDone && !Tuning.Arcade) StartTutorial(0);   // arcade : pas de tutoriel, le jeu se comprend seul
             else
@@ -495,6 +496,7 @@ namespace SamediRouge
 
         void OnFaction(bool t)
         {
+            if (Tuning.OnlyThief) t = true;
             if (t == thief) return;
             thief = t;
             Progress.Thief = t;
