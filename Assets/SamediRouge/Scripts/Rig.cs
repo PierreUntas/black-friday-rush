@@ -444,6 +444,12 @@ namespace SamediRouge
                 r.heavyLv3.gameObject.SetActive(false);
                 hb.gameObject.SetActive(false);
                 r.heavyBaton = hb;
+                // arme renforcée 3D (matraque cloutée / barre de fer) : remplace les formes et les bagues de niveau
+                if (ReplaceSlot(hb, thief ? "arme_heavy_voleur" : "arme_heavy_police", 0.95f, 1, new Vector3(0f, 0f, 0.4f), 90f, 0f) != null)
+                {
+                    if (r.heavyLv2 != null) { Object.Destroy(r.heavyLv2.gameObject); r.heavyLv2 = null; }
+                    if (r.heavyLv3 != null) { Object.Destroy(r.heavyLv3.gameObject); r.heavyLv3 = null; }
+                }
             }
             r.fistTrail = Trail(Art.Node(r.handR, "fist", Vector3.zero), new Color(1f, 0.6f, 0.4f), 0.2f);
             r.trail = r.fistTrail;

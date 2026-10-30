@@ -381,9 +381,29 @@ namespace SamediRouge
             }
         }
 
+        /// <summary>Accessoire de décor 3D (Meshy) posé au sol : taille = plus grande dimension au sol. Faux si le modèle manque.</summary>
+        public static bool Prop(Transform t, string name, float size, Vector3 pos, float yaw)
+        {
+            if (!GlbModel.Exists(name)) return false;
+            Transform m = GlbModel.Spawn(name, t);
+            Bounds b = new Bounds();
+            bool first = true;
+            foreach (MeshFilter f in m.GetComponentsInChildren<MeshFilter>())
+            {
+                if (first) { b = f.sharedMesh.bounds; first = false; } else b.Encapsulate(f.sharedMesh.bounds);
+            }
+            float k = size / Mathf.Max(0.001f, Mathf.Max(b.size.x, b.size.z));
+            Quaternion q = Quaternion.Euler(0f, yaw, 0f);
+            m.localScale = Vector3.one * k;
+            m.localRotation = q;
+            m.localPosition = pos - q * (new Vector3(b.center.x, b.min.y, b.center.z) * k);
+            return true;
+        }
+
         void Palm(Transform t, int s, float z)
         {
             float x = s * (ShopX - 1.3f);
+            if (Prop(t, "dec_plante", 1.7f, new Vector3(x, 0f, z), Random.Range(0f, 360f))) return;
             Art.Part(t, Art.Cube, planter, new Vector3(x, 0.4f, z), new Vector3(1.2f, 0.8f, 1.2f));
             Art.Part(t, Art.Cylinder, trunk, new Vector3(x, 1.9f, z), new Vector3(0.18f, 1.2f, 0.18f));
             for (int i = 0; i < 6; i++)
@@ -398,6 +418,7 @@ namespace SamediRouge
         void Bench(Transform t, int s, float z)
         {
             float x = s * (ShopX - 1.1f);
+            if (Prop(t, "dec_banc", 2.2f, new Vector3(x, 0f, z), 90f)) return;
             Art.Part(t, Art.Cube, bench, new Vector3(x, 0.45f, z), new Vector3(0.6f, 0.1f, 2.2f));
             Art.Part(t, Art.Cube, frameMat, new Vector3(x, 0.22f, z - 0.9f), new Vector3(0.5f, 0.44f, 0.08f), default, false);
             Art.Part(t, Art.Cube, frameMat, new Vector3(x, 0.22f, z + 0.9f), new Vector3(0.5f, 0.44f, 0.08f), default, false);
