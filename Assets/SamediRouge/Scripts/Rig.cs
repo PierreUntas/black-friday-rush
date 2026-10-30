@@ -205,6 +205,7 @@ namespace SamediRouge
             else if (Use3DEnemies && k == Kind.Thief && variant >= 0) r.skin3d = Skin3D.Attach(r, variant == Crew ? "voleur" : "pillard");
             // policiers adverses et recrues du policier : modèle « flic » (uniforme marine)
             else if (Use3DEnemies && k == Kind.Guard && variant >= 0) r.skin3d = Skin3D.Attach(r, "flic");
+            if (r.skin3d != null) ArmorModels(r, k == Kind.Guard);
             r.Tick(0f);
             return r;
         }
@@ -783,6 +784,25 @@ namespace SamediRouge
         }
 
         /// <summary>Une protection saute (coup qui ne met pas encore K.-O.).</summary>
+        /// <summary>
+        /// Protections des adversaires en 3D : au lieu de la boule grise, un vrai casque intégral (policier : casque d'élite,
+        /// pillard : casque de moto) et un gilet (pare-balles / gilet tagué). Elles sautent toujours sous les coups.
+        /// </summary>
+        static void ArmorModels(Rig r, bool guard)
+        {
+            foreach (Transform a in r.armor)
+            {
+                if (a == null) continue;
+                if (a.name == "armorHelmet")
+                    ReplaceSlot(a, guard ? "casque_police_niv3" : "casque_voleur_niv3", 0.39f, 0, new Vector3(0f, 0.23f, 0f), 0f, 0f);
+                else if (a.name == "armorChest")
+                {
+                    Transform m = ReplaceSlot(a, guard ? "gilet_police_niv2" : "gilet_voleur_niv3", 0.74f, 0, new Vector3(0f, 0.27f, 0f), 0f, 0f);
+                    if (m != null) FitTorso(m);
+                }
+            }
+        }
+
         public void ShedArmor(Vector3 push)
         {
             if (armor.Count == 0) return;
