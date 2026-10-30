@@ -498,7 +498,7 @@ namespace SamediRouge
         /// <summary>Le personnage grandit un peu avec sa puissance (niveaux cumulés), pour une différence visible.</summary>
         void PowerScale(int totalLevel)
         {
-            if (P != null && P.root != null) P.root.localScale = Vector3.one * Rig.Scale * (1f + 0.03f * totalLevel);
+            if (P != null && P.root != null) P.root.localScale = Vector3.one * Rig.Scale * (1f + 0.01f * totalLevel);   // l'équipement 3D se voit déjà : croissance discrète
         }
 
         void RefreshUpgrades()
