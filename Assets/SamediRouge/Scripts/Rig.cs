@@ -212,6 +212,8 @@ namespace SamediRouge
                 bool copBoss = look >= 6 && look != 12;
                 r.skin3d = Skin3D.Attach(r, copBoss ? "boss_flic" : "boss_voleur");
             }
+            // passants : deux modèles (homme / femme) répartis selon la variante
+            else if (Use3DEnemies && k == Kind.Shopper) r.skin3d = Skin3D.Attach(r, (variant & 1) == 0 ? "passant_1" : "passant_2");
             if (r.skin3d != null) ArmorModels(r, k == Kind.Guard);
             r.Tick(0f);
             return r;
