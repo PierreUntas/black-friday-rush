@@ -205,6 +205,13 @@ namespace SamediRouge
             else if (Use3DEnemies && k == Kind.Thief && variant >= 0) r.skin3d = Skin3D.Attach(r, variant == Crew ? "voleur" : "pillard");
             // policiers adverses et recrues du policier : modèle « flic » (uniforme marine)
             else if (Use3DEnemies && k == Kind.Guard && variant >= 0) r.skin3d = Skin3D.Attach(r, "flic");
+            // boss : un modèle costaud par camp (tenues 6-11 et 13 = boss policiers, les autres = boss voleurs)
+            else if (Use3DEnemies && k == Kind.Boss)
+            {
+                int look = variant >= BossLook ? variant - BossLook : -1;
+                bool copBoss = look >= 6 && look != 12;
+                r.skin3d = Skin3D.Attach(r, copBoss ? "boss_flic" : "boss_voleur");
+            }
             if (r.skin3d != null) ArmorModels(r, k == Kind.Guard);
             r.Tick(0f);
             return r;
