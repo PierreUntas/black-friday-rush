@@ -122,7 +122,7 @@ namespace SamediRouge
         bool demo;
         float demoT, autoT;
 
-        class Bolt { public Transform tr; public Ent target; public bool smg; }
+        class Bolt { public Transform tr; public Ent target; public bool smg; public Transform bat; public float spin; }
         int smgShots;
         readonly List<Bolt> bolts = new List<Bolt>();
         int hearts, coins, combo, idle;
@@ -1267,6 +1267,7 @@ namespace SamediRouge
                 bolts.Add(new Bolt { tr = mt, target = target, smg = true });
                 return;
             }
+            if (Tuning.Arcade && !smg && !gear[GPistol]) { ThrowBat(target); return; }
             if (smg)
             {
                 P.Recoil();
@@ -1329,7 +1330,7 @@ namespace SamediRouge
                 }
                 Vector3 aim = new Vector3(e.x, 1.15f, e.z);
                 Vector3 d = aim - b.tr.position;
-                float step = 75f * dt;
+                float step = (b.bat != null ? 30f : 75f) * dt;
                 if (d.magnitude <= step + 0.3f)
                 {
                     Destroy(b.tr.gameObject);
@@ -1342,6 +1343,12 @@ namespace SamediRouge
                 }
                 b.tr.position += d / d.magnitude * step;
                 b.tr.rotation = Quaternion.LookRotation(d);
+                if (b.bat != null)
+                {
+                    // batte lancée : elle tournoie sur elle-même
+                    b.spin += dt * 1300f;
+                    b.bat.localRotation = Quaternion.Euler(b.spin, 0f, 90f);
+                }
             }
         }
 

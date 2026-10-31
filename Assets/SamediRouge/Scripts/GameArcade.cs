@@ -214,6 +214,43 @@ namespace SamediRouge
         Transform heldIcon, mergeA, mergeB, newIcon;
         float mergeT = -1f, popT = -1f;
 
+        /// <summary>Modèle 3D (GLB) centré sous parent et mis à la taille voulue (plus grande dimension), sans ombre. Null s'il manque.</summary>
+        static Transform FitModel(Transform parent, string name, float size)
+        {
+            if (!GlbModel.Exists(name)) return null;
+            Transform m = GlbModel.Spawn(name, parent);
+            if (m == null) return null;
+            m.localPosition = Vector3.zero;
+            m.localRotation = Quaternion.Euler(0f, 180f, 0f);
+            m.localScale = Vector3.one;
+            Renderer[] rs = m.GetComponentsInChildren<Renderer>();
+            if (rs.Length > 0)
+            {
+                Bounds bb = rs[0].bounds;
+                foreach (Renderer r in rs) bb.Encapsulate(r.bounds);
+                float k = size / Mathf.Max(0.001f, Mathf.Max(bb.size.x, Mathf.Max(bb.size.y, bb.size.z)));
+                m.localScale = Vector3.one * k;
+                m.localPosition = -parent.InverseTransformVector(bb.center - parent.position) * k;
+            }
+            foreach (Renderer r in rs) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            return m;
+        }
+
+        /// <summary>Arcade, à mains nues : le héros lance sa batte (une nouvelle à chaque fois), qui tournoie jusqu'à l'ennemi.</summary>
+        void ThrowBat(Ent target)
+        {
+            P.throwT = 0f;
+            Snd.PlayPitch(Snd.I.whoosh, 0.35f, Random.Range(1.1f, 1.3f));
+            Transform tr = Art.Node(world, "bat", new Vector3(px + 0.3f, 1.5f, pz + 0.5f));
+            var spinner = new GameObject("spin").transform;
+            spinner.SetParent(tr, false);
+            if (FitModel(spinner, "arme_voleur_niv1", 1.35f) == null)
+                Art.Part(spinner, Art.Cylinder, Art.Mat(new Color(0.62f, 0.4f, 0.2f), 0.4f), Vector3.zero, new Vector3(0.13f, 0.6f, 0.13f), default, false);
+            TrailRenderer trl = Trail(tr);   // traînée : la batte se suit des yeux
+            trl.emitting = true;
+            bolts.Add(new Bolt { tr = tr, target = target, smg = false, bat = spinner });
+        }
+
         static string TierModel(int tier) => tier >= 2 ? "arme_voleur_niv3" : "arme_voleur_niv2";
 
         Transform WeaponIcon(int tier, Vector3 at)
@@ -222,27 +259,12 @@ namespace SamediRouge
             h.SetParent(world, false);
             h.localPosition = at;
             // modèle de l'arme mis à la taille voulue d'après sa vraie boîte englobante (rendu), centré sur la bulle
-            Transform m = GlbModel.Exists(TierModel(tier)) ? GlbModel.Spawn(TierModel(tier), h) : null;
-            if (m != null)
-            {
-                m.localPosition = Vector3.zero;
-                m.localRotation = Quaternion.Euler(0f, 180f, 0f);
-                m.localScale = Vector3.one;
-                Renderer[] rs = m.GetComponentsInChildren<Renderer>();
-                if (rs.Length > 0)
-                {
-                    Bounds bb = rs[0].bounds;
-                    foreach (Renderer r in rs) bb.Encapsulate(r.bounds);
-                    float k = 1.1f / Mathf.Max(0.001f, Mathf.Max(bb.size.x, Mathf.Max(bb.size.y, bb.size.z)));
-                    m.localScale = Vector3.one * k;
-                    m.localPosition = -h.InverseTransformVector(bb.center - h.position) * k;
-                }
-                foreach (Renderer r in rs) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            }
-            else Art.Part(h, Art.Cube, Art.Glow(new Color(1f, 0.8f, 0.3f), new Color(0.6f, 0.4f, 0.05f), 0.85f), Vector3.zero, new Vector3(0.9f, 0.26f, 0.18f));
+            Transform m = FitModel(h, TierModel(tier), 1.1f);
+            if (m == null)
+                Art.Part(h, Art.Cube, Art.Glow(new Color(1f, 0.8f, 0.3f), new Color(0.6f, 0.4f, 0.05f), 0.85f), Vector3.zero, new Vector3(0.9f, 0.26f, 0.18f));
             // bulle dorée translucide autour de l'arme : lisible au-dessus de la foule
             Art.Part(h, Art.Sphere, Art.Particle(null, new Color(1f, 0.85f, 0.3f, 0.35f)), Vector3.zero, Vector3.one * 1.35f, default, false);
-            Perf.Note("icône arme " + tier + " en " + h.position + " (" + (m != null ? m.GetComponentsInChildren<Renderer>().Length : 0) + " rendus)");
+            Perf.Note("icône arme " + tier + " en " + h.position);
             if (tier >= 3)
             {
                 // arme maximale : halo doré
