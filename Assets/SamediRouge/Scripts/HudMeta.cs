@@ -906,6 +906,9 @@ namespace SamediRouge
         /// Fin de course : gain animé, solde, POWER et CREW avec jauge vers le prochain achat, RETRY (ou suite en cas de victoire).
         /// tracks null : pas d'améliorations (tutoriel), le texte prend la place.
         /// </summary>
+        /// <summary>Écran de fin épuré (arcade) : ni texte d'explication, ni REJOUER / CARTE, ni lien vers l'équipement.</summary>
+        public bool minimalResult;
+
         public void ShowResult(bool victory, string tag, string title, string body, int earned, int bank, Track[] tracks, string tip, string contLabel = null)
         {
             if (resContLabel != null) resContLabel.text = contLabel ?? L("CONTINUE", "CONTINUER");
@@ -948,6 +951,12 @@ namespace SamediRouge
             resUpg.SetActive(tracks != null);
             resUpgLabel.text = victory ? L("REPLAY", "REJOUER") : L("EQUIPMENT", "ÉQUIPEMENT");
             resMap.SetActive(tracks != null);
+            if (minimalResult)
+            {
+                resUpg.SetActive(false);
+                resMap.SetActive(!victory);   // après un K.-O., on peut encore revenir à la carte
+                resMore.gameObject.SetActive(false);
+            }
             resRoot.transform.localScale = Vector3.one * 0.94f;
         }
 
@@ -975,7 +984,7 @@ namespace SamediRouge
                 int glv = Progress.GearLevel(thiefMode, t.data.gear);
                 t.icon.sprite = GearIcons.Upgrade(t.data.gear, thiefMode, t.data.cost < 0 ? glv : glv + 1); // le niveau à gagner : ça donne envie
                 t.level.text = t.data.level;
-                t.effect.text = t.data.effect;
+                t.effect.text = minimalResult ? "" : t.data.effect;
                 RefreshTrack(t, bank, false);
             }
             resTotal.text = L("BALANCE:  ", "SOLDE :  ") + bank + " " + Tuning.Cur;

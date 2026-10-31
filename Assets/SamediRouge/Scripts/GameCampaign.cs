@@ -293,6 +293,9 @@ namespace SamediRouge
             return t;
         }
 
+        /// <summary>Arcade : une seule amélioration proposée en fin de course, l'arme de départ.</summary>
+        Hud.Track[] ArcadeTracks() => new[] { Tracks()[0] };
+
         void ShowVictory()
         {
             LogRun(true);
@@ -322,6 +325,14 @@ namespace SamediRouge
             if (GiveFirstWeapon()) tip = FirstWeaponTip(true);
             bool sameMap = next >= 0 && Tuning.MapOf(next) == Tuning.MapOf(streetIdx);
             string cont = pendingUnlockMap >= 0 ? L("CONTINUE - LEVEL ", "CONTINUER - NIVEAU ") + (pendingUnlockMap + 1) : sameMap ? L("NEXT: ", "SUIVANTE : ") + Tuning.StreetNames[next] : L("CONTINUE", "CONTINUER");
+            if (Tuning.Arcade)
+            {
+                // arcade (retours YSO) : écran de fin minimal — le gain, une amélioration (l'arme de départ), CONTINUER
+                hud.minimalResult = true;
+                hud.ShowResult(true, L("MEGA STORE RAIDED!", "MEGA STORE PILLÉ !"), "", "", total, Progress.Coins, ArcadeTracks(), "", L("CONTINUE", "CONTINUER"));
+                return;
+            }
+            hud.minimalResult = false;
             hud.ShowResult(true, Tuning.Arcade && pendingUnlockMap < 0 ? L("MEGA STORE RAIDED!", "MEGA STORE PILLÉ !") : pendingUnlockMap >= 0 ? L("LEVEL " + (pendingUnlockMap + 1) + " UNLOCKED!", "NIVEAU " + (pendingUnlockMap + 1) + " DÉBLOQUÉ !") : already ? L("STREET HELD!", "RUE DÉFENDUE !") : L("STREET CONQUERED!", "RUE CONQUISE !"),
                            Tuning.StreetNames[streetIdx], body, total, Progress.Coins, Tracks(), tip, cont);
         }
@@ -366,6 +377,8 @@ namespace SamediRouge
             string body = RunSummary() + "\n<color=#FF7A6B>" + cause + L("  ·  reached ", "  ·  atteint : ") + where + "</color>";
             string tip = boss != null && superCount == 0 ? L("Tip: jump, then tap as you land = NINJA STRIKE x3!", "Astuce : saute, puis tape à l'atterrissage = COUP NINJA x3 !") : DefeatTip();
             if (GiveFirstWeapon()) tip = FirstWeaponTip(false);
+            hud.minimalResult = Tuning.Arcade;
+            if (Tuning.Arcade) { hud.ShowResult(false, L("KNOCKED OUT", "K.-O."), "", "", keep, Progress.Coins, ArcadeTracks(), ""); return; }
             hud.ShowResult(false, L("KNOCKED OUT", "K.-O."), Tuning.StreetNames[streetIdx], body, keep, Progress.Coins, Tracks(), tip);
         }
 

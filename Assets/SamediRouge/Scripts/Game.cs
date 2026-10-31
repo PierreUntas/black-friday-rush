@@ -1585,7 +1585,7 @@ namespace SamediRouge
                     // armé de l'attaque : on voit venir le coup
                     bossWind = 0f;
                     bossMove = BossMove();
-                    if (Tuning.Arcade && bossMove == 1) bossMove = 3;   // onde de choc (à sauter) remplacée par deux caisses
+                    if (Tuning.Arcade) bossMove = 0;   // arcade (retours YSO) : une seule attaque lisible, un carton lancé sur ton couloir
                     bossTargetLane = lane;
                     bossThrow = bossMove == 0 || bossMove == 3;
                     switch (bossMove)
@@ -2072,7 +2072,7 @@ namespace SamediRouge
             }
             if (e.type == ET.Loup)
             {
-                if (bossType == 6 && !superHitNow && bossStunT <= 0f)
+                if (bossType == 6 && !superHitNow && bossStunT <= 0f && !Tuning.Arcade)
                 {
                     // le chef de bande encaisse : seuls les Perfect Hits (ou l'ouverture dorée) font mal
                     dmg = 1;
