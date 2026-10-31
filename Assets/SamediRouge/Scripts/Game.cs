@@ -650,7 +650,9 @@ namespace SamediRouge
             }
             float dt = Time.deltaTime;
 
+            Perf.Frame();
             HandleInput();
+            Perf.Mark("input");
 
             switch (st)
             {
@@ -659,10 +661,13 @@ namespace SamediRouge
                 case St.End: EndTick(dt, udt); break;
             }
 
+            Perf.Mark("tick-rest");
             street.Tick(pz);
+            Perf.Mark("street");
             UpdateCamera(udt);
             UpdateAmbience(dt);
             PostFx.Tick(udt);
+            Perf.Mark("cam+fx");
             hud.BeginTags();
             if (st == St.Play && Tuning.Arcade) ArcadeTags();
             hud.EndTags();
@@ -672,6 +677,7 @@ namespace SamediRouge
                 hud.SetPlay(Mathf.FloorToInt(dist), Mathf.FloorToInt(score), hearts, koCount, ComboMult(), rec, gear, squad.Count, shieldHits, shieldT);
                 hud.SetStars(coins);
             }
+            Perf.Mark("hud");
         }
 
         void HandleInput()
@@ -930,14 +936,19 @@ namespace SamediRouge
                 rec = false;
             }
 
+            Perf.Mark("player");
             UpdateBuddy(dt);
             UpdateBolts(dt);
+            Perf.Mark("bolts");
             if (st != St.Play) return;
             UpdateRaids();
             UpdateSmg(dt);
+            Perf.Mark("smg+melee");
             UpdateSquad(dt, h);
+            Perf.Mark("squad");
             if (st != St.Play) return;
             if (Tuning.Arcade) ArcadeTick(dt);
+            Perf.Mark("arcade");
 
             UpdateStage(dt);
             if (st != St.Play) return;
@@ -951,6 +962,7 @@ namespace SamediRouge
                 else if (Tuning.Arcade && campaign && !demo && nextSpawnZ - stageStartZ <= StageLen) nextSpawnZ += ArcadeRow(nextSpawnZ, ShuffledLanes());
                 else nextSpawnZ += SpawnRow(nextSpawnZ);
             }
+            Perf.Mark("spawn");
             if (st != St.Play) return;
 
             for (int i = 0; i < ents.Count; i++)
@@ -959,6 +971,7 @@ namespace SamediRouge
                 if (st != St.Play) return;
             }
             ents.RemoveAll(e => e.dead);
+            Perf.Mark("ents");
 
             tickT += dt;
             if (tickT > 9f)
@@ -2013,6 +2026,13 @@ namespace SamediRouge
         /// light pour les coups de l'escouade et les rafales : pas d'arrêt sur image, effets plus légers.
         /// </summary>
         void HitCasseur(Ent e, bool byBuddy, float power = 1f, bool light = false, int dmg = 1)
+        {
+            double pt0 = Perf.Begin();
+            HitCasseurIn(e, byBuddy, power, light, dmg);
+            Perf.End("·hit", pt0);
+        }
+
+        void HitCasseurIn(Ent e, bool byBuddy, float power, bool light, int dmg)
         {
             light |= byBuddy;
             Vector3 chest = new Vector3(e.x, 1.2f, e.z);

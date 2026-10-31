@@ -104,6 +104,7 @@ namespace SamediRouge
             if (devCmdT < 0f) return;
 #if UNITY_EDITOR
             if (devCmd.Contains("tris")) devTrisAt = Time.realtimeSinceStartup + 5f;
+            Perf.On = devCmd.Contains("perf");
 #endif
             devCmdT = -1f; // une seule fois, à la première image
             hud.HideTitleNow();

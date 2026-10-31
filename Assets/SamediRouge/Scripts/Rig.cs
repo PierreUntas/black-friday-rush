@@ -81,6 +81,15 @@ namespace SamediRouge
 
         public static Rig Build(Kind k, Transform parent, Vector3 pos, float yaw, int variant = 0, bool outline = true, int armorLevel = 0)
         {
+            double pt0 = Perf.Begin();
+            Rig r = BuildIn(k, parent, pos, yaw, variant, outline, armorLevel);
+            Perf.End("·build", pt0);
+            return r;
+        }
+
+        static Rig BuildIn(Kind k, Transform parent, Vector3 pos, float yaw, int variant, bool outline, int armorLevel)
+        {
+            double q0 = Perf.Begin();
             var r = new Rig { kind = k };
             r.phase = Random.value * 6f;
             r.seed = Random.value * 6f;
@@ -209,9 +218,11 @@ namespace SamediRouge
             }
             r.stars.gameObject.SetActive(false);
 
+            Perf.End("··body", q0); q0 = Perf.Begin();
             r.skin = r.root.GetComponentsInChildren<MeshRenderer>(true);
             if (outline) Art.Outline(r.root, OutlineOverride != null ? 0.032f : k == Kind.Shopper ? 0.018f : 0.022f, OutlineOverride);
             r.renderers = r.root.GetComponentsInChildren<MeshRenderer>(true);
+            Perf.End("··outline", q0); q0 = Perf.Begin();
             // TEST : policier joué en personnage 3D complet (Meshy), animé par ce squelette
             if (Use3DHero && (k == Kind.Guard || k == Kind.Thief) && variant < 0)
             {
@@ -236,7 +247,9 @@ namespace SamediRouge
             else if (Use3DEnemies && k == Kind.Shopper) r.skin3d = Skin3D.Attach(r, (variant & 1) == 0 ? "passant_1" : "passant_2");
             // seuls le héros et le boss gardent ombre portée et boîte englobante recalculée
             if (r.skin3d != null && k != Kind.Boss && !(variant < 0 && (k == Kind.Guard || k == Kind.Thief))) r.skin3d.SetSecondary();
+            Perf.End("··skin3d", q0); q0 = Perf.Begin();
             if (r.skin3d != null) ArmorModels(r, k == Kind.Guard);
+            Perf.End("··armor", q0);
             // personnage 3D : la mitraillette se tient dans la main droite (comme le pistolet dans la gauche),
             // et non plus devant la poitrine, où elle flottait quand les bras du modèle pendent
             if (r.skin3d != null && r.smg != null && r.handR != null)
@@ -1662,6 +1675,13 @@ namespace SamediRouge
         public void KO(Vector3 impulse, Vector3 torque)
         {
             if (ko) return;
+            double pt0 = Perf.Begin();
+            KOIn(impulse, torque);
+            Perf.End("·ko", pt0);
+        }
+
+        void KOIn(Vector3 impulse, Vector3 torque)
+        {
             anim = Anim.Down;
             swingT = -1f;
             throwT = -1f;

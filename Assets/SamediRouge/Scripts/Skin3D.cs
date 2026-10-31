@@ -44,11 +44,34 @@ namespace SamediRouge
             catch (System.Exception e) { Debug.LogWarning("[Skin3D] " + e.Message); return null; }
         }
 
+        // index des os du dernier modèle interrogé : une seule traversée de la hiérarchie au lieu d'une par os
+        // (les recherches récursives coûtaient ~10 ms par personnage créé, d'où des saccades à chaque groupe d'ennemis)
+        static Transform boneRoot;
+        static readonly Dictionary<string, Transform> boneIndex = new Dictionary<string, Transform>();
+
         static Transform Find(Transform t, string bone)
         {
-            if (t.name == bone || t.name.EndsWith(":" + bone)) return t;
-            for (int i = 0; i < t.childCount; i++) { Transform f = Find(t.GetChild(i), bone); if (f != null) return f; }
-            return null;
+            if (t == null) return null;
+            if (!ReferenceEquals(t, boneRoot) || boneRoot == null)
+            {
+                boneRoot = t;
+                boneIndex.Clear();
+                Index(t);
+            }
+            return boneIndex.TryGetValue(bone, out Transform f) ? f : null;
+        }
+
+        static void Index(Transform t)
+        {
+            string n = t.name;
+            if (!boneIndex.ContainsKey(n)) boneIndex[n] = t;
+            int c = n.LastIndexOf(':');
+            if (c >= 0)
+            {
+                string s = n.Substring(c + 1);
+                if (!boneIndex.ContainsKey(s)) boneIndex[s] = t;
+            }
+            for (int i = 0; i < t.childCount; i++) Index(t.GetChild(i));
         }
 
         Skin3D(Rig r, GameObject prefab, string name)
@@ -77,12 +100,14 @@ namespace SamediRouge
             if (r.cap != null) { r.cap.gameObject.SetActive(false); r.cap = null; }
 
             jointSet = joints;
+            double q1 = Perf.Begin();
             Relays(r.handR, "RightHand", "RightHandMiddle1", 0);
             Relays(r.handL, "LeftHand", "LeftHandMiddle1", 0);
             // tête et buste du modèle plus petits que ceux du personnage en blocs : l'équipement est réduit en proportion
             Relays(r.neck, "Neck", null, 1);
             Relays(r.spine, "Spine", null, 2);
             Apply();
+            Perf.End("···relays", q1);
         }
 
         /// <summary>Remplace le modèle 3D (ex. le voleur avec sa tenue achetée) en gardant l'équipement et les relais.</summary>
@@ -104,7 +129,9 @@ namespace SamediRouge
 
         void Load(GameObject prefab, string name)
         {
+            double pq = Perf.Begin();
             Transform m = Object.Instantiate(prefab, holder, false).transform;
+            Perf.End("···inst", pq); pq = Perf.Begin();
             Quaternion q0 = m.localRotation;
             Vector3 s0 = m.localScale;
             m.localPosition = Vector3.zero;
@@ -134,6 +161,7 @@ namespace SamediRouge
             m.localPosition = new Vector3(-mid.x, -foot, -mid.z);
 
             // texture du modèle (matériau du jeu, compatible URP)
+            Perf.End("···fit", pq); pq = Perf.Begin();
             Texture2D tex = Resources.Load<Texture2D>("SamediRouge/Characters/" + name + "_tex");
             Material mat = tex != null ? Art.Tex(tex, Vector2.one, 0.35f) : Art.Mat(Color.white, 0.35f);
             skins = m.GetComponentsInChildren<SkinnedMeshRenderer>(true);
@@ -144,6 +172,7 @@ namespace SamediRouge
                 s.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;   // son ombre au sol : sans elle, le personnage semble flotter
             }
 
+            Perf.End("···mat", pq); pq = Perf.Begin();
             hipsBind = body.InverseTransformPoint(hips.position);
             footL = Find(m, "LeftFoot"); footR = Find(m, "RightFoot");
             if (footL != null) footH = body.InverseTransformPoint(footL.position).y;
@@ -170,9 +199,11 @@ namespace SamediRouge
             headK = neckB != null && top != null ? Mathf.Clamp((P(top).y - P(neckB).y) / 0.455f, 0.35f, 1.2f) : 0.6f;
             wideK = lArm != null && rArm != null ? Mathf.Clamp(Mathf.Abs(P(lArm).x - P(rArm).x) / 0.58f, 0.4f, 1.3f) : 0.8f;
             tallK = neckB != null && spineB != null ? Mathf.Clamp((P(neckB).y - P(spineB).y) / 0.5f, 0.4f, 1.3f) : 0.8f;
+            Perf.End("···map", pq); pq = Perf.Begin();
             fingers.Clear();
             Fingers(m, "Right", true);
             Fingers(m, "Left", false);
+            Perf.End("···fingers", pq);
         }
 
         void Map(Transform code, string bone, string child, Vector3 restDir)
