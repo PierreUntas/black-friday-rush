@@ -700,6 +700,8 @@ namespace SamediRouge
                 else if (st == St.Pause) SetPause(false);
             }
             if (inp.keyStart && st == St.Menu && metaScreen == MetaScreen.Map) hud.onPlayStreet?.Invoke();
+            // accueil arcade : un glissé (ou la barre d'espace) lance la partie
+            if (st == St.Menu && metaScreen == MetaScreen.Home && (inp.swipes.Count > 0 || inp.keyStart)) hud.onHomePlay?.Invoke();
             if (st != St.Play) return;
             if (inp.keySwing && !Tuning.Arcade) Swing();
             if (inp.taps.Count > 0 || inp.keySwing) actSwing = true;
@@ -755,7 +757,7 @@ namespace SamediRouge
             // sur la carte, la fiche joueur remplace le personnage (il reste visible dans les améliorations)
             bool showRig = metaScreen != MetaScreen.Map;
             if (P.root.gameObject.activeSelf != showRig) P.root.gameObject.SetActive(showRig);
-            if (metaScreen == MetaScreen.Upgrades)
+            if (metaScreen == MetaScreen.Upgrades || metaScreen == MetaScreen.Home)
             {
                 // aperçu de l'équipement : le personnage se tourne doucement face à la caméra
                 P.anim = Anim.Stand;

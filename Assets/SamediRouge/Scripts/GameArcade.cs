@@ -105,6 +105,7 @@ namespace SamediRouge
             lootEndZ = -1f;
             mateVolleyT = 0.5f;
             runTier = gear[GSmg] ? 2 : gear[GPistol] ? 1 : 0;
+            if (campaign && !demo && StartCrew > 0) AddMates(StartCrew);   // amélioration « Bande » de l'accueil
             if (campaign && !demo && streetIdx == 0) hud.Toast(L("← SWIPE →", "← GLISSE →"));
         }
 

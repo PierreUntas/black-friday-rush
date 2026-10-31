@@ -9,7 +9,7 @@ namespace SamediRouge
     /// </summary>
     public partial class Game
     {
-        enum MetaScreen { None, Map, Upgrades, Result }
+        enum MetaScreen { None, Map, Upgrades, Result, Home }
 
         bool campaign, runWon, inputDebug, debugBossRush;
         int viewMap = -1, weaponTier, shieldLv, shieldHits;
@@ -50,6 +50,8 @@ namespace SamediRouge
             hud.onDebugOpen = () => { RefreshDebug(); hud.ShowDebug(true); };
             hud.onDebug = DebugAction;
             hud.onMapTab = OnMapTab;
+            hud.onHomePlay = () => { if (st == St.Menu && metaScreen == MetaScreen.Home) StartStreet(HomeStreet()); };
+            hud.onHomeBuy = HomeBuy;
         }
 
         /// <summary>Premier lancement : tutoriel jouable ; ensuite, directement la carte.</summary>
@@ -117,6 +119,7 @@ namespace SamediRouge
             if (gm.Success)
                 for (int g = 0; g < 4; g++) Progress.SetGearLevel(thief, g, int.Parse(gm.Groups[g + 1].Value));
             if (devCmd.Contains("upgrades")) OpenUpgrades();
+            if (devCmd.Contains("home")) ToMenu();
             if (devCmd.Contains("tutorial")) StartTutorial(0);
             var sm = System.Text.RegularExpressions.Regex.Match(devCmd, @"street\s+(\d+)");
             if (sm.Success) StartStreet(int.Parse(sm.Groups[1].Value));
@@ -306,6 +309,7 @@ namespace SamediRouge
             int crewN = squad.Count + 1;
             if (Tuning.Arcade) bonus += crewN * 10;   // arcade : chaque membre de la bande rapporte au pillage
             int total = coins + bonus;
+            if (Tuning.Arcade) total = Mathf.RoundToInt(total * IncomeMult);   // amélioration « Revenus » de l'accueil
             Progress.Coins += total;
             var openBefore = new bool[Tuning.Maps];
             for (int m = 0; m < Tuning.Maps; m++) openBefore[m] = Progress.MapUnlocked(thief, m);
@@ -444,6 +448,7 @@ namespace SamediRouge
 
         void ShowMapScreen(int animate)
         {
+            if (Tuning.Arcade) { ShowHomeScreen(); return; }   // arcade : accueil épuré à la place de la carte
             metaScreen = MetaScreen.Map;
             menuFreeBottom = 1760f;
             menuFill = 0.38f;
@@ -522,6 +527,91 @@ namespace SamediRouge
             ResetPlayerRig();
             P.SetLevels(Progress.GearLevel(thief, 0), Progress.GearLevel(thief, 1), Progress.GearLevel(thief, 2));
             ShowMapScreen(-1);
+        }
+
+        // ------------------------------------------------------------------ accueil arcade (à la Hell Escape)
+
+        const string KCrew = "sr_arc_crew", KIncome = "sr_arc_income";
+        const int HomeMax = 10;
+        static int ArcLevel(string k) => Mathf.Clamp(PlayerPrefs.GetInt(k, 0), 0, HomeMax);
+        static int ArcCost(int lv, int b, int step) => lv >= HomeMax ? -1 : b + step * lv + 5 * lv * lv;
+        /// <summary>Membres de la bande dès le départ (amélioration « Bande »).</summary>
+        static int StartCrew => ArcLevel(KCrew);
+        /// <summary>Multiplicateur des gains (amélioration « Revenus ») : +20 % par niveau.</summary>
+        static float IncomeMult => 1f + 0.2f * ArcLevel(KIncome);
+
+        int HomeStreet()
+        {
+            int nx = Progress.NextStreet(thief);
+            return nx >= 0 ? nx : Tuning.Streets - 1;
+        }
+
+        int HomeCost(int i) => i == 0 ? ArcCost(ArcLevel(KCrew), 40, 30) : i == 1 ? Progress.NextCost(thief, Tuning.Weapon) : ArcCost(ArcLevel(KIncome), 60, 40);
+
+        void ShowHomeScreen()
+        {
+            metaScreen = MetaScreen.Home;
+            menuFreeBottom = 760f;
+            menuFill = 0.34f;
+            menuDrop = 0.1f;
+            menuFit = true;   // cadrage sur la taille réelle du personnage (comme la page Équipement)
+            campaign = false;
+            tutorialMode = false;
+            int si = HomeStreet();
+            selStreet = si;
+            PreviewGear();
+            int map = Tuning.MapOf(si);
+            int theme = Tuning.MapTheme[map];
+            street.SetTheme(theme, pz);
+            ThemeLighting(theme);
+            Color fog = theme >= 1 ? Tuning.StreetFog[Tuning.MapFirst[map]] : Pal.Fog;
+            RenderSettings.fogColor = fog;
+            cam.backgroundColor = fog;
+            street.SetTint(theme >= 1 ? Tuning.StreetFloor[Tuning.MapFirst[map]] : Color.white);
+            RefreshHome();
+        }
+
+        void RefreshHome()
+        {
+            int crew = ArcLevel(KCrew), wl = Progress.GearLevel(thief, Tuning.Weapon), inc = ArcLevel(KIncome);
+            string[] names = { L("CREW", "BANDE"), L("WEAPON", "ARME"), L("INCOME", "REVENUS") };
+            Sprite[] icons = { GearIcons.Get("gang"), GearIcons.Upgrade(Tuning.Weapon, thief, Mathf.Clamp(wl + 1, 1, 3)), GearIcons.Art("dollar") };
+            string[] wNames = { L("Bat", "Batte"), L("Strong bat", "Batte renforcée"), L("Pistol", "Pistolet"), L("Submachine gun", "Mitraillette") };
+            string[] lv =
+            {
+                "+" + crew + L(" at start", " au départ"),
+                wNames[Mathf.Clamp(wl, 0, 3)],
+                "×" + IncomeMult.ToString("0.0").Replace('.', ',')
+            };
+            int[] costs = { HomeCost(0), HomeCost(1), HomeCost(2) };
+            hud.ShowHome(HomeStreet() + 1, Progress.Coins, names, icons, lv, costs);
+        }
+
+        void HomeBuy(int i)
+        {
+            if (metaScreen != MetaScreen.Home) return;
+            int cost = HomeCost(i);
+            if (cost < 0) return;
+            if (Progress.Coins < cost)
+            {
+                Snd.Play(Snd.I.hurt, 0.3f);
+                return;
+            }
+            if (i == 1) Progress.Buy(thief, Tuning.Weapon);
+            else
+            {
+                Progress.Coins -= cost;
+                string k = i == 0 ? KCrew : KIncome;
+                PlayerPrefs.SetInt(k, ArcLevel(k) + 1);
+                PlayerPrefs.Save();
+            }
+            Snd.Play(Snd.I.pickup, 0.9f, 0f);
+            Haptics.Pulse(40, true);
+            PreviewGear();
+            P.Land(0.3f);
+            P.Flash(new Color(1f, 0.95f, 0.6f), 0.15f);
+            RefreshHome();
+            hud.PopHome(i);
         }
 
         void OpenUpgrades()

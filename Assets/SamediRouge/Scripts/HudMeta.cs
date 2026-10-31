@@ -621,6 +621,7 @@ namespace SamediRouge
             BuildMap();
             BuildUpgrades();
             BuildResult();
+            BuildHome();
             BuildDebug();
             inputDbg = Label(canvasRt, "", 54, Yellow, TextAnchor.MiddleCenter, true);
             Shadowed(inputDbg);
@@ -1115,6 +1116,7 @@ namespace SamediRouge
             upgRoot.SetActive(false);
             resRoot.SetActive(false);
             dbgRoot.SetActive(false);
+            if (homeRoot != null) homeRoot.SetActive(false);
         }
 
         void HideGameScreens()
@@ -1379,6 +1381,7 @@ namespace SamediRouge
         {
             TickMap(udt);
             TickTitle(udt);
+            TickHome(udt);
             if (upgRoot != null && upgRoot.activeSelf && gBuy != null)
                 for (int i = 0; i < gBuy.Length; i++)
                     if (gAfford[i]) gBuy[i].transform.localScale = Vector3.one * BuyPulse(Time.unscaledTime, i * 0.15f);
