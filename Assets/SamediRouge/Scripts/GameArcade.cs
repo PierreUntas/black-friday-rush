@@ -34,6 +34,18 @@ namespace SamediRouge
 
         readonly List<Craft> crafts = new List<Craft>();
 
+        /// <summary>Finale : cartons de butin numérotés devant le MEGA STORE, à casser en tirant (comme les caisses de Hell Escape).</summary>
+        class LootBox
+        {
+            public Transform tr;
+            public int lane, hp, max;
+            public float z, punch;
+            public bool broken;
+        }
+
+        readonly List<LootBox> loot = new List<LootBox>();
+        float lootEndZ = -1f;
+
         readonly List<Gate> gates = new List<Gate>();
         float nextGateZ, nextCrateZ, mateVolleyT;
         /// <summary>Niveau d'arme de la course : 0 mains nues, 1 pistolet, 2 mitraillette, 3 mitraillette renforcée.</summary>
@@ -88,6 +100,9 @@ namespace SamediRouge
             ClearMergeIcons();
             foreach (Craft c in crafts) if (c.go != null) Destroy(c.go);
             crafts.Clear();
+            foreach (LootBox b in loot) if (b.tr != null) Destroy(b.tr.gameObject);
+            loot.Clear();
+            lootEndZ = -1f;
             mateVolleyT = 0.5f;
             runTier = gear[GSmg] ? 2 : gear[GPistol] ? 1 : 0;
             if (campaign && !demo && streetIdx == 0) hud.Toast(L("← SWIPE →", "← GLISSE →"));
@@ -191,6 +206,16 @@ namespace SamediRouge
                         if (d < bd) { bd = d; best = e; }
                     }
                     if (best != null) Shoot(best, true, new Vector3(m.x, 1.2f, m.z + 0.4f));
+                    else if (loot.Count > 0)
+                    {
+                        int ml = Mathf.Clamp(Mathf.RoundToInt(m.x / Lane) + 1, 0, 2);
+                        LootBox lb = NearestLoot(ml, m.z, 24f) ?? NearestLoot(-1, m.z, 24f);
+                        if (lb != null)
+                        {
+                            Shoot(null, true, new Vector3(m.x, 1.2f, m.z + 0.4f));
+                            bolts[bolts.Count - 1].loot = lb;
+                        }
+                    }
                 }
             }
         }
@@ -422,8 +447,29 @@ namespace SamediRouge
         bool ArcadeFinale()
         {
             if (!campaign || tutorialMode || demo) return false;
-            finaleZ = pz + 34f;
+            // un champ de cartons de butin, puis le magasin
+            const int rows = 7;
+            float z0 = pz + 18f, gap = 6.5f;
+            lootEndZ = z0 + (rows - 1) * gap;
+            finaleZ = lootEndZ + 22f;
             nextSpawnZ = 1e9f;
+            foreach (LootBox b in loot) if (b.tr != null) Destroy(b.tr.gameObject);
+            loot.Clear();
+            Material card = Art.Mat(new Color(0.78f, 0.56f, 0.32f), 0.25f);
+            Material tape = Art.Mat(new Color(0.55f, 0.36f, 0.18f), 0.3f);
+            Material gold = Art.Glow(new Color(1f, 0.8f, 0.25f), new Color(1.3f, 0.9f, 0.2f), 0.6f);
+            for (int r = 0; r < rows; r++)
+                for (int l = 0; l < 3; l++)
+                {
+                    int hp = Mathf.Max(1, 1 + Mathf.RoundToInt(r * 0.7f) + Random.Range(0, 2) + runTier);
+                    var b = new LootBox { lane = l, z = z0 + r * gap + Random.Range(-0.6f, 0.6f), hp = hp, max = hp };
+                    b.tr = Art.Node(world, "loot", new Vector3((l - 1) * Lane, 0f, b.z));
+                    float k = 0.8f + 0.06f * Mathf.Min(hp, 8);   // les cartons solides sont plus gros
+                    Art.Part(b.tr, Art.Cube, card, new Vector3(0f, 0.6f * k, 0f), new Vector3(1.4f, 1.2f, 1.1f) * k);
+                    Art.Part(b.tr, Art.Cube, tape, new Vector3(0f, 1.2f * k + 0.01f, 0f), new Vector3(0.3f, 0.02f, 1.12f) * k, default, false);
+                    Art.Part(b.tr, Art.Cylinder, gold, new Vector3(0f, 1.2f * k + 0.08f, 0f), new Vector3(0.45f, 0.06f, 0.45f) * k, default, false);
+                    loot.Add(b);
+                }
             // les vigiles restants s'enfuient
             foreach (Ent e in ents)
                 if (!e.dead && !e.hit && e.type == ET.Casseur && e.rig != null)
@@ -432,6 +478,7 @@ namespace SamediRouge
                     e.rig.KO(new Vector3(Random.Range(-4f, 4f), 6f, 6f), new Vector3(Random.Range(-5f, 5f), 0f, Random.Range(-5f, 5f)));
                 }
             BuildStore(finaleZ);
+            Perf.Note("finale : " + loot.Count + " cartons jusqu'à " + lootEndZ.ToString("0") + ", magasin à " + finaleZ.ToString("0"));
             hud.Toast(L("RAID THE MEGA STORE!", "PILLE LE MEGA STORE !"));
             return true;
         }
@@ -474,8 +521,13 @@ namespace SamediRouge
         void FinaleTick()
         {
             if (finaleZ < 0f) return;
-            lane = 1;
-            speed = Mathf.Max(speed, 15f);
+            LootTick();
+            if (pz < lootEndZ + 3f) speed = 9.5f;   // champ de cartons : on garde le contrôle, un peu plus lentement
+            else
+            {
+                lane = 1;
+                speed = Mathf.Max(speed, 15f);
+            }
             foreach (Mate m in squad)
                 if (m.rig != null && m.z > finaleZ + 0.5f && m.rig.root.gameObject.activeSelf) m.rig.root.gameObject.SetActive(false);
             if (pz > finaleZ + 0.6f) P.SetVisible(false);
@@ -522,6 +574,13 @@ namespace SamediRouge
         bool ArcadeShootProps()
         {
             int l = Mathf.Clamp(Mathf.RoundToInt(px / Lane) + 1, 0, 2);
+            LootBox lb = NearestLoot(l, pz, 30f);
+            if (lb != null)
+            {
+                Shoot(null, gear[GSmg]);
+                bolts[bolts.Count - 1].loot = lb;
+                return true;
+            }
             foreach (Craft c in crafts)
             {
                 float d = c.z - pz;
@@ -541,6 +600,62 @@ namespace SamediRouge
                 return true;
             }
             return false;
+        }
+
+        LootBox NearestLoot(int lane, float fromZ, float range)
+        {
+            LootBox best = null;
+            foreach (LootBox b in loot)
+            {
+                if (b.broken || (lane >= 0 && b.lane != lane)) continue;
+                float d = b.z - fromZ;
+                if (d < 1f || d > range) continue;
+                if (best == null || b.z < best.z) best = b;
+            }
+            return best;
+        }
+
+        void LootHit(LootBox b)
+        {
+            if (b.broken) return;
+            b.hp--;
+            b.punch = 1f;
+            if (b.hp > 0) return;
+            b.broken = true;
+            int gain = b.max * 3;
+            coins += gain;
+            Vector3 p = b.tr.position + Vector3.up * 0.8f;
+            Fx.Debris(p);
+            Fx.Coin(p);
+            hud.FloatKey(p + Vector3.up * 0.6f, "+" + gain, Hud.StarGold, false);
+            Snd.Play(Snd.I.coin, 0.6f);
+            Destroy(b.tr.gameObject);
+        }
+
+        /// <summary>Cartons : rebond quand on les touche ; celui qu'on percute sans l'avoir cassé s'écrase sans rien rapporter.</summary>
+        void LootTick()
+        {
+            int l = Mathf.Clamp(Mathf.RoundToInt(px / Lane) + 1, 0, 2);
+            for (int i = loot.Count - 1; i >= 0; i--)
+            {
+                LootBox b = loot[i];
+                if (b.broken || b.tr == null) { loot.RemoveAt(i); continue; }
+                if (b.punch > 0f)
+                {
+                    b.punch = Mathf.Max(0f, b.punch - Time.deltaTime * 6f);
+                    b.tr.localScale = Vector3.one * (1f + 0.15f * b.punch);
+                }
+                if (b.lane == l && pz >= b.z - 0.9f)
+                {
+                    b.broken = true;
+                    Fx.Debris(b.tr.position + Vector3.up * 0.6f);
+                    shake = Mathf.Max(shake, 0.15f);
+                    Destroy(b.tr.gameObject);
+                    loot.RemoveAt(i);
+                    continue;
+                }
+                if (b.z < pz - 4f) { Destroy(b.tr.gameObject); loot.RemoveAt(i); }
+            }
         }
 
         /// <summary>Une porte touchée : +1 (les portes négatives remontent vers le positif), et ×N+1 tous les 4 coups.</summary>
@@ -620,7 +735,9 @@ namespace SamediRouge
                 for (int l = 0; l < 3; l++)
                     hud.Tag(new Vector3((l - 1) * Lane, 1.5f, g.z), GateText(g, l), Color.white, 2.2f);
             }
-            hud.Tag(new Vector3(px, 3.1f, pz), (squad.Count + 1).ToString(), Hud.Yellow, 1.3f);
+            foreach (LootBox b in loot)
+                if (!b.broken && b.z - pz < 60f) hud.Tag(new Vector3((b.lane - 1) * Lane, 1.9f, b.z), b.hp.ToString(), Color.white, 1.4f);
+            if (finaleZ < 0f || pz < lootEndZ + 3f) hud.Tag(new Vector3(px, 3.1f, pz), (squad.Count + 1).ToString(), Hud.Yellow, 1.3f);
         }
     }
 }

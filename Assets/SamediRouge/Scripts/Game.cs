@@ -122,7 +122,7 @@ namespace SamediRouge
         bool demo;
         float demoT, autoT;
 
-        class Bolt { public Transform tr; public Ent target; public bool smg; public Transform bat; public float spin; public Gate gate; public Craft craft; public int lane; }
+        class Bolt { public Transform tr; public Ent target; public bool smg; public Transform bat; public float spin; public Gate gate; public Craft craft; public LootBox loot; public int lane; }
         int smgShots;
         readonly List<Bolt> bolts = new List<Bolt>();
         int hearts, coins, combo, idle;
@@ -1321,19 +1321,21 @@ namespace SamediRouge
             for (int i = bolts.Count - 1; i >= 0; i--)
             {
                 Bolt b = bolts[i];
-                if (b.gate != null || b.craft != null)
+                if (b.gate != null || b.craft != null || b.loot != null)
                 {
-                    // tir sur une porte ou un panneau de fusion
-                    bool gone = b.gate != null ? b.gate.used : (b.craft.done || b.craft.go == null);
+                    // tir sur une porte, un panneau de fusion ou un carton de butin
+                    bool gone = b.gate != null ? b.gate.used : b.craft != null ? (b.craft.done || b.craft.go == null) : (b.loot.broken || b.loot.tr == null);
                     if (gone) { Destroy(b.tr.gameObject); bolts.RemoveAt(i); continue; }
-                    Vector3 pa = b.gate != null ? new Vector3((b.lane - 1) * Lane, 1.5f, b.gate.z) : new Vector3((b.craft.lane - 1) * Lane, 1.5f, b.craft.z);
+                    Vector3 pa = b.gate != null ? new Vector3((b.lane - 1) * Lane, 1.5f, b.gate.z)
+                               : b.craft != null ? new Vector3((b.craft.lane - 1) * Lane, 1.5f, b.craft.z)
+                               : new Vector3((b.loot.lane - 1) * Lane, 0.8f, b.loot.z);
                     Vector3 pd = pa - b.tr.position;
                     float ps = (b.bat != null ? 30f : 75f) * dt;
                     if (pd.magnitude <= ps + 0.3f)
                     {
                         Destroy(b.tr.gameObject);
                         bolts.RemoveAt(i);
-                        if (b.gate != null) GateHit(b.gate, b.lane); else CraftHit(b.craft);
+                        if (b.gate != null) GateHit(b.gate, b.lane); else if (b.craft != null) CraftHit(b.craft); else LootHit(b.loot);
                         continue;
                     }
                     b.tr.position += pd / pd.magnitude * ps;
