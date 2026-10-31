@@ -18,7 +18,21 @@ namespace SamediRouge
             public bool used;
             public GameObject go;
             public readonly Transform[] panel = new Transform[3];
+            public readonly int[] hits = new int[3];
+            public readonly float[] punch = new float[3];
         }
+
+        /// <summary>Panneau de fusion (à la Hell Escape) : on le remplit en tirant dessus, l'arme suivante sort quand la jauge est pleine.</summary>
+        class Craft
+        {
+            public GameObject go;
+            public int lane, hits, need;
+            public float z, punch;
+            public bool done;
+            public Transform bar, panel;
+        }
+
+        readonly List<Craft> crafts = new List<Craft>();
 
         readonly List<Gate> gates = new List<Gate>();
         float nextGateZ, nextCrateZ, mateVolleyT;
@@ -72,6 +86,8 @@ namespace SamediRouge
             nextCrateZ = pz + 80f;
             crates = 0;
             ClearMergeIcons();
+            foreach (Craft c in crafts) if (c.go != null) Destroy(c.go);
+            crafts.Clear();
             mateVolleyT = 0.5f;
             runTier = gear[GSmg] ? 2 : gear[GPistol] ? 1 : 0;
             if (campaign && !demo && streetIdx == 0) hud.Toast(L("← SWIPE →", "← GLISSE →"));
@@ -90,16 +106,9 @@ namespace SamediRouge
             }
             if (z >= nextCrateZ)
             {
-                // caisse d'armes dans un couloir au hasard, puis la suite du parcours normalement
-                // la caisse montre l'arme que tu tiens (ou le pistolet si tu es à mains nues) : deux pareilles fusionnent
-                if (runTier < 3)
-                {
-                    Ent c = Spawn(runTier >= 2 ? ET.Mitraillette : ET.Pistolet, devCenter ? 1 : Random.Range(0, 3), z + 3f);
-                    // colonne de lumière dorée : la caisse se repère de loin, comme un bonus de runner
-                    if (c != null && c.go != null)
-                        Art.Part(c.go.transform, Art.Cylinder, Art.Particle(null, new Color(1f, 0.82f, 0.25f, 0.28f)), new Vector3(0f, 1.6f, 0f), new Vector3(1.1f, 1.6f, 1.1f), default, false);
-                }
-                nextCrateZ = z + Random.Range(80f, 110f);
+                // panneau de fusion dans un couloir au hasard : il faut s'y placer et tirer dessus pour le remplir
+                if (runTier < 3) { SpawnCraft(z + 6f, devCenter ? 1 : Random.Range(0, 3)); nextCrateZ = z + Random.Range(80f, 105f); return 14f; }
+                nextCrateZ = z + Random.Range(80f, 105f);
             }
             return 0f;
         }
@@ -148,6 +157,7 @@ namespace SamediRouge
             FinaleTick();
             if (st != St.Play) return;
             MergeTick(dt);
+            PropsTick(dt);
             for (int i = gates.Count - 1; i >= 0; i--)
             {
                 Gate g = gates[i];
@@ -476,6 +486,126 @@ namespace SamediRouge
                 Fx.Confetti(new Vector3(-2f, 3f, pz + 1f));
                 Fx.Confetti(new Vector3(2f, 3f, pz + 1f));
                 RunWon();
+            }
+        }
+
+        void SpawnCraft(float z, int lane)
+        {
+            var c = new Craft { z = z, lane = lane, need = runTier == 0 ? 3 : runTier == 1 ? 6 : 12 };
+            Perf.Note("panneau de fusion couloir " + lane + " à " + z.ToString("0") + " (pz " + pz.ToString("0") + ")");
+            c.go = new GameObject("craft");
+            c.go.transform.SetParent(world, false);
+            c.go.transform.localPosition = new Vector3((lane - 1) * Lane, 0f, z);
+            Transform t = c.go.transform;
+            Material post = Art.Mat(new Color(0.92f, 0.92f, 0.95f), 0.6f, 0.3f);
+            Art.Part(t, Art.Cylinder, post, new Vector3(-1.12f, 1.35f, 0f), new Vector3(0.14f, 1.35f, 0.14f), default, false);
+            Art.Part(t, Art.Cylinder, post, new Vector3(1.12f, 1.35f, 0f), new Vector3(0.14f, 1.35f, 0.14f), default, false);
+            Art.Part(t, Art.Cube, post, new Vector3(0f, 2.72f, 0f), new Vector3(2.4f, 0.14f, 0.16f), default, false);
+            c.panel = Art.Part(t, Art.Cube, Art.Particle(null, new Color(1f, 0.78f, 0.2f, 0.45f)), new Vector3(0f, 1.35f, 0f), new Vector3(2.1f, 2.6f, 0.04f), default, false).transform;
+            // jauge : fond sombre, remplissage vert qui grandit depuis la gauche
+            Art.Part(t, Art.Cube, Art.Mat(new Color(0.12f, 0.12f, 0.15f), 0.3f), new Vector3(0f, 2.35f, -0.06f), new Vector3(1.8f, 0.24f, 0.05f), default, false);
+            c.bar = Art.Node(t, "bar", new Vector3(-0.88f, 2.35f, -0.1f));
+            Art.Part(c.bar, Art.Cube, Art.Glow(new Color(0.3f, 0.95f, 0.35f), new Color(0.3f, 1.2f, 0.35f), 0.5f), new Vector3(0.5f, 0f, 0f), new Vector3(1f, 0.18f, 0.05f), default, false);
+            c.bar.localScale = new Vector3(0.001f, 1f, 1f);
+            // l'arme qu'on va obtenir, au-dessus du panneau
+            var ic = new GameObject("next").transform;
+            ic.SetParent(t, false);
+            ic.localPosition = new Vector3(0f, 3.5f, 0f);
+            ic.localRotation = Quaternion.Euler(30f, 0f, 0f);
+            Art.Part(ic, Art.Sphere, Art.Particle(null, new Color(1f, 0.85f, 0.3f, 0.3f)), Vector3.zero, Vector3.one * 1.3f, default, false);
+            if (FitModel(ic, TierModel(runTier + 1), 1.3f) == null)
+                Art.Part(ic, Art.Cube, Art.Glow(new Color(1f, 0.8f, 0.3f), new Color(0.6f, 0.4f, 0.05f), 0.85f), Vector3.zero, new Vector3(0.9f, 0.26f, 0.18f));
+            crafts.Add(c);
+        }
+
+        /// <summary>Tir automatique sans ennemi en vue : il vise le panneau de fusion, sinon la porte de son couloir (plus on tire, meilleure elle devient).</summary>
+        bool ArcadeShootProps()
+        {
+            int l = Mathf.Clamp(Mathf.RoundToInt(px / Lane) + 1, 0, 2);
+            foreach (Craft c in crafts)
+            {
+                float d = c.z - pz;
+                if (c.done || c.lane != l || d < 2f || d > 32f) continue;
+                Shoot(null, gear[GSmg]);
+                bolts[bolts.Count - 1].craft = c;
+                return true;
+            }
+            foreach (Gate g in gates)
+            {
+                float d = g.z - pz;
+                if (g.used || d < 3f || d > 32f) continue;
+                Shoot(null, gear[GSmg]);
+                Bolt b = bolts[bolts.Count - 1];
+                b.gate = g;
+                b.lane = l;
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>Une porte touchée : +1 (les portes négatives remontent vers le positif), et ×N+1 tous les 4 coups.</summary>
+        void GateHit(Gate g, int l)
+        {
+            if (g.used) return;
+            if (g.mul[l]) { if (++g.hits[l] % 4 == 0) g.val[l] = Mathf.Min(g.val[l] + 1, 5); }
+            else
+            {
+                g.val[l] = Mathf.Min(g.val[l] + 1, 12);
+                if (g.val[l] == 0) g.val[l] = 1;   // pas de porte « 0 »
+            }
+            bool good = g.mul[l] || g.val[l] > 0;
+            if (g.panel[l] != null)
+            {
+                MeshRenderer mr = g.panel[l].GetComponent<MeshRenderer>();
+                if (mr != null) mr.sharedMaterial = Art.Particle(null, good ? GateGood : GateBad);
+            }
+            g.punch[l] = 1f;
+            Fx.Sparkle(new Vector3((l - 1) * Lane, 1.6f, g.z));
+        }
+
+        void CraftHit(Craft c)
+        {
+            if (c.done) return;
+            c.hits++;
+            c.punch = 1f;
+            c.bar.localScale = new Vector3(Mathf.Max(0.001f, 1.76f * Mathf.Clamp01(c.hits / (float)c.need)), 1f, 1f);
+            Fx.Sparkle(c.go.transform.position + new Vector3(0f, 1.6f, 0f));
+            if (c.hits < c.need) return;
+            // jauge pleine : le panneau s'efface, les deux armes fusionnent au-dessus de la bande
+            c.done = true;
+            Perf.Note("fusion : panneau rempli (" + c.need + " coups), niveau " + runTier);
+            Fx.Confetti(c.go.transform.position + Vector3.up * 1.6f);
+            Snd.Play(Snd.I.pickup, 0.9f, 0f);
+            Destroy(c.go, 0.05f);
+            if (runTier == 0) { UpgradeWeapon(); return; }
+            if (mergeA != null) Destroy(mergeA.gameObject);
+            if (mergeB != null) Destroy(mergeB.gameObject);
+            mergeA = WeaponIcon(runTier, IconBase + new Vector3(-0.85f, 0f, 0f));
+            mergeB = WeaponIcon(runTier, IconBase + new Vector3(0.85f, 0f, 0f));
+            mergeT = 0f;
+        }
+
+        /// <summary>Petits coups de « boing » sur les panneaux touchés, et nettoyage des panneaux dépassés.</summary>
+        void PropsTick(float dt)
+        {
+            foreach (Gate g in gates)
+                for (int l = 0; l < 3; l++)
+                {
+                    if (g.punch[l] <= 0f || g.panel[l] == null) continue;
+                    g.punch[l] = Mathf.Max(0f, g.punch[l] - dt * 6f);
+                    float k = 1f + 0.12f * g.punch[l];
+                    g.panel[l].localScale = new Vector3(2.1f * k, 2.6f * k, 0.04f);
+                }
+            for (int i = crafts.Count - 1; i >= 0; i--)
+            {
+                Craft c = crafts[i];
+                if (c.go == null || c.z < pz - 6f) { if (c.go != null) Destroy(c.go); crafts.RemoveAt(i); continue; }
+                if (c.punch > 0f && c.panel != null)
+                {
+                    c.punch = Mathf.Max(0f, c.punch - dt * 6f);
+                    float k = 1f + 0.12f * c.punch;
+                    c.panel.localScale = new Vector3(2.1f * k, 2.6f * k, 0.04f);
+                }
             }
         }
 

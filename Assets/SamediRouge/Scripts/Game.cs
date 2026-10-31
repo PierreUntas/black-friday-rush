@@ -122,7 +122,7 @@ namespace SamediRouge
         bool demo;
         float demoT, autoT;
 
-        class Bolt { public Transform tr; public Ent target; public bool smg; public Transform bat; public float spin; }
+        class Bolt { public Transform tr; public Ent target; public bool smg; public Transform bat; public float spin; public Gate gate; public Craft craft; public int lane; }
         int smgShots;
         readonly List<Bolt> bolts = new List<Bolt>();
         int hearts, coins, combo, idle;
@@ -1321,6 +1321,26 @@ namespace SamediRouge
             for (int i = bolts.Count - 1; i >= 0; i--)
             {
                 Bolt b = bolts[i];
+                if (b.gate != null || b.craft != null)
+                {
+                    // tir sur une porte ou un panneau de fusion
+                    bool gone = b.gate != null ? b.gate.used : (b.craft.done || b.craft.go == null);
+                    if (gone) { Destroy(b.tr.gameObject); bolts.RemoveAt(i); continue; }
+                    Vector3 pa = b.gate != null ? new Vector3((b.lane - 1) * Lane, 1.5f, b.gate.z) : new Vector3((b.craft.lane - 1) * Lane, 1.5f, b.craft.z);
+                    Vector3 pd = pa - b.tr.position;
+                    float ps = (b.bat != null ? 30f : 75f) * dt;
+                    if (pd.magnitude <= ps + 0.3f)
+                    {
+                        Destroy(b.tr.gameObject);
+                        bolts.RemoveAt(i);
+                        if (b.gate != null) GateHit(b.gate, b.lane); else CraftHit(b.craft);
+                        continue;
+                    }
+                    b.tr.position += pd / pd.magnitude * ps;
+                    b.tr.rotation = Quaternion.LookRotation(pd);
+                    if (b.bat != null) { b.spin += dt * 1300f; b.bat.localRotation = Quaternion.Euler(b.spin, 0f, 90f); }
+                    continue;
+                }
                 Ent e = b.target;
                 if (e == null || e.hit || e.dead || e.go == null)
                 {
@@ -2016,9 +2036,15 @@ namespace SamediRouge
                 if (taken) continue;
                 if (d < bd) { bd = d; best = e; }
             }
-            if (best == null) return;
             // cadence : mitraillette en rafale, pistolet régulier, à mains nues un lancer plus lent
-            smgT = gear[GSmg] ? 0.11f : gear[GPistol] ? Tuning.AutoPistolRate : Tuning.AutoBareRate;
+            float rate = gear[GSmg] ? 0.11f : gear[GPistol] ? Tuning.AutoPistolRate : Tuning.AutoBareRate;
+            if (best == null)
+            {
+                // arcade : sans ennemi en vue, il tire sur le panneau de fusion ou la porte de son couloir
+                if (Tuning.Arcade && ArcadeShootProps()) smgT = rate;
+                return;
+            }
+            smgT = rate;
             Shoot(best, gear[GSmg]);
         }
 
