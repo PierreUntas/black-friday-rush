@@ -24,6 +24,7 @@ namespace SamediRouge
         float nextGateZ, nextCrateZ, mateVolleyT;
         /// <summary>Niveau d'arme de la course : 0 mains nues, 1 pistolet, 2 mitraillette, 3 mitraillette renforcée.</summary>
         int runTier;
+        static bool devCenter;   // dev (éditeur) : caisses dans le couloir du milieu, pour tester la fusion sans diriger
         /// <summary>Caisses d'armes ramassées vers la prochaine fusion.</summary>
         int crates;
         const int ArcadeMaxSquad = 24;
@@ -70,6 +71,7 @@ namespace SamediRouge
             nextGateZ = pz + 48f;
             nextCrateZ = pz + 80f;
             crates = 0;
+            ClearMergeIcons();
             mateVolleyT = 0.5f;
             runTier = gear[GSmg] ? 2 : gear[GPistol] ? 1 : 0;
             if (campaign && !demo && streetIdx == 0) hud.Toast(L("← SWIPE →", "← GLISSE →"));
@@ -89,8 +91,15 @@ namespace SamediRouge
             if (z >= nextCrateZ)
             {
                 // caisse d'armes dans un couloir au hasard, puis la suite du parcours normalement
-                Spawn(ET.Pistolet, Random.Range(0, 3), z + 3f);
-                nextCrateZ = z + Random.Range(65f, 90f);
+                // la caisse montre l'arme que tu tiens (ou le pistolet si tu es à mains nues) : deux pareilles fusionnent
+                if (runTier < 3)
+                {
+                    Ent c = Spawn(runTier >= 2 ? ET.Mitraillette : ET.Pistolet, devCenter ? 1 : Random.Range(0, 3), z + 3f);
+                    // colonne de lumière dorée : la caisse se repère de loin, comme un bonus de runner
+                    if (c != null && c.go != null)
+                        Art.Part(c.go.transform, Art.Cylinder, Art.Particle(null, new Color(1f, 0.82f, 0.25f, 0.28f)), new Vector3(0f, 1.6f, 0f), new Vector3(1.1f, 1.6f, 1.1f), default, false);
+                }
+                nextCrateZ = z + Random.Range(80f, 110f);
             }
             return 0f;
         }
@@ -138,6 +147,7 @@ namespace SamediRouge
         {
             FinaleTick();
             if (st != St.Play) return;
+            MergeTick(dt);
             for (int i = gates.Count - 1; i >= 0; i--)
             {
                 Gate g = gates[i];
@@ -200,24 +210,147 @@ namespace SamediRouge
         }
 
         /// <summary>Une caisse d'armes : deux caisses fusionnent en une arme du niveau au-dessus.</summary>
+        // ---- fusion d'armes visible : les armes ramassées flottent au-dessus de la bande, deux pareilles se rejoignent
+        Transform heldIcon, mergeA, mergeB, newIcon;
+        float mergeT = -1f, popT = -1f;
+
+        static string TierModel(int tier) => tier >= 2 ? "arme_voleur_niv3" : "arme_voleur_niv2";
+
+        Transform WeaponIcon(int tier, Vector3 at)
+        {
+            var h = new GameObject("weapon_icon").transform;
+            h.SetParent(world, false);
+            h.localPosition = at;
+            // modèle de l'arme mis à la taille voulue d'après sa vraie boîte englobante (rendu), centré sur la bulle
+            Transform m = GlbModel.Exists(TierModel(tier)) ? GlbModel.Spawn(TierModel(tier), h) : null;
+            if (m != null)
+            {
+                m.localPosition = Vector3.zero;
+                m.localRotation = Quaternion.Euler(0f, 180f, 0f);
+                m.localScale = Vector3.one;
+                Renderer[] rs = m.GetComponentsInChildren<Renderer>();
+                if (rs.Length > 0)
+                {
+                    Bounds bb = rs[0].bounds;
+                    foreach (Renderer r in rs) bb.Encapsulate(r.bounds);
+                    float k = 1.1f / Mathf.Max(0.001f, Mathf.Max(bb.size.x, Mathf.Max(bb.size.y, bb.size.z)));
+                    m.localScale = Vector3.one * k;
+                    m.localPosition = -h.InverseTransformVector(bb.center - h.position) * k;
+                }
+                foreach (Renderer r in rs) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            }
+            else Art.Part(h, Art.Cube, Art.Glow(new Color(1f, 0.8f, 0.3f), new Color(0.6f, 0.4f, 0.05f), 0.85f), Vector3.zero, new Vector3(0.9f, 0.26f, 0.18f));
+            // bulle dorée translucide autour de l'arme : lisible au-dessus de la foule
+            Art.Part(h, Art.Sphere, Art.Particle(null, new Color(1f, 0.85f, 0.3f, 0.35f)), Vector3.zero, Vector3.one * 1.35f, default, false);
+            Perf.Note("icône arme " + tier + " en " + h.position + " (" + (m != null ? m.GetComponentsInChildren<Renderer>().Length : 0) + " rendus)");
+            if (tier >= 3)
+            {
+                // arme maximale : halo doré
+                Material gold = Art.Glow(new Color(1f, 0.8f, 0.2f), new Color(1.6f, 1.1f, 0.2f), 0.5f);
+                Art.Part(h, Art.Cylinder, gold, new Vector3(0f, -0.35f, 0f), new Vector3(0.9f, 0.02f, 0.9f), default, false);
+            }
+            return h;
+        }
+
+        void ClearMergeIcons()
+        {
+            foreach (Transform t in new[] { heldIcon, mergeA, mergeB, newIcon }) if (t != null) Destroy(t.gameObject);
+            heldIcon = mergeA = mergeB = newIcon = null;
+            mergeT = popT = -1f;
+        }
+
+        Vector3 IconBase => new Vector3(px, 4.4f, pz + 0.5f);
+
         void WeaponCrate(Vector3 p)
         {
-            if (runTier >= 3) { score += 100f; hud.FloatKey(p + Vector3.up, "+100", Hud.Yellow, true); return; }
+            Perf.Note("caisse : niveau " + runTier + ", caisses " + crates);
+            if (runTier >= 3) { score += 100f; return; }
+            Snd.Play(Snd.I.pickup, 0.8f, 0f);
+            if (runTier == 0)
+            {
+                // à mains nues : la première caisse donne directement le pistolet
+                UpgradeWeapon();
+                return;
+            }
             crates++;
             if (crates < CratesPerMerge)
             {
-                hud.FloatKey(p + Vector3.up, crates + "/" + CratesPerMerge, Hud.Yellow, true);
+                // première arme : elle reste en l'air au-dessus de la bande, en attendant sa jumelle
+                if (heldIcon != null) Destroy(heldIcon.gameObject);
+                heldIcon = WeaponIcon(runTier, IconBase + new Vector3(-0.85f, 0f, 0f));
+                Fx.Pickup(heldIcon.position);
                 return;
             }
             crates = 0;
+            // deuxième arme : les deux se rejoignent puis fusionnent
+            if (mergeA != null) Destroy(mergeA.gameObject);
+            if (mergeB != null) Destroy(mergeB.gameObject);
+            mergeA = heldIcon != null ? heldIcon : WeaponIcon(runTier, IconBase + new Vector3(-0.85f, 0f, 0f));
+            heldIcon = null;
+            mergeB = WeaponIcon(runTier, IconBase + new Vector3(0.85f, 0f, 0f));
+            mergeT = 0f;
+        }
+
+        void UpgradeWeapon()
+        {
             runTier++;
             gear[GPistol] = runTier >= 1;
             gear[GSmg] = runTier >= 2;
             ApplyGear();
-            hud.Toast(L("MERGE! LV ", "FUSION ! NIV ") + (runTier + 1));
-            Fx.Confetti(new Vector3(px, 1.6f, pz + 1f));
+            if (newIcon != null) Destroy(newIcon.gameObject);
+            newIcon = WeaponIcon(runTier, IconBase);
+            popT = 0f;
+            Fx.Confetti(IconBase);
             P.Flash(Hud.StarGold, 0.3f);
             Snd.Play(Snd.I.pickup, 1f, 0f);
+        }
+
+        /// <summary>Animation des armes au-dessus de la bande (attente, rapprochement, fusion, nouvelle arme qui descend dans la main).</summary>
+        void MergeTick(float dt)
+        {
+            Vector3 b = IconBase;
+            // l'arme se présente de profil, inclinée vers la caméra, et se balance doucement (une rotation complète la montrait par la tranche)
+            float sway = Mathf.Sin(Time.time * 2.5f) * 18f;
+            Quaternion face = Quaternion.Euler(35f, sway, 0f);
+            if (heldIcon != null)
+            {
+                heldIcon.localPosition = b + new Vector3(-0.85f, Mathf.Sin(Time.time * 3f) * 0.08f, 0f);
+                heldIcon.localRotation = face;
+            }
+            if (mergeT >= 0f)
+            {
+                mergeT += dt;
+                float k = Mathf.Clamp01(mergeT / 0.45f);
+                float e = k * k;
+                if (mergeA != null) { mergeA.localPosition = b + new Vector3(-0.85f * (1f - e), 0.15f * Mathf.Sin(k * Mathf.PI), 0f); mergeA.localRotation = face * Quaternion.Euler(0f, 0f, 25f * Mathf.Sin(k * Mathf.PI)); }
+                if (mergeB != null) { mergeB.localPosition = b + new Vector3(0.85f * (1f - e), 0.15f * Mathf.Sin(k * Mathf.PI), 0f); mergeB.localRotation = face * Quaternion.Euler(0f, 0f, -25f * Mathf.Sin(k * Mathf.PI)); }
+                if (k >= 1f)
+                {
+                    mergeT = -1f;
+                    if (mergeA != null) Destroy(mergeA.gameObject);
+                    if (mergeB != null) Destroy(mergeB.gameObject);
+                    mergeA = mergeB = null;
+                    hud.Flash(0.25f);
+                    UpgradeWeapon();
+                }
+            }
+            if (popT >= 0f && newIcon != null)
+            {
+                popT += dt;
+                // pop (gros puis normal), tient un instant, puis descend dans la main du héros en rétrécissant
+                float s = popT < 0.2f ? Mathf.Lerp(0.3f, 1.5f, popT / 0.2f) : popT < 0.4f ? Mathf.Lerp(1.5f, 1.1f, (popT - 0.2f) / 0.2f) : popT < 1.0f ? 1.1f : Mathf.Lerp(1.1f, 0.2f, (popT - 1f) / 0.3f);
+                float y = popT < 1.0f ? 0f : Mathf.Lerp(0f, -2.6f, (popT - 1f) / 0.3f);
+                newIcon.localPosition = b + new Vector3(0f, y, 0f);
+                newIcon.localScale = Vector3.one * s;
+                newIcon.localRotation = face;
+                if (popT >= 1.3f)
+                {
+                    Destroy(newIcon.gameObject);
+                    newIcon = null;
+                    popT = -1f;
+                    Fx.Sparkle(new Vector3(px, 1.3f, pz));
+                }
+            }
         }
 
         /// <summary>

@@ -48,6 +48,14 @@ namespace SamediRouge
             }
         }
 
+        /// <summary>Événement de jeu noté dans le journal (pour caler les captures d'écran).</summary>
+        [Conditional("UNITY_EDITOR")]
+        public static void Note(string what)
+        {
+            if (!On) return;
+            log.Append(Time.realtimeSinceStartup.ToString("0.00")).Append("s  >> ").Append(what).Append('\n');
+        }
+
         /// <summary>Attribue le temps écoulé depuis la dernière marque à « name ».</summary>
         [Conditional("UNITY_EDITOR")]
         public static void Mark(string name)

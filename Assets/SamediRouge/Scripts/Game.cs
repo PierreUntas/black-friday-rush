@@ -362,6 +362,7 @@ namespace SamediRouge
             demo = false;
             if (P != null) P.SetVisible(true);   // caché en entrant dans le MEGA STORE (arcade)
             if (store != null) { Destroy(store); store = null; }
+            ClearMergeIcons();
             pendingEnd = null;
             warn.gameObject.SetActive(false);
             warn2.gameObject.SetActive(false);
