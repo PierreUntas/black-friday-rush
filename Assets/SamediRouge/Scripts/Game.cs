@@ -644,6 +644,8 @@ namespace SamediRouge
             {
                 if (hitStop > 0f) hitStop -= udt;
                 else if (slowMo > 0f) slowMo -= udt;
+                // arcade : pas d'arrêt sur image à chaque coup (avec la foule qui frappe en continu, ça ressemble à du lag)
+                if (Tuning.Arcade) hitStop = 0f;
                 Time.timeScale = hitStop > 0f ? 0.06f : slowMo > 0f ? 0.3f : (tipSlow && st == St.Play) ? 0.35f : 1f;
             }
             float dt = Time.deltaTime;
@@ -1200,8 +1202,11 @@ namespace SamediRouge
             P.Spin();
             P.Land(0.45f);
             P.Flash(NinjaGold, 0.18f);
-            slowMo = Mathf.Max(slowMo, 0.4f);
-            zoom = Mathf.Max(zoom, 0.6f);
+            if (!Tuning.Arcade)
+            {
+                slowMo = Mathf.Max(slowMo, 0.4f);
+                zoom = Mathf.Max(zoom, 0.6f);
+            }
             shake = Mathf.Max(shake, 0.5f);
             fovKick = Mathf.Max(fovKick, 9f);
             hud.Flash(0.55f);
@@ -1707,7 +1712,7 @@ namespace SamediRouge
             score += bonus;
             coins += loot;
             e.rig.KO(new Vector3(Random.value < 0.5f ? -4f : 4f, 9f, speed + 7f), new Vector3(Random.Range(-6f, 6f), Random.Range(-3f, 3f), Random.Range(-10f, 10f)));
-            slowMo = 1.1f;
+            slowMo = Tuning.Arcade ? 0.5f : 1.1f;   // arcade : ralenti court, la finale enchaîne
             shake = 0.5f;
             zoom = 1f;
             hud.Flash(0.6f);
@@ -2090,8 +2095,11 @@ namespace SamediRouge
                 starsCombo += Tuning.StarsCombo;
                 hud.Float(chest + Vector3.up * 1.2f, "COMBO +" + Tuning.StarsCombo + " " + Tuning.Cur, Hud.StarGold, true);
                 // palier de combo : ralenti et zoom sur le voleur qui s'envole
-                slowMo = Mathf.Max(slowMo, 0.45f);
-                zoom = 0.7f;
+                if (!Tuning.Arcade)
+                {
+                    slowMo = Mathf.Max(slowMo, 0.45f);
+                    zoom = 0.7f;
+                }
                 if (!Tuning.Arcade) hud.Toast("COMBO x" + combo + "!");
                 Fx.Confetti(chest + Vector3.up * 0.4f);
             }
