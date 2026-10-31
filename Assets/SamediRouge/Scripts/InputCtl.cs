@@ -15,6 +15,12 @@ namespace SamediRouge
         public readonly List<Vector2> taps = new List<Vector2>();
         public readonly List<int> swipes = new List<int>();
         public bool keySwing, keyPause, keyStart;
+        /// <summary>Déplacement horizontal du doigt (pixels) pendant cette image : pour faire glisser le héros librement.</summary>
+        public float dragDX;
+        /// <summary>Glissés venant du clavier seulement (flèches) : dans l'éditeur, ils changent encore de couloir.</summary>
+        public readonly List<int> keySwipes = new List<int>();
+        int dragId = int.MinValue;
+        Vector2 dragLast;
 
         class Track { public Vector2 start; public float t; public bool done; }
         readonly Dictionary<int, Track> tracks = new Dictionary<int, Track>();
@@ -31,6 +37,8 @@ namespace SamediRouge
         {
             taps.Clear();
             swipes.Clear();
+            keySwipes.Clear();
+            dragDX = 0f;
             keySwing = keyPause = keyStart = false;
             threshold = Mathf.Max(22f, Screen.height * 0.028f);
 
@@ -58,10 +66,10 @@ namespace SamediRouge
                 if (Input.GetMouseButtonUp(0)) End(-1, mp, false);
             }
 
-            if (Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.Q)) swipes.Add(Left);
-            if (Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.D)) swipes.Add(Right);
-            if (Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.Z) || Input.GetKeyDown(KeyCode.Space)) swipes.Add(Up);
-            if (Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.S)) swipes.Add(Down);
+            if (Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.Q)) { swipes.Add(Left); keySwipes.Add(Left); }
+            if (Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.D)) { swipes.Add(Right); keySwipes.Add(Right); }
+            if (Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.Z) || Input.GetKeyDown(KeyCode.Space)) { swipes.Add(Up); keySwipes.Add(Up); }
+            if (Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.S)) { swipes.Add(Down); keySwipes.Add(Down); }
             if (Input.GetKeyDown(KeyCode.F) || Input.GetKeyDown(KeyCode.J)) keySwing = true;
             if (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.P)) keyPause = true;
             if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)) keyStart = true;
@@ -94,10 +102,10 @@ namespace SamediRouge
             var kb = UnityEngine.InputSystem.Keyboard.current;
             if (kb != null)
             {
-                if (kb.leftArrowKey.wasPressedThisFrame || kb.aKey.wasPressedThisFrame || kb.qKey.wasPressedThisFrame) swipes.Add(Left);
-                if (kb.rightArrowKey.wasPressedThisFrame || kb.dKey.wasPressedThisFrame) swipes.Add(Right);
-                if (kb.upArrowKey.wasPressedThisFrame || kb.wKey.wasPressedThisFrame || kb.zKey.wasPressedThisFrame || kb.spaceKey.wasPressedThisFrame) swipes.Add(Up);
-                if (kb.downArrowKey.wasPressedThisFrame || kb.sKey.wasPressedThisFrame) swipes.Add(Down);
+                if (kb.leftArrowKey.wasPressedThisFrame || kb.aKey.wasPressedThisFrame || kb.qKey.wasPressedThisFrame) { swipes.Add(Left); keySwipes.Add(Left); }
+                if (kb.rightArrowKey.wasPressedThisFrame || kb.dKey.wasPressedThisFrame) { swipes.Add(Right); keySwipes.Add(Right); }
+                if (kb.upArrowKey.wasPressedThisFrame || kb.wKey.wasPressedThisFrame || kb.zKey.wasPressedThisFrame || kb.spaceKey.wasPressedThisFrame) { swipes.Add(Up); keySwipes.Add(Up); }
+                if (kb.downArrowKey.wasPressedThisFrame || kb.sKey.wasPressedThisFrame) { swipes.Add(Down); keySwipes.Add(Down); }
                 if (kb.fKey.wasPressedThisFrame || kb.jKey.wasPressedThisFrame) keySwing = true;
                 if (kb.escapeKey.wasPressedThisFrame || kb.pKey.wasPressedThisFrame) keyPause = true;
                 if (kb.enterKey.wasPressedThisFrame) keyStart = true;
@@ -108,10 +116,12 @@ namespace SamediRouge
         void Begin(int id, Vector2 p)
         {
             tracks[id] = new Track { start = p, t = Time.unscaledTime, done = false };
+            if (dragId == int.MinValue) { dragId = id; dragLast = p; }
         }
 
         void Move(int id, Vector2 p)
         {
+            if (id == dragId) { dragDX += p.x - dragLast.x; dragLast = p; }
             if (!tracks.TryGetValue(id, out Track tr) || tr.done) return;
             Vector2 d = p - tr.start;
             if (d.magnitude < threshold) return;
@@ -122,6 +132,7 @@ namespace SamediRouge
 
         void End(int id, Vector2 p, bool canceled)
         {
+            if (id == dragId) { dragDX += p.x - dragLast.x; dragId = int.MinValue; }
             if (!tracks.TryGetValue(id, out Track tr)) return;
             if (!tr.done && !canceled)
             {

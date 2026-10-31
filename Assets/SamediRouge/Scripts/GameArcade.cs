@@ -54,8 +54,12 @@ namespace SamediRouge
         /// <summary>Caisses d'armes ramassées vers la prochaine fusion.</summary>
         int crates;
         const int ArcadeMaxSquad = 24;
+        /// <summary>Arcade : vitesse de course réduite, taille des personnages de ta bande (alignée sur les adversaires).</summary>
+        const float ArcadeSpeed = 0.78f, CrewScale = 0.84f, FreeMax = 3.3f;
+        float freeX;
+        bool FreeMove => Tuning.Arcade && campaign && !demo && !tutorialMode;
         /// <summary>Arcade : la rue est plus longue (environ une minute de course avant le boss).</summary>
-        const float ArcadeLengthMult = 3.4f;
+        const float ArcadeLengthMult = 2.8f;
         float finaleZ = -1f;
         GameObject store;
         const int CratesPerMerge = 2;
@@ -105,7 +109,9 @@ namespace SamediRouge
             lootEndZ = -1f;
             mateVolleyT = 0.5f;
             runTier = gear[GSmg] ? 2 : gear[GPistol] ? 1 : 0;
+            freeX = 0f;
             if (campaign && !demo && StartCrew > 0) AddMates(StartCrew);   // amélioration « Bande » de l'accueil
+            ArmCrew();
             if (campaign && !demo && streetIdx == 0) hud.Toast(L("← SWIPE →", "← GLISSE →"));
         }
 
@@ -273,18 +279,30 @@ namespace SamediRouge
         }
 
         /// <summary>Arcade, à mains nues : le héros lance sa batte (une nouvelle à chaque fois), qui tournoie jusqu'à l'ennemi.</summary>
-        void ThrowBat(Ent target)
+        void ThrowBat(Ent target, Vector3? from = null)
         {
-            P.throwT = 0f;
-            Snd.PlayPitch(Snd.I.whoosh, 0.35f, Random.Range(1.1f, 1.3f));
-            Transform tr = Art.Node(world, "bat", new Vector3(px + 0.3f, 1.5f, pz + 0.5f));
+            bool mate = from.HasValue;
+            if (!mate)
+            {
+                P.throwT = 0f;
+                Snd.PlayPitch(Snd.I.whoosh, 0.35f, Random.Range(1.1f, 1.3f));
+            }
+            Transform tr = Art.Node(world, "bat", mate ? from.Value : new Vector3(px + 0.3f, 1.5f, pz + 0.5f));
             var spinner = new GameObject("spin").transform;
             spinner.SetParent(tr, false);
-            if (FitModel(spinner, "arme_voleur_niv1", 1.35f) == null)
-                Art.Part(spinner, Art.Cylinder, Art.Mat(new Color(0.62f, 0.4f, 0.2f), 0.4f), Vector3.zero, new Vector3(0.13f, 0.6f, 0.13f), default, false);
-            TrailRenderer trl = Trail(tr);   // traînée : la batte se suit des yeux
-            trl.emitting = true;
-            bolts.Add(new Bolt { tr = tr, target = target, smg = false, bat = spinner });
+            // la bande : batte simple (2 cylindres, léger) ; le héros : le modèle 3D de la batte
+            if (mate || FitModel(spinner, "arme_voleur_niv1", 1.25f) == null)
+            {
+                Material wood = Art.Mat(new Color(0.72f, 0.52f, 0.3f), 0.45f);
+                Art.Part(spinner, Art.Cylinder, wood, new Vector3(0f, -0.2f, 0f), new Vector3(0.06f, 0.22f, 0.06f), default, false);
+                Art.Part(spinner, Art.Cylinder, wood, new Vector3(0f, 0.18f, 0f), new Vector3(0.11f, 0.2f, 0.11f), default, false);
+            }
+            if (!mate)
+            {
+                TrailRenderer trl = Trail(tr);   // traînée : la batte se suit des yeux
+                trl.emitting = true;
+            }
+            bolts.Add(new Bolt { tr = tr, target = target, smg = mate, bat = spinner, spin = Random.Range(0f, 360f) });
         }
 
         static string TierModel(int tier) => tier >= 2 ? "arme_voleur_niv3" : "arme_voleur_niv2";
@@ -349,12 +367,19 @@ namespace SamediRouge
             mergeT = 0f;
         }
 
+        /// <summary>La bande porte la même arme que le héros (batte, pistolet, mitraillette).</summary>
+        void ArmCrew()
+        {
+            foreach (Mate m in squad) if (m.rig != null) m.rig.CrewWeapon(runTier);
+        }
+
         void UpgradeWeapon()
         {
             runTier++;
             gear[GPistol] = runTier >= 1;
             gear[GSmg] = runTier >= 2;
             ApplyGear();
+            ArmCrew();
             if (newIcon != null) Destroy(newIcon.gameObject);
             newIcon = WeaponIcon(runTier, IconBase);
             popT = 0f;
@@ -523,10 +548,11 @@ namespace SamediRouge
         {
             if (finaleZ < 0f) return;
             LootTick();
-            if (pz < lootEndZ + 3f) speed = 9.5f;   // champ de cartons : on garde le contrôle, un peu plus lentement
+            if (pz < lootEndZ + 3f) speed = 8.5f;   // champ de cartons : on garde le contrôle, un peu plus lentement
             else
             {
                 lane = 1;
+                freeX = 0f;
                 speed = Mathf.Max(speed, 15f);
             }
             foreach (Mate m in squad)

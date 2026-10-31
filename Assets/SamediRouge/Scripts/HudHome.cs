@@ -15,7 +15,9 @@ namespace SamediRouge
         readonly Text[] homeName = new Text[3], homeLv = new Text[3], homeCost = new Text[3];
         readonly bool[] homeAfford = new bool[3];
         public System.Action<int> onHomeBuy;
-        public System.Action onHomePlay;
+        public System.Action onHomePlay, onHomeReset;
+        Text homeResetLabel;
+        float homeResetArm = -1f;
 
         static readonly Color[] HomeColors = { new Color(0.93f, 0.68f, 0.12f), new Color(0.55f, 0.3f, 0.85f), new Color(0.25f, 0.72f, 0.35f) };
 
@@ -37,6 +39,12 @@ namespace SamediRouge
             Image cBg = Box(r, new Color(0.06f, 0.08f, 0.11f, 0.85f), new Vector2(1f, 1f), new Vector2(-170f, -110f), new Vector2(270f, 84f));
             homeCoins = Label(cBg.rectTransform, "", 42, StarGold, TextAnchor.MiddleCenter, true);
             Stretch(homeCoins.rectTransform);
+            // remise à zéro de la partie (deux touchers : le premier demande confirmation)
+            Image rs = Button(r, "RESET", new Color(0.2f, 0.22f, 0.27f, 0.85f), new Vector2(0f, 1f), new Vector2(110f, -110f), new Vector2(170f, 76f), 30, () =>
+            {
+                if (homeResetArm > 0f) { homeResetArm = -1f; homeResetLabel.text = "RESET"; onHomeReset?.Invoke(); }
+                else { homeResetArm = 3f; homeResetLabel.text = L("SURE?", "SÛR ?"); }
+            }, out homeResetLabel);
 
             homeSwipe = Label(r, L("SWIPE TO PLAY", "GLISSE POUR JOUER"), 68, Color.white, TextAnchor.MiddleCenter, true);
             Shadowed(homeSwipe);
@@ -100,6 +108,7 @@ namespace SamediRouge
         void TickHome(float udt)
         {
             if (homeRoot == null || !homeRoot.activeSelf) return;
+            if (homeResetArm > 0f) { homeResetArm -= udt; if (homeResetArm <= 0f) homeResetLabel.text = "RESET"; }
             float a = 0.55f + 0.45f * Mathf.Abs(Mathf.Sin(Time.unscaledTime * 2.2f));
             homeSwipe.color = new Color(1f, 1f, 1f, a);
             homeSwipe.transform.localScale = Vector3.one * (1f + 0.04f * Mathf.Sin(Time.unscaledTime * 4.4f));

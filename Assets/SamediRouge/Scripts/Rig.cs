@@ -911,6 +911,39 @@ namespace SamediRouge
         public void Recoil() { recoil = 1f; }
 
         /// <summary>Affiche l'équipement : 0 casque, 1 gilet, 2 matraque, 3 bouclier, 4 pistolet, 5 mitraillette.</summary>
+        /// <summary>
+        /// Arcade : un membre de la bande prend la même arme que le héros. 0 batte, 1 pistolet (en plus de la batte),
+        /// 2 et plus mitraillette (la batte est rangée). Les armes sont créées à la première demande.
+        /// </summary>
+        public void CrewWeapon(int tier)
+        {
+            Transform handL = skin3d != null ? skin3d.RelayOf(this.handL) : this.handL;
+            Transform handR = skin3d != null ? skin3d.RelayOf(this.handR) : spine;
+            if (tier >= 1 && pistol == null && handL != null)
+            {
+                pistol = Art.Node(handL, "pistol", Vector3.zero);
+                Material pBody = Art.Mat(new Color(1f, 0.31f, 0.64f), 0.5f);
+                Material pTip = Art.Glow(new Color(0.25f, 0.85f, 0.45f), new Color(0.3f, 1.2f, 0.5f), 0.5f);
+                Art.Part(pistol, Art.Cube, pBody, new Vector3(0f, -0.02f, 0.1f), new Vector3(0.07f, 0.09f, 0.26f), default, false);
+                Art.Part(pistol, Art.Cube, pBody, new Vector3(0f, -0.1f, 0.02f), new Vector3(0.06f, 0.14f, 0.07f), new Vector3(-15f, 0f, 0f), false);
+                Art.Part(pistol, Art.Sphere, pTip, new Vector3(0f, 0.07f, 0.1f), Vector3.one * 0.1f, default, false);
+            }
+            if (tier >= 2 && smg == null && handR != null)
+            {
+                smg = Art.Node(handR, "smg", Vector3.zero);
+                Material gBody = Art.Mat(new Color(0.54f, 0.24f, 1f), 0.5f);
+                Material gAcc = Art.Glow(new Color(0.25f, 0.85f, 0.45f), new Color(0.3f, 1.2f, 0.5f), 0.5f);
+                Art.Part(smg, Art.Cube, gBody, new Vector3(0f, 0f, 0.05f), new Vector3(0.1f, 0.13f, 0.5f), default, false);
+                Art.Part(smg, Art.Cube, gAcc, new Vector3(0f, -0.13f, 0.08f), new Vector3(0.06f, 0.18f, 0.08f), new Vector3(12f, 0f, 0f), false);
+                Art.Part(smg, Art.Sphere, gAcc, new Vector3(0f, 0.13f, -0.05f), Vector3.one * 0.15f, default, false);
+            }
+            bool s = tier >= 2;
+            if (baton != null) baton.gameObject.SetActive(!s);
+            if (pistol != null) pistol.gameObject.SetActive(tier == 1);
+            if (smg != null) smg.gameObject.SetActive(s);
+            aiming = s;
+        }
+
         public void SetGear(bool[] g)
         {
             bool smgOn = g.Length > 5 && g[5];

@@ -711,7 +711,8 @@ namespace SamediRouge
                 foreach (int sw in inp.swipes)
                     hud.InputDebug(sw == InputCtl.Left ? "SWIPE LEFT" : sw == InputCtl.Right ? "SWIPE RIGHT" : sw == InputCtl.Up ? "SWIPE UP = JUMP" : "SWIPE DOWN = SLIDE");
             }
-            foreach (int s in inp.swipes)
+            // arcade : le héros glisse librement sous le doigt ; seules les flèches du clavier changent encore de couloir
+            foreach (int s in (FreeMove ? inp.keySwipes : inp.swipes))
             {
                 hintT = 0f;
                 if (Tuning.Arcade && (s == InputCtl.Up || s == InputCtl.Down)) continue;   // arcade : un seul geste, gauche / droite
@@ -802,6 +803,7 @@ namespace SamediRouge
                 if (hp75 < 0 && fr >= 0.75f) hp75 = hearts;
             }
             float target = tutorialMode ? Tuning.TutorialSpeed : Mathf.Min(Tuning.MaxSpeed[Diff], Tuning.StartSpeed[Diff] + dist / 60f);
+            if (Tuning.Arcade) target *= ArcadeSpeed;   // arcade : rythme plus posé, on a le temps de viser
             float want = stumble > 0f ? target * 0.6f : target;
             speed = Mathf.MoveTowards(speed, want, (stumble > 0f ? 30f : 5f) * dt);
             float dz = speed * dt;
@@ -870,7 +872,17 @@ namespace SamediRouge
 
             // déplacement latéral et vertical
             float tx = (lane - 1) * Lane;
-            px = Mathf.Lerp(px, tx, 1f - Mathf.Exp(-(thief ? Tuning.ThiefLaneSpeed : Tuning.GuardLaneSpeed) * dt));
+            if (FreeMove)
+            {
+                // glissé libre (à la Hell Escape) : le doigt déplace le héros, une largeur d'écran ≈ toute la largeur de la piste ;
+                // les flèches du clavier (éditeur) changent de couloir d'un coup
+                if (inp.keySwipes.Count > 0) freeX = (lane - 1) * Lane;
+                freeX = Mathf.Clamp(freeX + inp.dragDX / Mathf.Max(1f, Screen.width) * 9f, -FreeMax, FreeMax);
+                tx = freeX;
+                px = Mathf.Lerp(px, tx, 1f - Mathf.Exp(-22f * dt));
+                lane = Mathf.Clamp(Mathf.RoundToInt(px / Lane) + 1, 0, 2);
+            }
+            else px = Mathf.Lerp(px, tx, 1f - Mathf.Exp(-(thief ? Tuning.ThiefLaneSpeed : Tuning.GuardLaneSpeed) * dt));
             bool air = py > 0.01f;
             vy -= 38f * dt;
             py += vy * dt;
@@ -1260,6 +1272,7 @@ namespace SamediRouge
         void Shoot(Ent target, bool smg, Vector3? from = null)
         {
             Vector3 muzzle;
+            if (from.HasValue && Tuning.Arcade && runTier == 0) { ThrowBat(target, from); return; }   // la bande lance aussi des battes
             if (from.HasValue)
             {
                 // tir d'un membre de la bande : discret (pas de son ni de traînée, il y en a beaucoup)
@@ -1332,7 +1345,7 @@ namespace SamediRouge
                                : b.craft != null ? new Vector3((b.craft.lane - 1) * Lane, 1.5f, b.craft.z)
                                : new Vector3((b.loot.lane - 1) * Lane, 0.8f, b.loot.z);
                     Vector3 pd = pa - b.tr.position;
-                    float ps = (b.bat != null ? 30f : 75f) * dt;
+                    float ps = (b.bat != null ? 24f : 75f) * dt;
                     if (pd.magnitude <= ps + 0.3f)
                     {
                         Destroy(b.tr.gameObject);
@@ -1342,7 +1355,7 @@ namespace SamediRouge
                     }
                     b.tr.position += pd / pd.magnitude * ps;
                     b.tr.rotation = Quaternion.LookRotation(pd);
-                    if (b.bat != null) { b.spin += dt * 1300f; b.bat.localRotation = Quaternion.Euler(b.spin, 0f, 90f); }
+                    if (b.bat != null) { b.spin += dt * 900f; b.bat.localRotation = Quaternion.Euler(b.spin, 0f, 0f); }
                     continue;
                 }
                 Ent e = b.target;
@@ -1354,7 +1367,7 @@ namespace SamediRouge
                 }
                 Vector3 aim = new Vector3(e.x, 1.15f, e.z);
                 Vector3 d = aim - b.tr.position;
-                float step = (b.bat != null ? 30f : 75f) * dt;
+                float step = (b.bat != null ? 24f : 75f) * dt;
                 if (d.magnitude <= step + 0.3f)
                 {
                     Destroy(b.tr.gameObject);
@@ -1370,8 +1383,8 @@ namespace SamediRouge
                 if (b.bat != null)
                 {
                     // batte lancée : elle tournoie sur elle-même
-                    b.spin += dt * 1300f;
-                    b.bat.localRotation = Quaternion.Euler(b.spin, 0f, 90f);
+                    b.spin += dt * 900f;
+                    b.bat.localRotation = Quaternion.Euler(b.spin, 0f, 0f);   // tourne bout sur bout, comme un couteau lancé
                 }
             }
         }
@@ -1908,6 +1921,7 @@ namespace SamediRouge
                 Rig r = Rig.Build(thief ? Kind.Thief : Kind.Guard, world, new Vector3(px + sl.x, 0f, pz + sl.y), 0f, thief ? Rig.Crew : 0, true, MateArmor);
                 Rig.OutlineOverride = null;
                 AllyRing(r);
+                if (Tuning.Arcade) { r.root.localScale *= CrewScale; r.CrewWeapon(runTier); }   // à la taille des adversaires, même arme que le héros
                 squad.Add(new Mate { rig = r, x = px + sl.x, z = pz + sl.y, slot = squad.Count });
             }
         }

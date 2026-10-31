@@ -54,6 +54,17 @@ namespace SamediRouge
             hud.onMapTab = OnMapTab;
             hud.onHomePlay = () => { if (st == St.Menu && metaScreen == MetaScreen.Home) StartStreet(HomeStreet()); };
             hud.onHomeBuy = HomeBuy;
+            hud.onHomeReset = () =>
+            {
+                // remise à zéro complète : progression, améliorations, solde
+                Progress.ResetAll();
+                PlayerPrefs.SetInt(KCrew, 0);
+                PlayerPrefs.SetInt(KIncome, 0);
+                PlayerPrefs.Save();
+                selStreet = -1;
+                Snd.Play(Snd.I.whoosh, 0.6f);
+                ShowHomeScreen();
+            };
         }
 
         /// <summary>Premier lancement : tutoriel jouable ; ensuite, directement la carte.</summary>
@@ -646,7 +657,7 @@ namespace SamediRouge
         /// <summary>Le personnage grandit un peu avec sa puissance (niveaux cumulés), pour une différence visible.</summary>
         void PowerScale(int totalLevel)
         {
-            if (P != null && P.root != null) P.root.localScale = Vector3.one * Rig.Scale * (1f + 0.01f * totalLevel);   // l'équipement 3D se voit déjà : croissance discrète
+            if (P != null && P.root != null) P.root.localScale = Vector3.one * Rig.Scale * (1f + 0.01f * totalLevel) * (Tuning.Arcade ? CrewScale : 1f);   // l'équipement 3D se voit déjà : croissance discrète
         }
 
         void RefreshUpgrades()
