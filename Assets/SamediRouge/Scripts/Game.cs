@@ -360,6 +360,8 @@ namespace SamediRouge
         void ToMenu()
         {
             demo = false;
+            if (P != null) P.SetVisible(true);   // caché en entrant dans le MEGA STORE (arcade)
+            if (store != null) { Destroy(store); store = null; }
             pendingEnd = null;
             warn.gameObject.SetActive(false);
             warn2.gameObject.SetActive(false);
@@ -943,7 +945,9 @@ namespace SamediRouge
             else while (nextSpawnZ < pz + 110f)
             {
                 float a = Tuning.Arcade ? ArcadeSpawn(nextSpawnZ) : 0f;
-                nextSpawnZ += a > 0f ? a : SpawnRow(nextSpawnZ);
+                if (a > 0f) nextSpawnZ += a;
+                else if (Tuning.Arcade && campaign && !demo && nextSpawnZ - stageStartZ <= StageLen) nextSpawnZ += ArcadeRow(nextSpawnZ, ShuffledLanes());
+                else nextSpawnZ += SpawnRow(nextSpawnZ);
             }
             if (st != St.Play) return;
 
@@ -1434,7 +1438,7 @@ namespace SamediRouge
                 }
             }
             float frac = Mathf.Clamp01((pz - stageStartZ) / StageLen);
-            if (boss == null && !demo && !tutorialMode && !runWon && pz - stageStartZ >= StageLen + 12f) StartBoss();
+            if (boss == null && !demo && !tutorialMode && !runWon && store == null && pz - stageStartZ >= StageLen + 12f) StartBoss();
             if (boss != null && (boss.dead || boss.go == null)) boss = null;
             hud.SetStage(stage, frac, boss != null ? BossName : null, boss != null ? boss.hp / (float)bossMaxHp : 0f);
             if (boss == null) { warn.gameObject.SetActive(false); warn2.gameObject.SetActive(false); }
@@ -1445,6 +1449,7 @@ namespace SamediRouge
             bossType = tutorialMode ? 0 : campaign ? Tuning.StreetBoss[streetIdx] : bossOrder[(stage - 1) % 6];
             int baseHp = tutorialMode ? Tuning.TutorialBossHp : campaign ? Mathf.RoundToInt(Tuning.BossHp[Mathf.Clamp(streetIdx + debugDiff, 0, Tuning.Streets - 1)] * Tuning.BossHpMult) : 6 + (stage - 1) * 3;
             bossMaxHp = gear[GSmg] ? baseHp * 3 : baseHp;
+            if (Tuning.Arcade) bossMaxHp = Mathf.RoundToInt(bossMaxHp * (1f + squad.Count / 8f));   // grosse bande : le boss tient le temps d'un vrai combat
             hpAtBoss = hearts;
             bossAttacks = 0;
             bossCharging = false;
@@ -1722,6 +1727,7 @@ namespace SamediRouge
                 bossCharging = false;
                 warn.gameObject.SetActive(false);
                 warn2.gameObject.SetActive(false);
+                if (Tuning.Arcade && ArcadeFinale()) return;
                 RunWon();
                 return;
             }
@@ -1886,8 +1892,17 @@ namespace SamediRouge
                 {
                     // cibles réparties : les plus proches d'abord, en évitant d'empiler toute l'escouade sur le même
                     Ent target = threats[m.slot % threats.Count];
-                    tx = Mathf.Clamp(target.x + (m.slot % 2 == 0 ? -0.35f : 0.35f), -3.5f, 3.5f);
-                    tz = Mathf.Min(target.z - 1.1f, pz + 2.2f - (m.slot / 3) * 0.6f);
+                    if (Tuning.Arcade)
+                    {
+                        // arcade : la foule fonce en gardant sa forme de grappe (pas une file indienne)
+                        tx = Mathf.Clamp(target.x * 0.6f + px * 0.4f + sl.x * 0.8f, -3.5f, 3.5f);
+                        tz = Mathf.Min(target.z - 1.2f, pz + 2.2f) + sl.y * 0.7f;
+                    }
+                    else
+                    {
+                        tx = Mathf.Clamp(target.x + (m.slot % 2 == 0 ? -0.35f : 0.35f), -3.5f, 3.5f);
+                        tz = Mathf.Min(target.z - 1.1f, pz + 2.2f - (m.slot / 3) * 0.6f);
+                    }
                 }
                 m.x = Mathf.Lerp(m.x, tx, 1f - Mathf.Exp((charge ? -11f : -7f) * dt));
                 m.z = Mathf.Lerp(m.z, tz, 1f - Mathf.Exp((charge ? -8f : -5f) * dt));
@@ -2103,9 +2118,19 @@ namespace SamediRouge
 
         void Hurt(int n, string why)
         {
-            if (inv > 0f || perfectGuardT > 0f) return;
+            if (inv > 0f || perfectGuardT > 0f || finaleZ > 0f) return;
             if (tutorialMode) { TutorialFail(why); return; }
             if (demo) { inv = 0.6f; P.Flash(new Color(1f, 0.25f, 0.2f), 0.12f); return; }
+            if (Tuning.Arcade && squad.Count > 0)
+            {
+                // arcade : la bande encaisse à ta place (un ou deux membres tombent)
+                int lose = Mathf.Min(squad.Count, n + 1);
+                for (int k = 0; k < lose; k++) LoseMate(squad.Count - 1, new Vector3(Random.Range(-3f, 3f), 4f, 2f));
+                inv = 0.45f;
+                hud.Damage(0.12f);
+                Haptics.Pulse(25);
+                return;
+            }
             if (shieldHits > 0)
             {
                 // bouclier gagné : il encaisse le coup et se fissure ; au dernier coup il se brise
@@ -2344,6 +2369,13 @@ namespace SamediRouge
         }
 
         // ================================================================== génération
+
+        static int[] ShuffledLanes()
+        {
+            int[] l = { 0, 1, 2 };
+            for (int i = 2; i > 0; i--) { int j = Random.Range(0, i + 1); int t = l[i]; l[i] = l[j]; l[j] = t; }
+            return l;
+        }
 
         float SpawnRow(float z)
         {
@@ -3186,6 +3218,13 @@ namespace SamediRouge
                 Vector3 body = P.root.position;
                 want = body + new Vector3(3.2f, 3.6f, -3.8f);
                 look = body + new Vector3(0f, 0.6f, 0f);
+                if (Tuning.Arcade && store != null)
+                {
+                    // victoire arcade : plan large sur la façade du MEGA STORE pillé
+                    Vector3 sp = store.transform.position;
+                    want = sp + new Vector3(2.5f, 5.5f, -15f);
+                    look = sp + new Vector3(0f, 5f, 0f);
+                }
                 wantFov = portrait ? 62f : 50f;
             }
             else
@@ -3195,9 +3234,9 @@ namespace SamediRouge
                 {
                     // grosse bande : la caméra prend de la hauteur pour voir la foule et la route devant
                     float ck = Mathf.Clamp01(squad.Count / (float)ArcadeMaxSquad);
-                    want += new Vector3(0f, 2.4f * ck, -2.2f * ck);
+                    want += new Vector3(0f, 2.6f + 2.2f * ck, -0.4f - 1f * ck);
                 }
-                look = new Vector3(px * 0.4f, 1.25f, pz + 9f);
+                look = Tuning.Arcade ? new Vector3(px * 0.4f, 0.4f, pz + 6.5f) : new Vector3(px * 0.4f, 1.25f, pz + 9f);
                 wantFov = (portrait ? 66f : 54f) + Mathf.InverseLerp(12f, 26f, speed) * 7f;
                 // pendant un ralenti : la caméra se rapproche et resserre le cadre
                 float zk = slowMo > 0f ? zoom : 0f;

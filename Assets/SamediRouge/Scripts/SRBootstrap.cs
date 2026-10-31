@@ -35,6 +35,7 @@ namespace SamediRouge
             };
 #endif
             Application.targetFrameRate = 60;
+            Application.runInBackground = true;
             Screen.sleepTimeout = SleepTimeout.NeverSleep;
 #if !UNITY_EDITOR
             Screen.orientation = ScreenOrientation.Portrait;

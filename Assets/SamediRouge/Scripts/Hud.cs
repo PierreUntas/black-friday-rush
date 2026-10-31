@@ -886,6 +886,7 @@ namespace SamediRouge
             Slot(4, gear[1], gear[1] ? "" : next == 1 ? L("NEXT", "SUIV.") : "", next == 1 && !gear[1]);
             Slot(5, gear[3], gear[3] && chargeT > 0f ? Mathf.CeilToInt(chargeT) + " s" : next == 3 ? L("NEXT", "SUIV.") : "", next == 3 && !gear[3]);
             Slot(6, squad > 0, squad > 0 ? "x" + squad : "", false);
+            if (Quiet) for (int i = 0; i < slotShow.Length; i++) slotShow[i] = false;   // arcade : la taille de la bande est affichée au-dessus du héros
             LayoutSlots();
         }
 

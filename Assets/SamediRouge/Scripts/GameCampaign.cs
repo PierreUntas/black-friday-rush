@@ -217,7 +217,7 @@ namespace SamediRouge
             }
             else
             {
-                StageLen = debugBossRush ? 30f : Tuning.StreetLength[Diff];
+                StageLen = debugBossRush ? 30f : Tuning.StreetLength[Diff] * (Tuning.Arcade ? ArcadeLengthMult : 1f);
                 speed = Tuning.StartSpeed[Diff];
             }
         }
@@ -246,7 +246,7 @@ namespace SamediRouge
             endT = 0f;
             P.anim = Anim.Cheer;
             foreach (Mate m in squad) m.rig.anim = Anim.Cheer;
-            hud.Toast(tutorialMode ? L("TRAINING DONE!", "ENTRAÎNEMENT TERMINÉ !") : L("STREET CONQUERED!", "RUE CONQUISE !"));
+            hud.Toast(tutorialMode ? L("TRAINING DONE!", "ENTRAÎNEMENT TERMINÉ !") : Tuning.Arcade ? L("JACKPOT!", "JACKPOT !") : L("STREET CONQUERED!", "RUE CONQUISE !"));
             pendingEnd = tutorialMode ? (System.Action)ShowTutorialDone : ShowVictory;
         }
 
@@ -297,6 +297,8 @@ namespace SamediRouge
             metaScreen = MetaScreen.Result;
             bool already = Progress.Conquered(thief, streetIdx);
             int bonus = already ? Mathf.RoundToInt(Tuning.VictoryBonus[streetIdx] * Tuning.ReplayBonusFactor) : Tuning.VictoryBonus[streetIdx];
+            int crewN = squad.Count + 1;
+            if (Tuning.Arcade) bonus += crewN * 10;   // arcade : chaque membre de la bande rapporte au pillage
             int total = coins + bonus;
             Progress.Coins += total;
             var openBefore = new bool[Tuning.Maps];
@@ -308,7 +310,7 @@ namespace SamediRouge
             int n = Progress.ConqueredCount(thief);
             int next = Progress.NextStreet(thief);
             selStreet = next >= 0 ? next : streetIdx;
-            string body = RunSummary() + "  ·  " + (already ? L("replay bonus +", "bonus de rejeu +") : L("victory bonus +", "bonus de victoire +")) + bonus;
+            string body = Tuning.Arcade ? L("Crew ×", "Bande ×") + crewN + "   ·   " + koCount + " KO" : RunSummary() + "  ·  " + (already ? L("replay bonus +", "bonus de rejeu +") : L("victory bonus +", "bonus de victoire +")) + bonus;
             // fin du niveau qui donne l'arme renforcée : c'est la récompense du niveau dur
             bool weaponWon = pendingUnlockMap >= 1 && Tuning.MapWeaponTier[pendingUnlockMap] >= 1 && Tuning.MapWeaponTier[pendingUnlockMap - 1] == 0;
             string tip = weaponWon ? M(L("YOU WIN THE REINFORCED BATON! Level " + (pendingUnlockMap + 1) + " unlocked", "TU GAGNES LA MATRAQUE RENFORCÉE ! Niveau " + (pendingUnlockMap + 1) + " débloqué"),
@@ -318,7 +320,7 @@ namespace SamediRouge
             if (GiveFirstWeapon()) tip = FirstWeaponTip(true);
             bool sameMap = next >= 0 && Tuning.MapOf(next) == Tuning.MapOf(streetIdx);
             string cont = pendingUnlockMap >= 0 ? L("CONTINUE - LEVEL ", "CONTINUER - NIVEAU ") + (pendingUnlockMap + 1) : sameMap ? L("NEXT: ", "SUIVANTE : ") + Tuning.StreetNames[next] : L("CONTINUE", "CONTINUER");
-            hud.ShowResult(true, pendingUnlockMap >= 0 ? L("LEVEL " + (pendingUnlockMap + 1) + " UNLOCKED!", "NIVEAU " + (pendingUnlockMap + 1) + " DÉBLOQUÉ !") : already ? L("STREET HELD!", "RUE DÉFENDUE !") : L("STREET CONQUERED!", "RUE CONQUISE !"),
+            hud.ShowResult(true, Tuning.Arcade && pendingUnlockMap < 0 ? L("MEGA STORE RAIDED!", "MEGA STORE PILLÉ !") : pendingUnlockMap >= 0 ? L("LEVEL " + (pendingUnlockMap + 1) + " UNLOCKED!", "NIVEAU " + (pendingUnlockMap + 1) + " DÉBLOQUÉ !") : already ? L("STREET HELD!", "RUE DÉFENDUE !") : L("STREET CONQUERED!", "RUE CONQUISE !"),
                            Tuning.StreetNames[streetIdx], body, total, Progress.Coins, Tracks(), tip, cont);
         }
 
