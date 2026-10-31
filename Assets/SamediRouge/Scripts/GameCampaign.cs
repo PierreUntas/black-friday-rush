@@ -41,6 +41,8 @@ namespace SamediRouge
             hud.onRetry = () => { if (tutorialMode) StartTutorial(tutStep); else StartStreet(streetIdx); };
             hud.onContinue = () =>
             {
+                // arcade : retour à l'accueil (améliorations, puis « glisse pour jouer »), comme Hell Escape
+                if (Tuning.Arcade) { ToMenu(); return; }
                 // victoire : rue suivante directement (sans repasser par la carte), sauf nouveau niveau débloqué
                 int nx = Progress.NextStreet(thief);
                 if (!tutorialMode && pendingUnlockMap < 0 && nx >= 0 && Tuning.MapOf(nx) == Tuning.MapOf(streetIdx)) StartStreet(nx);
@@ -334,7 +336,7 @@ namespace SamediRouge
             {
                 // arcade (retours YSO) : écran de fin minimal — le gain, une amélioration (l'arme de départ), CONTINUER
                 hud.minimalResult = true;
-                hud.ShowResult(true, L("MEGA STORE RAIDED!", "MEGA STORE PILLÉ !"), "", "", total, Progress.Coins, ArcadeTracks(), "", L("CONTINUE", "CONTINUER"));
+                hud.ShowResult(true, L("MEGA STORE RAIDED!", "MEGA STORE PILLÉ !"), "", "", total, Progress.Coins, null, "", L("CONTINUE", "CONTINUER"));
                 return;
             }
             hud.minimalResult = false;
@@ -383,7 +385,7 @@ namespace SamediRouge
             string tip = boss != null && superCount == 0 ? L("Tip: jump, then tap as you land = NINJA STRIKE x3!", "Astuce : saute, puis tape à l'atterrissage = COUP NINJA x3 !") : DefeatTip();
             if (GiveFirstWeapon()) tip = FirstWeaponTip(false);
             hud.minimalResult = Tuning.Arcade;
-            if (Tuning.Arcade) { hud.ShowResult(false, L("KNOCKED OUT", "K.-O."), "", "", keep, Progress.Coins, ArcadeTracks(), ""); return; }
+            if (Tuning.Arcade) { hud.ShowResult(false, L("KNOCKED OUT", "K.-O."), "", "", keep, Progress.Coins, null, ""); return; }
             hud.ShowResult(false, L("KNOCKED OUT", "K.-O."), Tuning.StreetNames[streetIdx], body, keep, Progress.Coins, Tracks(), tip);
         }
 

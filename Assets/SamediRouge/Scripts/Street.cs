@@ -207,12 +207,13 @@ namespace SamediRouge
                 float r = Random.value;
                 float zp = Random.Range(4f, Chunk - 4f);
                 propZ[s < 0 ? 0 : 1] = zp;
-                if (r < 0.45f) Palm(t, s, zp);
+                if (Tuning.Arcade) { if (r < 0.3f) Palm(t, s, zp); }   // arcade : décor plus calme
+                else if (r < 0.45f) Palm(t, s, zp);
                 else if (r < 0.75f) Bench(t, s, zp);
             }
 
             // vie du centre commercial : promeneurs à l'étage, lèche-vitrines au rez-de-chaussée
-            int nUp = Random.Range(0, 3);   // promeneurs de l'étage : peu nombreux (chaque personnage coûte au téléphone)
+            int nUp = Tuning.Arcade ? 0 : Random.Range(0, 3);   // arcade : pas de promeneurs (lisibilité, et chaque personnage coûte)   // promeneurs de l'étage : peu nombreux (chaque personnage coûte au téléphone)
             for (int i = 0; i < nUp; i++)
             {
                 int s = Random.value < 0.5f ? -1 : 1;
@@ -222,7 +223,7 @@ namespace SamediRouge
                 r.speed = Random.Range(1.1f, 1.6f);
                 cd.people.Add(new Walker { rig = r, dir = dir, v = r.speed });
             }
-            if (Random.value < 0.6f)
+            if (!Tuning.Arcade && Random.value < 0.6f)
             {
                 int s = Random.value < 0.5f ? -1 : 1;
                 float zs = Random.Range(3f, Chunk - 3f);
@@ -233,7 +234,7 @@ namespace SamediRouge
             }
 
             // map 2 : objets renversés, fumée légère, un gyrophare qui éclaire en rouge
-            if (Theme == 1)
+            if (Theme == 1 && !Tuning.Arcade)
             {
                 for (int s = -1; s <= 1; s += 2)
                     for (int k = 0; k < 2; k++) LootedProps(t, s, Random.Range(2f, Chunk - 2f));
@@ -260,7 +261,7 @@ namespace SamediRouge
             }
 
             // grappe de ballons
-            if (Theme == 0 && Random.value < 0.4f)
+            if (Theme == 0 && !Tuning.Arcade && Random.value < 0.4f)
             {
                 int s = Random.value < 0.5f ? -1 : 1;
                 Vector3 b = new Vector3(s * (ShopX - 1.2f), 0f, Random.Range(3f, Chunk - 3f));

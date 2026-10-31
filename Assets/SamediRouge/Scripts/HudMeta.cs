@@ -859,7 +859,7 @@ namespace SamediRouge
             resRetry = Button(r, L("RETRY", "RÉESSAYER"), Yellow, new Vector2(0.5f, 0f), new Vector2(0f, 400f), new Vector2(1000f, 170f), 64, () => onRetry?.Invoke(), out Text rt).gameObject;
             rt.color = new Color(0.12f, 0.1f, 0.04f);
             resUpg = Button(r, L("EQUIPMENT", "ÉQUIPEMENT"), Blue, new Vector2(0.5f, 0f), new Vector2(-255f, 228f), new Vector2(490f, 120f), 38, () => onUpgrades?.Invoke(), out resUpgLabel).gameObject;
-            resMap = Button(r, L("MAP", "CARTE"), new Color(0.2f, 0.24f, 0.3f), new Vector2(0.5f, 0f), new Vector2(255f, 228f), new Vector2(490f, 120f), 38, () => onBackToMap?.Invoke(), out _).gameObject;
+            resMap = Button(r, L("MAP", "CARTE"), new Color(0.2f, 0.24f, 0.3f), new Vector2(0.5f, 0f), new Vector2(255f, 228f), new Vector2(490f, 120f), 38, () => onBackToMap?.Invoke(), out resMapLabel).gameObject;
             resRoot.SetActive(false);
         }
 
@@ -909,6 +909,7 @@ namespace SamediRouge
         /// </summary>
         /// <summary>Écran de fin épuré (arcade) : ni texte d'explication, ni REJOUER / CARTE, ni lien vers l'équipement.</summary>
         public bool minimalResult;
+        Text resMapLabel;
 
         public void ShowResult(bool victory, string tag, string title, string body, int earned, int bank, Track[] tracks, string tip, string contLabel = null)
         {
@@ -955,7 +956,9 @@ namespace SamediRouge
             if (minimalResult)
             {
                 resUpg.SetActive(false);
-                resMap.SetActive(!victory);   // après un K.-O., on peut encore revenir à la carte
+                resMap.SetActive(!victory);   // après un K.-O., on peut revenir à l'accueil (améliorations)
+                resMap.GetComponent<RectTransform>().anchoredPosition = new Vector2(0f, 228f);
+                if (resMapLabel != null) resMapLabel.text = L("HOME", "ACCUEIL");
                 resMore.gameObject.SetActive(false);
             }
             resRoot.transform.localScale = Vector3.one * 0.94f;
