@@ -13,7 +13,7 @@ namespace SamediRouge
         public Mode mode;
         public int lane, hp;
         public float x, y, z, depth = 0.5f, timer, vz, escape, bob;
-        public bool hit, dead, fled;
+        public bool hit, dead, fled, vanish;   // vanish : ennemi assommé qui disparaît vite (arcade)
         public int raid = -1; // magasin attaqué auquel appartient ce pillard (-1 : aucun)
         public GameObject ring; // cercle rouge au sol sous un ennemi
         public GameObject go;
@@ -960,6 +960,7 @@ namespace SamediRouge
                 float a = Tuning.Arcade ? ArcadeSpawn(nextSpawnZ) : 0f;
                 if (a > 0f) nextSpawnZ += a;
                 else if (Tuning.Arcade && campaign && !demo && nextSpawnZ - stageStartZ <= StageLen) nextSpawnZ += ArcadeRow(nextSpawnZ, ShuffledLanes());
+                else if (Tuning.Arcade && campaign && !demo) nextSpawnZ += 20f;   // arène du boss : piste vide, on ne voit que le combat
                 else nextSpawnZ += SpawnRow(nextSpawnZ);
             }
             Perf.Mark("spawn");
@@ -1052,6 +1053,17 @@ namespace SamediRouge
                     break;
             }
 
+            if (e.vanish && !e.dead)
+            {
+                e.timer -= dt;
+                if (e.timer <= 0f)
+                {
+                    if (e.rig != null) Fx.Puff(e.rig.root.position + Vector3.up * 0.5f);
+                    e.dead = true;
+                    if (e.go != null) Destroy(e.go);
+                    return;
+                }
+            }
             // une fois touché, l'objet appartient à la physique : on ne le replace plus
             if (!e.hit && e.go != null) e.go.transform.localPosition = new Vector3(e.x, e.y, e.z);
 
@@ -2036,9 +2048,10 @@ namespace SamediRouge
         {
             light |= byBuddy;
             Vector3 chest = new Vector3(e.x, 1.2f, e.z);
-            Haptics.Pulse(light ? 8 : 18);
-            Fx.Hit(chest);
+            if (!Tuning.Arcade) Haptics.Pulse(light ? 8 : 18);
+            if (!Tuning.Arcade) Fx.Hit(chest);
             Snd.PlayPitch(Snd.I.bonk, light ? 0.6f : 1f, Random.Range(0.9f, 1.1f) / Mathf.Sqrt(power));
+            if (Tuning.Arcade) light = true;   // arcade : pas de flash d'écran ni de coup de zoom à chaque coup, la foule frappe sans arrêt
             if (!light)
             {
                 hitStop = 0.05f + 0.02f * power;
@@ -2103,12 +2116,21 @@ namespace SamediRouge
             int loot = thief ? Tuning.LootThief : Tuning.LootGuard;
             coins += loot;
             starsKO += loot;
-            Fx.Coin(chest + Vector3.up * 0.3f);
+            if (!Tuning.Arcade) Fx.Coin(chest + Vector3.up * 0.3f);
             if (!light || Random.value < 0.35f)
                 hud.Float(chest + Vector3.up * 0.6f, power >= 1.9f ? L("SMASH!", "ÉCRASÉ !") : thief ? (Random.value < 0.5f ? L("SHOVE!", "POUSSE-TOI !") : L("OUTTA MY WAY!", "DÉGAGE !")) : (Random.value < 0.5f ? "BONK!" : L("GOTCHA!", "JE TE TIENS !")), Hud.Yellow, true);
             hud.Float(chest, "+" + loot + " " + Tuning.Cur, Hud.StarGold);
             hud.ComboPop();
             if (!light) Fx.Confetti(chest);
+            if (Tuning.Arcade)
+            {
+                // arcade : l'ennemi tombe en arrière sur place puis disparaît dans un petit nuage (pas de corps qui volent partout)
+                Fx.Hit(chest);
+                e.rig.KO(new Vector3(Random.Range(-0.8f, 0.8f), 2.2f, speed * 0.85f + 1.5f), new Vector3(-6f, 0f, Random.Range(-1.5f, 1.5f)));
+                e.vanish = true;
+                e.timer = 0.55f;
+                return;
+            }
             if (combo % 5 == 0)
             {
                 coins += Tuning.StarsCombo;
@@ -2121,7 +2143,7 @@ namespace SamediRouge
                     zoom = 0.7f;
                 }
                 if (!Tuning.Arcade) hud.Toast("COMBO x" + combo + "!");
-                Fx.Confetti(chest + Vector3.up * 0.4f);
+                if (!Tuning.Arcade) Fx.Confetti(chest + Vector3.up * 0.4f);
             }
             float side = Mathf.Abs(e.x - px) < 0.3f ? (Random.value < 0.5f ? -1f : 1f) : Mathf.Sign(e.x - px);
             e.rig.KO(new Vector3(side * Random.Range(4.5f, 7.5f) * power, Random.Range(4f, 6.5f) * Mathf.Sqrt(power), speed + Random.Range(1f, 4f) * power),

@@ -873,6 +873,7 @@ namespace SamediRouge
                 if (hearts[i].gameObject.activeSelf) hearts[i].gameObject.SetActive(false);
             SetHealth(heartsLeft, maxHearts);
             koT.text = ko + " " + (ko == 1 ? koNoun : koNouns);
+            if (koT.transform.parent.gameObject.activeSelf == Quiet) koT.transform.parent.gameObject.SetActive(!Quiet);   // arcade : pas de compteur de KO
             bool combo = comboMult > 1f && !Quiet;
             if (comboBg.gameObject.activeSelf != combo) comboBg.gameObject.SetActive(combo);
             if (combo) comboT.text = "COMBO x" + comboMult.ToString("0.#").Replace('.', ',');

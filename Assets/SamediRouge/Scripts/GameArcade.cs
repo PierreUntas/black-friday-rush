@@ -227,43 +227,30 @@ namespace SamediRouge
         /// </summary>
         float ArcadeRow(float z, int[] lanes)
         {
+            // piste épurée (retours YSO) : des groupes d'ennemis, quelques pièces, et rien d'autre
+            // (ni obstacles, ni trousses, ni recrues : la bande ne grossit que par les portes)
             float prog = Mathf.Clamp01((z - stageStartZ) / Mathf.Max(1f, StageLen));
             int crowd = squad.Count + 1;
             float r = Random.value;
-            if (r < 0.42f)
+            if (r < 0.6f)
             {
                 int n = Mathf.Clamp(2 + crowd / 4 + Mathf.RoundToInt(prog * 4f) + Diff / 3, 2, 10);
                 SpawnPack(lanes[0], z, n);
-                for (int i = 0; i < 5; i++) Spawn(ET.Piece, lanes[2], z + i * 2f);
-                return 19f;
+                for (int i = 0; i < 3; i++) Spawn(ET.Piece, lanes[2], z + 2f + i * 2.4f);
+                return 20f;
             }
-            if (r < 0.58f)
+            if (r < 0.85f)
             {
-                // barrage : deux bandes côte à côte, un couloir libre plein de pièces
+                // barrage : deux groupes côte à côte, un couloir libre
                 int n = Mathf.Clamp(2 + crowd / 6 + Mathf.RoundToInt(prog * 3f), 2, 7);
                 SpawnPack(lanes[0], z, n);
                 SpawnPack(lanes[1], z + 1.5f, n);
-                for (int i = 0; i < 6; i++) Spawn(ET.Piece, lanes[2], z + i * 1.8f);
-                return 21f;
+                for (int i = 0; i < 3; i++) Spawn(ET.Piece, lanes[2], z + 2f + i * 2.4f);
+                return 22f;
             }
-            if (r < 0.78f)
-            {
-                ET[] pool = { ET.Poubelle, ET.Barricade, ET.Voiture, ET.Poubelle };
-                Spawn(pool[Random.Range(0, pool.Length)], lanes[0], z);
-                if (prog > 0.3f && Random.value < 0.6f) Spawn(pool[Random.Range(0, pool.Length)], lanes[1], z + 9f);
-                for (int i = 0; i < 5; i++) Spawn(ET.Piece, lanes[2], z + i * 2f);
-                if (Random.value < 0.5f) SpawnPack(lanes[2], z + 12f, Mathf.Clamp(1 + crowd / 6, 1, 4));
-                return 18f;
-            }
-            if (r < 0.9f && squad.Count < ArcadeMaxSquad)
-            {
-                SpawnRecruits(lanes[0], z + 3f, Random.Range(2, 4));
-                SpawnPack(lanes[1], z + 6f, Mathf.Clamp(2 + crowd / 5, 2, 6));
-                return 17f;
-            }
-            if (hearts < MaxHearts && Random.value < 0.5f) Spawn(ET.Cafe, lanes[0], z + 2f);
-            for (int i = 0; i < 6; i++) Spawn(ET.Piece, lanes[1], z + i * 1.8f);
-            return 13f;
+            // respiration : une ligne de pièces
+            for (int i = 0; i < 4; i++) Spawn(ET.Piece, lanes[1], z + i * 2.2f);
+            return 14f;
         }
 
         /// <summary>Boss à terre : la bande fonce dans le MEGA STORE, puis l'écran de victoire.</summary>
