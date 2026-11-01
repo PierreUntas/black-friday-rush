@@ -57,6 +57,23 @@ namespace SamediRouge
         /// <summary>Arcade : vitesse de course réduite, taille des personnages de ta bande (alignée sur les adversaires).</summary>
         const float ArcadeSpeed = 0.65f, CrewScale = 0.62f, FreeMax = 3.3f;
         float freeX;
+
+        /// <summary>
+        /// Difficulté arcade du niveau en cours (0 = très facile). Courbe en dents de scie par cycles de 5 niveaux
+        /// (facile, moyen, moyen+, dur, respiration) sur une base qui monte doucement ; les 3 premiers niveaux restent
+        /// presque imperdables. Rattrapage : chaque échec récent sur ce niveau le rend un peu plus facile.
+        /// </summary>
+        float arcD;
+        static readonly float[] Saw = { 0f, 0.15f, 0.3f, 0.5f, -0.1f };
+
+        float ArcadeDifficulty()
+        {
+            int lv = streetIdx;
+            float d = lv < 3 ? lv * 0.05f : 0.12f * lv + Saw[lv % 5];
+            int fails = Progress.Conquered(thief, lv) ? 0 : Mathf.Max(0, Progress.Tries(thief, lv) - 1);
+            d -= 0.25f * Mathf.Min(fails, 2);
+            return Mathf.Clamp(d, 0f, 3f);
+        }
         bool FreeMove => Tuning.Arcade && campaign && !demo && !tutorialMode;
         /// <summary>Arcade : la rue est plus longue (environ une minute de course avant le boss).</summary>
         const float ArcadeLengthMult = 2.4f;
@@ -110,6 +127,8 @@ namespace SamediRouge
             mateVolleyT = 0.5f;
             runTier = gear[GSmg] ? 2 : gear[GPistol] ? 1 : 0;
             freeX = 0f;
+            arcD = campaign && !demo ? ArcadeDifficulty() : 0f;
+            Perf.Note("niveau " + (streetIdx + 1) + " : difficulté " + arcD.ToString("0.00"));
             if (campaign && !demo && StartCrew > 0) AddMates(StartCrew);   // amélioration « Bande » de l'accueil
             ArmCrew();
             if (campaign && !demo && streetIdx == 0) hud.Toast(L("← SWIPE →", "← GLISSE →"));
@@ -145,7 +164,7 @@ namespace SamediRouge
                 (Random.Range(2, 5) + n / 4, false),
                 (Random.Range(4, 8) + n / 3, false),
                 (n >= 3 ? (Random.value < 0.25f ? 3 : 2) : Random.Range(5, 9), n >= 3),
-                (-(Random.Range(2, 4) + n / 4), false),
+                (-Mathf.RoundToInt((Random.Range(2, 4) + n / 4) * (1f + 0.5f * arcD)), false),
             };
             int bad = 3;
             int[] pick = { Random.Range(0, 3), bad, -1 };
@@ -450,7 +469,7 @@ namespace SamediRouge
             float r = Random.value;
             if (r < 0.6f)
             {
-                int n = Mathf.Clamp(2 + crowd / 4 + Mathf.RoundToInt(prog * 4f) + Diff / 3, 2, 10);
+                int n = Mathf.Clamp(2 + crowd / 4 + Mathf.RoundToInt(prog * (3f + 2f * arcD) + arcD * 2f), 2, 12);
                 SpawnPack(lanes[0], z, n);
                 for (int i = 0; i < 3; i++) Spawn(ET.Piece, lanes[2], z + 2f + i * 2.4f);
                 return 20f;
@@ -458,7 +477,7 @@ namespace SamediRouge
             if (r < 0.85f)
             {
                 // barrage : deux groupes côte à côte, un couloir libre
-                int n = Mathf.Clamp(2 + crowd / 6 + Mathf.RoundToInt(prog * 3f), 2, 7);
+                int n = Mathf.Clamp(2 + crowd / 6 + Mathf.RoundToInt(prog * (2f + 2f * arcD) + arcD), 2, 9);
                 SpawnPack(lanes[0], z, n);
                 SpawnPack(lanes[1], z + 1.5f, n);
                 for (int i = 0; i < 3; i++) Spawn(ET.Piece, lanes[2], z + 2f + i * 2.4f);
@@ -487,7 +506,7 @@ namespace SamediRouge
             for (int r = 0; r < rows; r++)
                 for (int l = 0; l < 3; l++)
                 {
-                    int hp = Mathf.Max(1, 1 + Mathf.RoundToInt(r * 0.7f) + Random.Range(0, 2) + runTier);
+                    int hp = Mathf.Max(1, 1 + Mathf.RoundToInt(r * 0.7f * (1f + 0.5f * arcD)) + Random.Range(0, 2) + runTier);
                     var b = new LootBox { lane = l, z = z0 + r * gap + Random.Range(-0.6f, 0.6f), hp = hp, max = hp };
                     b.tr = Art.Node(world, "loot", new Vector3((l - 1) * Lane, 0f, b.z));
                     float k = 0.8f + 0.06f * Mathf.Min(hp, 8);   // les cartons solides sont plus gros
@@ -570,7 +589,7 @@ namespace SamediRouge
 
         void SpawnCraft(float z, int lane)
         {
-            var c = new Craft { z = z, lane = lane, need = runTier == 0 ? 3 : runTier == 1 ? 6 : 12 };
+            var c = new Craft { z = z, lane = lane, need = Mathf.RoundToInt((runTier == 0 ? 3 : runTier == 1 ? 6 : 12) * (1f + 0.4f * arcD)) };
             Perf.Note("panneau de fusion couloir " + lane + " à " + z.ToString("0") + " (pz " + pz.ToString("0") + ")");
             c.go = new GameObject("craft");
             c.go.transform.SetParent(world, false);

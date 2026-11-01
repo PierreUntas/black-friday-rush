@@ -804,7 +804,7 @@ namespace SamediRouge
                 if (hp75 < 0 && fr >= 0.75f) hp75 = hearts;
             }
             float target = tutorialMode ? Tuning.TutorialSpeed : Mathf.Min(Tuning.MaxSpeed[Diff], Tuning.StartSpeed[Diff] + dist / 60f);
-            if (Tuning.Arcade) target *= ArcadeSpeed;   // arcade : rythme plus posé, on a le temps de viser
+            if (Tuning.Arcade) target *= ArcadeSpeed * (1f + 0.06f * Mathf.Min(arcD, 2f));   // arcade : rythme plus posé, on a le temps de viser
             float want = stumble > 0f ? target * 0.6f : target;
             speed = Mathf.MoveTowards(speed, want, (stumble > 0f ? 30f : 5f) * dt);
             float dz = speed * dt;
@@ -1536,7 +1536,7 @@ namespace SamediRouge
             bossType = tutorialMode ? 0 : campaign ? Tuning.StreetBoss[streetIdx] : bossOrder[(stage - 1) % 6];
             int baseHp = tutorialMode ? Tuning.TutorialBossHp : campaign ? Mathf.RoundToInt(Tuning.BossHp[Mathf.Clamp(streetIdx + debugDiff, 0, Tuning.Streets - 1)] * Tuning.BossHpMult) : 6 + (stage - 1) * 3;
             bossMaxHp = gear[GSmg] ? baseHp * 3 : baseHp;
-            if (Tuning.Arcade) bossMaxHp = Mathf.RoundToInt(bossMaxHp * (1f + squad.Count / 8f));   // grosse bande : le boss tient le temps d'un vrai combat
+            if (Tuning.Arcade) bossMaxHp = Mathf.RoundToInt(bossMaxHp * (1f + squad.Count / 8f) * (1f + 0.6f * arcD));   // grosse bande : le boss tient le temps d'un vrai combat
             hpAtBoss = hearts;
             bossAttacks = 0;
             bossCharging = false;
