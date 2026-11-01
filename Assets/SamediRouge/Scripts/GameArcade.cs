@@ -55,7 +55,7 @@ namespace SamediRouge
         int crates;
         const int ArcadeMaxSquad = 24;
         /// <summary>Arcade : vitesse de course réduite, taille des personnages de ta bande (alignée sur les adversaires).</summary>
-        const float ArcadeSpeed = 0.78f, CrewScale = 0.84f, FreeMax = 3.3f;
+        const float ArcadeSpeed = 0.78f, CrewScale = 0.7f, FreeMax = 3.3f;
         float freeX;
         bool FreeMove => Tuning.Arcade && campaign && !demo && !tutorialMode;
         /// <summary>Arcade : la rue est plus longue (environ une minute de course avant le boss).</summary>
@@ -82,7 +82,7 @@ namespace SamediRouge
                 var l = new List<Vector2>();
                 for (int j = 0; l.Count < 40; j++)
                 {
-                    float r = 0.6f * Mathf.Sqrt(j + 1.2f), a = j * 2.39996f + 1.2f;
+                    float r = 0.52f * Mathf.Sqrt(j + 1.2f), a = j * 2.39996f + 1.2f;
                     var v = new Vector2(Mathf.Clamp(Mathf.Cos(a) * r * 1.1f, -2.9f, 2.9f), -0.5f + Mathf.Sin(a) * r * 0.65f);
                     if (v.sqrMagnitude < 0.45f || (Mathf.Abs(v.x) < 0.55f && v.y > 0f)) continue;   // pas sur le héros ni juste devant lui
                     l.Add(v);
@@ -335,7 +335,7 @@ namespace SamediRouge
             mergeT = popT = -1f;
         }
 
-        Vector3 IconBase => new Vector3(px, 4.4f, pz + 0.5f);
+        Vector3 IconBase => new Vector3(px, 3.8f, pz + 0.5f);
 
         void WeaponCrate(Vector3 p)
         {
@@ -764,7 +764,7 @@ namespace SamediRouge
             }
             foreach (LootBox b in loot)
                 if (!b.broken && b.z - pz < 60f) hud.Tag(new Vector3((b.lane - 1) * Lane, 1.9f, b.z), b.hp.ToString(), Color.white, 1.4f);
-            if (finaleZ < 0f || pz < lootEndZ + 3f) hud.Tag(new Vector3(px, 3.1f, pz), (squad.Count + 1).ToString(), Hud.Yellow, 1.3f);
+            if (finaleZ < 0f || pz < lootEndZ + 3f) hud.Tag(new Vector3(px, 2.6f, pz), (squad.Count + 1).ToString(), Hud.Yellow, 1.3f);
         }
     }
 }

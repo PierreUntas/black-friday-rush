@@ -161,6 +161,16 @@ namespace SamediRouge
             keys.Sort((x, y) => sum[y].CompareTo(sum[x]));
             var sb = new System.Text.StringBuilder("total " + total + "\n");
             for (int i = 0; i < keys.Count && i < 40; i++) sb.Append(sum[keys[i]] + "\t" + cnt[keys[i]] + "x\t" + keys[i] + "\n");
+            // tailles réelles (boîtes englobantes) : héros, un coéquipier, un adversaire
+            System.Func<Transform, string> H = t =>
+            {
+                if (t == null) return "-";
+                float lo = 1e9f, hi = -1e9f;
+                foreach (Renderer r in t.GetComponentsInChildren<Renderer>()) { if (!r.enabled || !(r is SkinnedMeshRenderer)) continue; lo = Mathf.Min(lo, r.bounds.min.y); hi = Mathf.Max(hi, r.bounds.max.y); }
+                return hi > lo ? (hi - lo).ToString("0.00") + " m (échelle " + t.localScale.x.ToString("0.000") + ")" : "?";
+            };
+            Ent foe = ents.Find(x => x.type == ET.Casseur && !x.hit && x.rig != null);
+            sb.Append("taille héros " + H(P.root) + " · coéquipier " + H(squad.Count > 0 ? squad[0].rig.root : null) + " · adversaire " + H(foe != null ? foe.rig.root : null) + "\n");
             try { System.IO.File.WriteAllText(System.IO.Path.Combine(Application.dataPath, "../Logs/sr-tris.txt"), sb.ToString()); } catch (System.Exception) { }
         }
 #endif
