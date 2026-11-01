@@ -8,6 +8,9 @@ namespace SamediRouge
     /// </summary>
     public static class Tuning
     {
+        /// <summary>V3 : jeu de braquage vue de dessus (Heist) au lieu du runner.</summary>
+        public const bool Heist = true;
+
         /// <summary>
         /// Mode « arcade » (retours de l'éditeur YSO) : tir automatique dès le départ, coups de près automatiques,
         /// un seul geste (glisser à gauche / à droite), plus de saut ni de glissade, moins de texte.

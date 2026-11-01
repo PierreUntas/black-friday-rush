@@ -43,8 +43,9 @@ namespace SamediRouge
             if (Loc.Fr) Debug.Log("Samedi Rouge: FR"); // langue lue ici une fois (PlayerPrefs interdit dans les constructeurs)
             Art.Init(litMaterial, emissiveMaterial, particleMaterial);
             GlbModel.PreloadAll();
-            var game = new GameObject("Game").AddComponent<Game>();
-            game.transform.SetParent(transform, false);
+            // V3 « Braquage » (branche v3) : vue de dessus façon GTA ; sinon le runner des V1/V2
+            if (Tuning.Heist) new GameObject("Heist").AddComponent<Heist>().transform.SetParent(transform, false);
+            else new GameObject("Game").AddComponent<Game>().transform.SetParent(transform, false);
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
