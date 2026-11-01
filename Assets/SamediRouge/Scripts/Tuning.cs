@@ -8,7 +8,7 @@ namespace SamediRouge
     /// </summary>
     public static class Tuning
     {
-        /// <summary>V3 : jeu de braquage vue de dessus (Heist) au lieu du runner.</summary>
+        /// <summary>V3 : battle royale vue de dessus (Royale) au lieu du runner.</summary>
         public const bool Heist = true;
 
         /// <summary>

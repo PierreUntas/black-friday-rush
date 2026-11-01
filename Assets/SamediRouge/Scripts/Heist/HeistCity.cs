@@ -111,6 +111,105 @@ namespace SamediRouge
             Random.state = keep;
         }
 
+        /// <summary>Carte de battle royale : mêmes rues, quelques pâtés transformés en places (herbe, arbres, murets),
+        /// des voitures garées pour se mettre à couvert, et des points de butin un peu partout.</summary>
+        public readonly List<Vector3> lootSpots = new List<Vector3>();
+
+        public HeistCity(Transform parent, int seed)
+        {
+            Random.State keep = Random.state;
+            Random.InitState(seed);
+            root = Art.Node(parent, "Map", Vector3.zero);
+            Ground();
+            var parks = new HashSet<int>();
+            while (parks.Count < 4) parks.Add(Random.Range(0, N * N));
+            for (int bi = 0; bi < N; bi++)
+                for (int bj = 0; bj < N; bj++)
+                {
+                    if (parks.Contains(bi * N + bj)) Park(bi, bj);
+                    else BlockAt(bi, bj);
+                }
+            // voitures garées : abris sur la chaussée
+            for (int k = 0; k < 14; k++)
+            {
+                bool ns = Random.value < 0.5f;
+                int line = Random.Range(0, N + 1), seg = Random.Range(0, N);
+                float along = seg * Pitch + Road * 0.5f + Random.Range(3f, Block - 3f);
+                float side = Random.value < 0.5f ? -3.4f : 3.4f;
+                Vector3 at = ns ? new Vector3(line * Pitch + side, 0f, along) : new Vector3(along, 0f, line * Pitch + side);
+                ParkedCar(at, ns);
+            }
+            // points de butin : trottoirs (coins et milieux), places, chaussée
+            for (int bi = 0; bi < N; bi++)
+                for (int bj = 0; bj < N; bj++)
+                {
+                    Rect b = BlockRect(bi, bj);
+                    float w = Walk * 0.5f;
+                    lootSpots.Add(new Vector3(b.center.x, 0f, b.yMin - w));
+                    lootSpots.Add(new Vector3(b.center.x, 0f, b.yMax + w));
+                    lootSpots.Add(new Vector3(b.xMin - w, 0f, b.center.y));
+                    lootSpots.Add(new Vector3(b.xMax + w, 0f, b.center.y));
+                    walkSpots.Add(new Vector3(b.xMin - w, 0f, b.yMin - w));
+                    walkSpots.Add(new Vector3(b.xMax + w, 0f, b.yMax + w));
+                    walkSpots.Add(new Vector3(b.xMin - w, 0f, b.yMax + w));
+                    walkSpots.Add(new Vector3(b.xMax + w, 0f, b.yMin - w));
+                }
+            for (int i = 0; i <= N; i++)
+                for (int j = 0; j <= N; j++)
+                    lootSpots.Add(Node(i, j) + new Vector3(Random.Range(-2f, 2f), 0f, Random.Range(-2f, 2f)));
+            Shuffle(lootSpots);
+            Random.state = keep;
+        }
+
+        void Park(int bi, int bj)
+        {
+            Rect b = BlockRect(bi, bj);
+            float sw = b.width + 2f * Walk;
+            Material slab = Art.Tex(Art.Slabs, new Vector2(sw / 3f, sw / 3f), 0.25f);
+            Art.Part(root, Art.Cube, slab, new Vector3(b.center.x, 0.07f, b.center.y), new Vector3(sw, 0.14f, sw), default, false);
+            Material grass = Art.Mat(new Color(0.42f, 0.66f, 0.32f), 0.15f);
+            Art.Part(root, Art.Cube, grass, new Vector3(b.center.x, 0.09f, b.center.y), new Vector3(b.width, 0.14f, b.height), default, false);
+            // allées en croix
+            Material path = Art.Mat(new Color(0.82f, 0.76f, 0.62f), 0.2f);
+            Art.Part(root, Art.Cube, path, new Vector3(b.center.x, 0.1f, b.center.y), new Vector3(2.2f, 0.14f, b.height), default, false);
+            Art.Part(root, Art.Cube, path, new Vector3(b.center.x, 0.1f, b.center.y), new Vector3(b.width, 0.14f, 2.2f), default, false);
+            // murets (abris) et arbres
+            Material wall = Art.Mat(new Color(0.78f, 0.74f, 0.68f), 0.3f);
+            for (int k = 0; k < 4; k++)
+            {
+                float x = b.center.x + (k % 2 == 0 ? -1f : 1f) * b.width * 0.25f, z = b.center.y + (k < 2 ? -1f : 1f) * b.height * 0.25f;
+                bool along = Random.value < 0.5f;
+                Vector3 size = along ? new Vector3(4f, 1.1f, 0.6f) : new Vector3(0.6f, 1.1f, 4f);
+                Art.Part(root, Art.Cube, wall, new Vector3(x, 0.55f, z), size);
+                solids.Add(new Rect(x - size.x * 0.5f, z - size.z * 0.5f, size.x, size.z));
+                lootSpots.Add(new Vector3(x + (along ? 0f : 1.4f), 0f, z + (along ? 1.4f : 0f)));
+                Prop("dec_arbuste", new Vector3(b.center.x + (k % 2 == 0 ? 1f : -1f) * b.width * 0.36f, 0.16f, b.center.y + (k < 2 ? 1f : -1f) * b.height * 0.36f), 2.2f);
+            }
+            for (int c = 0; c < 4; c++)
+            {
+                float x = c % 2 == 0 ? b.xMin - Walk * 0.55f : b.xMax + Walk * 0.55f;
+                float z = c < 2 ? b.yMin - Walk * 0.55f : b.yMax + Walk * 0.55f;
+                Prop("dec_lampadaire", new Vector3(x, 0.14f, z), 3.6f);
+            }
+        }
+
+        void ParkedCar(Vector3 at, bool northSouth)
+        {
+            Transform t = Art.Node(root, "parked", at);
+            t.localRotation = Quaternion.Euler(0f, northSouth ? (Random.value < 0.5f ? 0f : 180f) : (Random.value < 0.5f ? 90f : -90f), 0f);
+            Color[] cols = { new Color(0.85f, 0.2f, 0.18f), new Color(0.98f, 0.78f, 0.15f), new Color(0.2f, 0.55f, 0.85f), new Color(0.92f, 0.92f, 0.9f), new Color(0.2f, 0.2f, 0.24f) };
+            Material body = Art.Mat(cols[Random.Range(0, cols.Length)], 0.6f, 0.15f);
+            Material glass = Art.Mat(new Color(0.1f, 0.13f, 0.18f), 0.9f, 0.4f);
+            Material tire = Art.Mat(new Color(0.07f, 0.07f, 0.08f), 0.2f);
+            Art.Part(t, Art.Cube, body, new Vector3(0f, 0.6f, 0f), new Vector3(1.8f, 0.65f, 3.8f));
+            Art.Part(t, Art.Cube, glass, new Vector3(0f, 1.1f, -0.25f), new Vector3(1.6f, 0.55f, 1.9f), default, false);
+            Art.Part(t, Art.Cube, body, new Vector3(0f, 1.4f, -0.3f), new Vector3(1.58f, 0.06f, 1.5f), default, false);
+            for (int i = 0; i < 4; i++)
+                Art.Part(t, Art.Cylinder, tire, new Vector3(i % 2 == 0 ? -0.9f : 0.9f, 0.34f, i < 2 ? 1.25f : -1.25f), new Vector3(0.68f, 0.12f, 0.68f), new Vector3(0f, 0f, 90f), false);
+            Vector2 half = northSouth ? new Vector2(0.95f, 1.95f) : new Vector2(1.95f, 0.95f);
+            solids.Add(new Rect(at.x - half.x, at.z - half.y, half.x * 2f, half.y * 2f));
+        }
+
         static void Shuffle<T>(List<T> l)
         {
             for (int i = l.Count - 1; i > 0; i--) { int j = Random.Range(0, i + 1); T t = l[i]; l[i] = l[j]; l[j] = t; }
