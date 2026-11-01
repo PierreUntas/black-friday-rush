@@ -55,7 +55,7 @@ namespace SamediRouge
         int crates;
         const int ArcadeMaxSquad = 24;
         /// <summary>Arcade : vitesse de course réduite, taille des personnages de ta bande (alignée sur les adversaires).</summary>
-        const float ArcadeSpeed = 0.65f, CrewScale = 0.62f, FreeMax = 3.3f;
+        const float ArcadeSpeed = 0.65f, CrewScale = 0.45f, FreeMax = 3.3f;
         float freeX;
 
         /// <summary>
@@ -99,7 +99,7 @@ namespace SamediRouge
                 var l = new List<Vector2>();
                 for (int j = 0; l.Count < 40; j++)
                 {
-                    float r = 0.52f * Mathf.Sqrt(j + 1.2f), a = j * 2.39996f + 1.2f;
+                    float r = 0.42f * Mathf.Sqrt(j + 1.2f), a = j * 2.39996f + 1.2f;
                     var v = new Vector2(Mathf.Clamp(Mathf.Cos(a) * r * 1.1f, -2.9f, 2.9f), -0.5f + Mathf.Sin(a) * r * 0.65f);
                     if (v.sqrMagnitude < 0.45f || (Mathf.Abs(v.x) < 0.55f && v.y > 0f)) continue;   // pas sur le héros ni juste devant lui
                     l.Add(v);
@@ -281,14 +281,14 @@ namespace SamediRouge
                         if (Mathf.Abs(e.x - m.x) > 2.6f && e.type != ET.Loup) continue;
                         if (d < bd) { bd = d; best = e; }
                     }
-                    if (best != null) Shoot(best, true, new Vector3(m.x, 1.2f, m.z + 0.4f));
+                    if (best != null) Shoot(best, true, new Vector3(m.x, 0.9f, m.z + 0.4f));
                     else if (loot.Count > 0)
                     {
                         int ml = Mathf.Clamp(Mathf.RoundToInt(m.x / Lane) + 1, 0, 2);
                         LootBox lb = NearestLoot(ml, m.z, 24f) ?? NearestLoot(-1, m.z, 24f);
                         if (lb != null)
                         {
-                            Shoot(null, true, new Vector3(m.x, 1.2f, m.z + 0.4f));
+                            Shoot(null, true, new Vector3(m.x, 0.9f, m.z + 0.4f));
                             bolts[bolts.Count - 1].loot = lb;
                         }
                     }
@@ -356,7 +356,7 @@ namespace SamediRouge
                 P.throwT = 0f;
                 Snd.PlayPitch(Snd.I.whoosh, 0.35f, Random.Range(1.1f, 1.3f));
             }
-            Vector3 at = mate ? from.Value : new Vector3(px + 0.3f, 1.5f, pz + 0.5f);
+            Vector3 at = mate ? from.Value : new Vector3(px + 0.25f, 1.1f, pz + 0.5f);
             string key = mate ? "batM" : "batH";
             Transform tr = TakeBolt(key, at);
             Transform spinner;
