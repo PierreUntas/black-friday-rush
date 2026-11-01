@@ -55,11 +55,11 @@ namespace SamediRouge
         int crates;
         const int ArcadeMaxSquad = 24;
         /// <summary>Arcade : vitesse de course réduite, taille des personnages de ta bande (alignée sur les adversaires).</summary>
-        const float ArcadeSpeed = 0.78f, CrewScale = 0.62f, FreeMax = 3.3f;
+        const float ArcadeSpeed = 0.65f, CrewScale = 0.62f, FreeMax = 3.3f;
         float freeX;
         bool FreeMove => Tuning.Arcade && campaign && !demo && !tutorialMode;
         /// <summary>Arcade : la rue est plus longue (environ une minute de course avant le boss).</summary>
-        const float ArcadeLengthMult = 2.8f;
+        const float ArcadeLengthMult = 2.4f;
         float finaleZ = -1f;
         GameObject store;
         const int CratesPerMerge = 2;
@@ -589,10 +589,10 @@ namespace SamediRouge
             // l'arme qu'on va obtenir, au-dessus du panneau
             var ic = new GameObject("next").transform;
             ic.SetParent(t, false);
-            ic.localPosition = new Vector3(0f, 3.5f, 0f);
-            ic.localRotation = Quaternion.Euler(30f, 0f, 0f);
-            Art.Part(ic, Art.Sphere, Art.Particle(null, new Color(1f, 0.85f, 0.3f, 0.3f)), Vector3.zero, Vector3.one * 1.3f, default, false);
-            if (FitModel(ic, TierModel(runTier + 1), 1.3f) == null)
+            // l'arme à gagner est affichée dans le portique, sous la jauge, face à la caméra
+            ic.localPosition = new Vector3(0f, 1.2f, -0.15f);
+            ic.localRotation = Quaternion.Euler(20f, 0f, 0f);
+            if (FitModel(ic, TierModel(runTier + 1), 1.6f) == null)
                 Art.Part(ic, Art.Cube, Art.Glow(new Color(1f, 0.8f, 0.3f), new Color(0.6f, 0.4f, 0.05f), 0.85f), Vector3.zero, new Vector3(0.9f, 0.26f, 0.18f));
             crafts.Add(c);
         }
