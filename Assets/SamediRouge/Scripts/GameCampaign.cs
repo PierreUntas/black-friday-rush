@@ -254,6 +254,7 @@ namespace SamediRouge
         int EnemyHp()
         {
             if (!campaign || tutorialMode) return 1;
+            if (Tuning.Arcade) return ArcadeEnemyHp();
             BalanceConfig c = BalanceConfig.I;
             float r = Random.value;
             if (r < c.heavyShare[Diff]) return c.hpHeavy[Diff];

@@ -123,7 +123,7 @@ namespace SamediRouge
         bool demo;
         float demoT, autoT;
 
-        class Bolt { public Transform tr; public Ent target; public bool smg; public Transform bat; public float spin; public Gate gate; public Craft craft; public LootBox loot; public int lane; }
+        class Bolt { public string pool; public Transform tr; public Ent target; public bool smg; public Transform bat; public float spin; public Gate gate; public Craft craft; public LootBox loot; public int lane; }
         int smgShots;
         readonly List<Bolt> bolts = new List<Bolt>();
         int hearts, coins, combo, idle;
@@ -142,6 +142,7 @@ namespace SamediRouge
 
         // caméra
         Vector3 camPos;
+        float lastBonk;
         float shake, hitStop, slowMo, fov = 62f, fovKick, camRoll, zoom;
         bool camInit, rollOnLand;
         ParticleSystem speedLines;
@@ -1288,10 +1289,16 @@ namespace SamediRouge
             if (from.HasValue)
             {
                 // tir d'un membre de la bande : discret (pas de son ni de traînée, il y en a beaucoup)
-                Transform mt = Art.Node(world, "bolt", from.Value);
-                Color mc = Random.value < 0.5f ? new Color(1f, 0.31f, 0.64f) : new Color(0.25f, 0.85f, 0.45f);
-                Art.Part(mt, Art.Sphere, Art.Glow(mc, mc * 2f, 0.6f), Vector3.zero, Vector3.one * 0.12f, default, false);
-                bolts.Add(new Bolt { tr = mt, target = target, smg = true });
+                bool pink = Random.value < 0.5f;
+                string mk = pink ? "mateP" : "mateG";
+                Transform mt = TakeBolt(mk, from.Value);
+                if (mt == null)
+                {
+                    mt = Art.Node(world, "bolt", from.Value);
+                    Color mc = pink ? new Color(1f, 0.31f, 0.64f) : new Color(0.25f, 0.85f, 0.45f);
+                    Art.Part(mt, Art.Sphere, Art.Glow(mc, mc * 2f, 0.6f), Vector3.zero, Vector3.one * 0.12f, default, false);
+                }
+                bolts.Add(new Bolt { tr = mt, target = target, smg = true, pool = mk });
                 return;
             }
             if (Tuning.Arcade && !smg && !gear[GPistol]) { ThrowBat(target); return; }
@@ -1306,24 +1313,29 @@ namespace SamediRouge
                 P.shootT = 0f;
                 Snd.Play(Snd.I.shot, 0.6f);
                 muzzle = P.pistol != null ? P.pistol.position + P.pistol.forward * 0.3f : new Vector3(px, 1.2f, pz + 0.6f);
-                fovKick = Mathf.Max(fovKick, 1.5f);
+                if (!Tuning.Arcade) fovKick = Mathf.Max(fovKick, 1.5f);
             }
             Fx.Sparkle(muzzle);
-            Transform tr = Art.Node(world, "bolt", muzzle);
-            // projectiles cartoon, non létaux : policiers = décharge du taser / fléchettes en mousse ; voleurs = billes de peinture
             Color c;
             if (thief) c = (smg && (smgShots++ & 1) == 1) ? new Color(0.25f, 0.85f, 0.45f) : new Color(1f, 0.31f, 0.64f);
             else c = smg ? new Color(1f, 0.55f, 0.15f) : new Color(0.45f, 0.95f, 1f);
-            if (thief) Art.Part(tr, Art.Sphere, Art.Glow(c, c * 2f, 0.6f), Vector3.zero, Vector3.one * (smg ? 0.12f : 0.16f), default, false);
-            else if (smg)
+            string hk = "hero" + (thief ? "T" : "C") + (smg ? "S" : "P") + (c.r > 0.5f ? "1" : "0");
+            Transform tr = TakeBolt(hk, muzzle);
+            if (tr == null)
             {
-                Art.Part(tr, Art.Capsule, Art.Glow(c, c * 1.5f, 0.4f), Vector3.zero, new Vector3(0.07f, 0.16f, 0.07f), new Vector3(90f, 0f, 0f), false);
-                Art.Part(tr, Art.Sphere, Art.Glow(new Color(0.24f, 0.49f, 1f), new Color(0.3f, 0.6f, 1.6f), 0.5f), new Vector3(0f, 0f, 0.15f), Vector3.one * 0.08f, default, false);
+                tr = Art.Node(world, "bolt", muzzle);
+                // projectiles cartoon, non létaux : policiers = décharge du taser / fléchettes en mousse ; voleurs = billes de peinture
+                if (thief) Art.Part(tr, Art.Sphere, Art.Glow(c, c * 2f, 0.6f), Vector3.zero, Vector3.one * (smg ? 0.12f : 0.16f), default, false);
+                else if (smg)
+                {
+                    Art.Part(tr, Art.Capsule, Art.Glow(c, c * 1.5f, 0.4f), Vector3.zero, new Vector3(0.07f, 0.16f, 0.07f), new Vector3(90f, 0f, 0f), false);
+                    Art.Part(tr, Art.Sphere, Art.Glow(new Color(0.24f, 0.49f, 1f), new Color(0.3f, 0.6f, 1.6f), 0.5f), new Vector3(0f, 0f, 0.15f), Vector3.one * 0.08f, default, false);
+                }
+                else Art.Part(tr, Art.Capsule, Art.Glow(c, c * 4f, 0.5f), Vector3.zero, new Vector3(0.08f, 0.35f, 0.08f), new Vector3(90f, 0f, 0f), false);
+                TrailRenderer trl = Trail(tr);
+                trl.emitting = true;
             }
-            else Art.Part(tr, Art.Capsule, Art.Glow(c, c * 4f, 0.5f), Vector3.zero, new Vector3(0.08f, 0.35f, 0.08f), new Vector3(90f, 0f, 0f), false);
-            TrailRenderer trl = Trail(tr);
-            trl.emitting = true;
-            bolts.Add(new Bolt { tr = tr, target = target, smg = smg });
+            bolts.Add(new Bolt { tr = tr, target = target, smg = smg, pool = hk });
         }
 
         static TrailRenderer Trail(Transform tr)
@@ -1352,7 +1364,7 @@ namespace SamediRouge
                 {
                     // tir sur une porte, un panneau de fusion ou un carton de butin
                     bool gone = b.gate != null ? b.gate.used : b.craft != null ? (b.craft.done || b.craft.go == null) : (b.loot.broken || b.loot.tr == null);
-                    if (gone) { Destroy(b.tr.gameObject); bolts.RemoveAt(i); continue; }
+                    if (gone) { FreeBolt(b); bolts.RemoveAt(i); continue; }
                     Vector3 pa = b.gate != null ? new Vector3((b.lane - 1) * Lane, 1.5f, b.gate.z)
                                : b.craft != null ? new Vector3((b.craft.lane - 1) * Lane, 1.5f, b.craft.z)
                                : new Vector3((b.loot.lane - 1) * Lane, 0.8f, b.loot.z);
@@ -1360,7 +1372,7 @@ namespace SamediRouge
                     float ps = (b.bat != null ? 24f : 75f) * dt;
                     if (pd.magnitude <= ps + 0.3f)
                     {
-                        Destroy(b.tr.gameObject);
+                        FreeBolt(b);
                         bolts.RemoveAt(i);
                         if (b.gate != null) GateHit(b.gate, b.lane); else if (b.craft != null) CraftHit(b.craft); else LootHit(b.loot);
                         continue;
@@ -1373,7 +1385,7 @@ namespace SamediRouge
                 Ent e = b.target;
                 if (e == null || e.hit || e.dead || e.go == null)
                 {
-                    Destroy(b.tr.gameObject);
+                    FreeBolt(b);
                     bolts.RemoveAt(i);
                     continue;
                 }
@@ -1382,7 +1394,7 @@ namespace SamediRouge
                 float step = (b.bat != null ? 24f : 75f) * dt;
                 if (d.magnitude <= step + 0.3f)
                 {
-                    Destroy(b.tr.gameObject);
+                    FreeBolt(b);
                     bolts.RemoveAt(i);
                     Fx.Sparkle(aim);
                     if (e.type == ET.Manif) Bavure(e);
@@ -1403,8 +1415,39 @@ namespace SamediRouge
 
         void ClearBolts()
         {
-            foreach (Bolt b in bolts) if (b.tr != null) Destroy(b.tr.gameObject);
+            foreach (Bolt b in bolts) FreeBolt(b);
             bolts.Clear();
+        }
+
+        // projectiles réutilisés (arcade : des dizaines de tirs par seconde, créer/détruire des objets à chaque fois fait des à-coups)
+        readonly Dictionary<string, Stack<Transform>> boltPool = new Dictionary<string, Stack<Transform>>();
+
+        Transform TakeBolt(string key, Vector3 pos)
+        {
+            if (!boltPool.TryGetValue(key, out Stack<Transform> st)) return null;
+            while (st.Count > 0)
+            {
+                Transform t = st.Pop();
+                if (t == null) continue;
+                t.position = pos;
+                t.rotation = Quaternion.identity;
+                t.gameObject.SetActive(true);
+                TrailRenderer trl = t.GetComponent<TrailRenderer>();
+                if (trl != null) { trl.Clear(); trl.emitting = true; }
+                return t;
+            }
+            return null;
+        }
+
+        void FreeBolt(Bolt b)
+        {
+            if (b.tr == null) return;
+            if (b.pool == null) { Destroy(b.tr.gameObject); return; }
+            TrailRenderer trl = b.tr.GetComponent<TrailRenderer>();
+            if (trl != null) trl.emitting = false;
+            b.tr.gameObject.SetActive(false);
+            if (!boltPool.TryGetValue(b.pool, out Stack<Transform> st)) boltPool[b.pool] = st = new Stack<Transform>();
+            st.Push(b.tr);
         }
 
         /// <summary>Pickups d'équipement en course (temporaires) : plaque d'armure, bouclier, pistolet, mitraillette.</summary>
@@ -2114,7 +2157,11 @@ namespace SamediRouge
             Vector3 chest = new Vector3(e.x, 1.2f, e.z);
             if (!Tuning.Arcade) Haptics.Pulse(light ? 8 : 18);
             if (!Tuning.Arcade) Fx.Hit(chest);
-            Snd.PlayPitch(Snd.I.bonk, light ? 0.6f : 1f, Random.Range(0.9f, 1.1f) / Mathf.Sqrt(power));
+            if (!Tuning.Arcade || Time.unscaledTime - lastBonk > 0.07f)
+            {
+                lastBonk = Time.unscaledTime;
+                Snd.PlayPitch(Snd.I.bonk, light ? 0.6f : 1f, Random.Range(0.9f, 1.1f) / Mathf.Sqrt(power));
+            }
             if (Tuning.Arcade) light = true;   // arcade : pas de flash d'écran ni de coup de zoom à chaque coup, la foule frappe sans arrêt
             if (!light)
             {
@@ -2161,9 +2208,9 @@ namespace SamediRouge
                 e.hp -= dmg;
                 e.rig.Flash(Color.white, 0.08f);
                 e.rig.Land(0.3f);
-                e.rig.ShedArmor(new Vector3(Mathf.Sign(e.x - px + 0.01f) * 3f, 2f, 3f));
+                if (e.hp <= 3) e.rig.ShedArmor(new Vector3(Mathf.Sign(e.x - px + 0.01f) * 3f, 2f, 3f));   // la protection saute aux derniers coups
                 e.z += light ? 0.4f : 1.6f;
-                Snd.PlayPitch(Snd.I.glass, 0.45f, 1.6f);
+                if (!Tuning.Arcade) Snd.PlayPitch(Snd.I.glass, 0.45f, 1.6f);
                 if (!light) hud.Float(chest + Vector3.up * 0.6f, L("CLANG! " + e.hp + " more", "CLANG ! encore " + e.hp), Hud.Info, false);
                 return;
             }
@@ -2182,10 +2229,10 @@ namespace SamediRouge
             coins += loot;
             starsKO += loot;
             if (!Tuning.Arcade) Fx.Coin(chest + Vector3.up * 0.3f);
-            if (!light || Random.value < 0.35f)
+            if (!Tuning.Arcade && (!light || Random.value < 0.35f))
                 hud.Float(chest + Vector3.up * 0.6f, power >= 1.9f ? L("SMASH!", "ÉCRASÉ !") : thief ? (Random.value < 0.5f ? L("SHOVE!", "POUSSE-TOI !") : L("OUTTA MY WAY!", "DÉGAGE !")) : (Random.value < 0.5f ? "BONK!" : L("GOTCHA!", "JE TE TIENS !")), Hud.Yellow, true);
-            hud.Float(chest, "+" + loot + " " + Tuning.Cur, Hud.StarGold);
-            hud.ComboPop();
+            if (loot > 0) hud.Float(chest, "+" + loot + " " + Tuning.Cur, Hud.StarGold);
+            if (!Tuning.Arcade) hud.ComboPop();
             if (!light) Fx.Confetti(chest);
             if (Tuning.Arcade)
             {
@@ -2766,6 +2813,7 @@ namespace SamediRouge
         int ArmorVis(int hp)
         {
             if (!campaign || tutorialMode) return Mathf.Clamp(hp - 1, 0, 2);
+            if (Tuning.Arcade) return hp >= 4 ? 2 : hp >= 2 ? 1 : 0;   // casque, puis gilet : on voit qui est costaud
             BalanceConfig c = BalanceConfig.I;
             return hp >= c.hpHeavy[Diff] ? 2 : hp >= c.hpArmored[Diff] ? 1 : 0;
         }
@@ -2863,7 +2911,7 @@ namespace SamediRouge
         {
             bool hard = campaign && !tutorialMode;
             Mode m = Random.value < (hard ? 0.85f : 0.7f) ? Mode.Fonce : Mode.Casse;
-            float vz = Random.Range(4.5f, 7f) * (hard ? Tuning.EnemyRush : 1f);
+            float vz = Random.Range(4.5f, 7f) * (hard ? Tuning.EnemyRush : 1f) * (Tuning.Arcade ? 1f + 0.15f * Mathf.Min(arcD, 2.5f) : 1f);
             for (int i = 0; i < n; i++)
             {
                 int row = i / 3, col = i % 3;

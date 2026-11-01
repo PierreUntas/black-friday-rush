@@ -897,6 +897,7 @@ namespace SamediRouge
             Transform a = armor[armor.Count - 1];
             armor.RemoveAt(armor.Count - 1);
             if (a == null) return;
+            if (Tuning.Arcade) { Fx.Sparkle(a.position); Object.Destroy(a.gameObject); return; }   // arcade : pas de physique (à-coups)
             a.SetParent(root.parent, true);
             var col = a.gameObject.AddComponent<SphereCollider>();
             col.radius = 0.2f;

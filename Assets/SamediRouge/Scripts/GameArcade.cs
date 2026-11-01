@@ -154,6 +154,20 @@ namespace SamediRouge
             return 0f;
         }
 
+        /// <summary>
+        /// Arcade : les adversaires s'endurcissent avec le niveau et au fil de la course. Niveau 1 : un coup suffit,
+        /// quelques costauds à 2 en fin de parcours ; ensuite casques puis gilets, qu'il faut une meilleure arme
+        /// (ou une plus grosse bande) pour abattre avant qu'ils n'arrivent sur toi.
+        /// </summary>
+        int ArcadeEnemyHp()
+        {
+            float prog = Mathf.Clamp01((pz + 35f - stageStartZ) / Mathf.Max(1f, StageLen));
+            float tough = arcD * 0.9f + prog * (0.9f + 0.7f * arcD);
+            int hp = 1 + Mathf.FloorToInt(tough * 0.6f);
+            if (Random.value < Mathf.Clamp(0.12f + 0.2f * tough, 0f, 0.55f)) hp += 1 + Mathf.FloorToInt(tough * 0.5f);   // un costaud dans le groupe
+            return Mathf.Clamp(hp, 1, 8);
+        }
+
         void SpawnGate(float z)
         {
             var g = new Gate { z = z };
@@ -308,22 +322,30 @@ namespace SamediRouge
                 P.throwT = 0f;
                 Snd.PlayPitch(Snd.I.whoosh, 0.35f, Random.Range(1.1f, 1.3f));
             }
-            Transform tr = Art.Node(world, "bat", mate ? from.Value : new Vector3(px + 0.3f, 1.5f, pz + 0.5f));
-            var spinner = new GameObject("spin").transform;
-            spinner.SetParent(tr, false);
-            // la bande : batte simple (2 cylindres, léger) ; le héros : le modèle 3D de la batte
-            if (mate || FitModel(spinner, "arme_voleur_niv1", 1.25f) == null)
+            Vector3 at = mate ? from.Value : new Vector3(px + 0.3f, 1.5f, pz + 0.5f);
+            string key = mate ? "batM" : "batH";
+            Transform tr = TakeBolt(key, at);
+            Transform spinner;
+            if (tr != null) spinner = tr.GetChild(0);
+            else
             {
-                Material wood = Art.Mat(new Color(0.72f, 0.52f, 0.3f), 0.45f);
-                Art.Part(spinner, Art.Cylinder, wood, new Vector3(0f, -0.2f, 0f), new Vector3(0.06f, 0.22f, 0.06f), default, false);
-                Art.Part(spinner, Art.Cylinder, wood, new Vector3(0f, 0.18f, 0f), new Vector3(0.11f, 0.2f, 0.11f), default, false);
+                tr = Art.Node(world, "bat", at);
+                spinner = new GameObject("spin").transform;
+                spinner.SetParent(tr, false);
+                // la bande : batte simple (2 cylindres, léger) ; le héros : le modèle 3D de la batte
+                if (mate || FitModel(spinner, "arme_voleur_niv1", 1.25f) == null)
+                {
+                    Material wood = Art.Mat(new Color(0.72f, 0.52f, 0.3f), 0.45f);
+                    Art.Part(spinner, Art.Cylinder, wood, new Vector3(0f, -0.2f, 0f), new Vector3(0.06f, 0.22f, 0.06f), default, false);
+                    Art.Part(spinner, Art.Cylinder, wood, new Vector3(0f, 0.18f, 0f), new Vector3(0.11f, 0.2f, 0.11f), default, false);
+                }
+                if (!mate)
+                {
+                    TrailRenderer trl = Trail(tr);   // traînée : la batte se suit des yeux
+                    trl.emitting = true;
+                }
             }
-            if (!mate)
-            {
-                TrailRenderer trl = Trail(tr);   // traînée : la batte se suit des yeux
-                trl.emitting = true;
-            }
-            bolts.Add(new Bolt { tr = tr, target = target, smg = mate, bat = spinner, spin = Random.Range(0f, 360f) });
+            bolts.Add(new Bolt { tr = tr, target = target, smg = mate, bat = spinner, spin = Random.Range(0f, 360f), pool = key });
         }
 
         static string TierModel(int tier) => tier >= 2 ? "arme_voleur_niv3" : "arme_voleur_niv2";
