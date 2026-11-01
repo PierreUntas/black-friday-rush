@@ -1012,6 +1012,12 @@ namespace SamediRouge
                         if (e.mode == Mode.Fonce && e.z - pz < 45f)
                         {
                             e.z -= e.vz * dt;
+                            if (Tuning.Arcade && FreeMove && e.z - pz < 24f && e.z > pz)
+                            {
+                                // arcade : les vigiles se rabattent sur ta bande, on ne peut plus simplement les éviter
+                                float dx = px - e.x;
+                                if (Mathf.Abs(dx) > 0.7f) e.x += Mathf.Sign(dx) * Mathf.Min(Mathf.Abs(dx) - 0.7f, (2.4f + 0.8f * arcD) * dt);
+                            }
                             e.rig.anim = e.z - pz < 16f ? Anim.Charge : Anim.Run;
                             e.rig.speed = e.vz;
                         }
@@ -2071,7 +2077,7 @@ namespace SamediRouge
                         if (!safe && !gear[GShield]) { touch = e; break; }
                     }
                 }
-                if (hitE != null && m.cd <= 0f)
+                if (hitE != null && m.cd <= 0f && !Tuning.Arcade)   // arcade : la bande ne fait que tirer, le contact coûte des membres
                 {
                     m.cd = 0.36f;
                     r.swingStyle = Random.Range(0, 3);
@@ -2911,7 +2917,7 @@ namespace SamediRouge
         void SpawnPack(int ln, float z, int n)
         {
             bool hard = campaign && !tutorialMode;
-            Mode m = Random.value < (hard ? 0.85f : 0.7f) ? Mode.Fonce : Mode.Casse;
+            Mode m = Tuning.Arcade || Random.value < (hard ? 0.85f : 0.7f) ? Mode.Fonce : Mode.Casse;
             float vz = Random.Range(4.5f, 7f) * (hard ? Tuning.EnemyRush : 1f) * (Tuning.Arcade ? 1f + 0.15f * Mathf.Min(arcD, 2.5f) : 1f);
             for (int i = 0; i < n; i++)
             {

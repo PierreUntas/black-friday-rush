@@ -195,26 +195,26 @@ namespace SamediRouge
         void SetPackHp(float z, int n, float share)
         {
             float prog = Mathf.Clamp01((z - stageStartZ) / Mathf.Max(1f, StageLen));
-            float k = Mathf.Min(2.2f, 0.85f + 0.4f * arcD + 0.6f * prog);
+            float k = Mathf.Min(2.4f, 1.0f + 0.4f * arcD + 0.7f * prog);
             float t = 26f / Mathf.Max(6f, speed + 6f * Tuning.EnemyRush);   // temps entre l'entrée à portée et le contact
             float budget = k * t * Mathf.Pow(ArcadePower(), 0.85f) * share;
             arcPackHp = Mathf.Max(1f, budget / Mathf.Max(1, n));
-            Perf.Note("groupe " + n + " ennemis, pression " + k.ToString("0.00") + ", pv " + arcPackHp.ToString("0.0"));
+            Perf.Note("bande " + (squad.Count + 1) + " · groupe " + n + " ennemis, pression " + k.ToString("0.00") + ", pv " + arcPackHp.ToString("0.0"));
         }
 
         void SpawnGate(float z)
         {
             var g = new Gate { z = z };
             int n = squad.Count + 1;
-            bool x2 = n >= 6 && Random.value < 0.5f;
+            bool x2 = n >= 10 && Random.value < 0.3f;
             // trois choix : toujours au moins un bon et un mauvais
             var opts = new List<(int v, bool m)>
             {
                 // peu généreuses : +1..+2 au début, les ×2 n'arrivent qu'avec une bande déjà formée
-                (Random.Range(1, 3) + n / 8, false),
-                (Random.Range(2, 4) + n / 6, false),
-                (x2 ? 2 : Random.Range(3, 5) + n / 6, x2),
-                (-Mathf.RoundToInt((Random.Range(2, 4) + n / 3) * (1f + 0.5f * arcD)), false),
+                (Random.Range(1, 3) + n / 10, false),
+                (Random.Range(2, 4) + n / 8, false),
+                (x2 ? 2 : Random.Range(2, 5) + n / 8, x2),
+                (-Mathf.RoundToInt((Random.Range(2, 5) + n / 3) * (1f + 0.5f * arcD)), false),
             };
             int bad = 3;
             int[] pick = { Random.Range(0, 3), bad, -1 };
@@ -770,10 +770,10 @@ namespace SamediRouge
         void GateHit(Gate g, int l)
         {
             if (g.used) return;
-            if (g.mul[l]) { if (++g.hits[l] % 8 == 0) g.val[l] = Mathf.Min(g.val[l] + 1, 3); }
+            if (g.mul[l]) { }   // un ×2 reste un ×2
             else
             {
-                if (++g.hits[l] % 3 == 0) g.val[l] = Mathf.Min(g.val[l] + 1, 6);
+                if (++g.hits[l] % 4 == 0) g.val[l] = Mathf.Min(g.val[l] + 1, 4);
                 if (g.val[l] == 0) g.val[l] = 1;   // pas de porte « 0 »
             }
             bool good = g.mul[l] || g.val[l] > 0;
