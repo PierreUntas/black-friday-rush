@@ -170,8 +170,15 @@ namespace SamediRouge
             System.Func<Transform, string> H = t =>
             {
                 if (t == null) return "-";
-                float lo = 1e9f, hi = -1e9f;
-                foreach (Renderer r in t.GetComponentsInChildren<Renderer>()) { if (!r.enabled || !(r is SkinnedMeshRenderer)) continue; lo = Mathf.Min(lo, r.bounds.min.y); hi = Mathf.Max(hi, r.bounds.max.y); }
+                float lo = 1e9f, hi = -1e9f; var tm = new Mesh();
+                foreach (SkinnedMeshRenderer r in t.GetComponentsInChildren<SkinnedMeshRenderer>())
+                {
+                    if (!r.enabled) continue;
+                    r.BakeMesh(tm, false);
+                    Matrix4x4 b = Matrix4x4.TRS(r.transform.position, r.transform.rotation, Vector3.one);
+                    foreach (Vector3 v in tm.vertices) { float y = b.MultiplyPoint3x4(v).y; lo = Mathf.Min(lo, y); hi = Mathf.Max(hi, y); }
+                }
+                Destroy(tm);
                 return hi > lo ? (hi - lo).ToString("0.00") + " m (échelle " + t.localScale.x.ToString("0.000") + ", bas " + lo.ToString("0.000") + " / sol " + t.position.y.ToString("0.000") + ")" : "?";
             };
             Ent foe = ents.Find(x => x.type == ET.Casseur && !x.hit && x.rig != null);
