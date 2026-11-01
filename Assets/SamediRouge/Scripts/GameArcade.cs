@@ -55,7 +55,7 @@ namespace SamediRouge
         int crates;
         const int ArcadeMaxSquad = 24;
         /// <summary>Arcade : vitesse de course réduite, taille des personnages de ta bande (alignée sur les adversaires).</summary>
-        const float ArcadeSpeed = 0.78f, CrewScale = 0.7f, FreeMax = 3.3f;
+        const float ArcadeSpeed = 0.78f, CrewScale = 0.62f, FreeMax = 3.3f;
         float freeX;
         bool FreeMove => Tuning.Arcade && campaign && !demo && !tutorialMode;
         /// <summary>Arcade : la rue est plus longue (environ une minute de course avant le boss).</summary>

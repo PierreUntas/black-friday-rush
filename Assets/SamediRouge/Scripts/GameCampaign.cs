@@ -167,7 +167,7 @@ namespace SamediRouge
                 if (t == null) return "-";
                 float lo = 1e9f, hi = -1e9f;
                 foreach (Renderer r in t.GetComponentsInChildren<Renderer>()) { if (!r.enabled || !(r is SkinnedMeshRenderer)) continue; lo = Mathf.Min(lo, r.bounds.min.y); hi = Mathf.Max(hi, r.bounds.max.y); }
-                return hi > lo ? (hi - lo).ToString("0.00") + " m (échelle " + t.localScale.x.ToString("0.000") + ")" : "?";
+                return hi > lo ? (hi - lo).ToString("0.00") + " m (échelle " + t.localScale.x.ToString("0.000") + ", bas " + lo.ToString("0.000") + " / sol " + t.position.y.ToString("0.000") + ")" : "?";
             };
             Ent foe = ents.Find(x => x.type == ET.Casseur && !x.hit && x.rig != null);
             sb.Append("taille héros " + H(P.root) + " · coéquipier " + H(squad.Count > 0 ? squad[0].rig.root : null) + " · adversaire " + H(foe != null ? foe.rig.root : null) + "\n");

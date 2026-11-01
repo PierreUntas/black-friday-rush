@@ -24,7 +24,7 @@ namespace SamediRouge
         readonly List<Pair> pairs = new List<Pair>();
         readonly List<Relay> relays = new List<Relay>();
         readonly Vector3 codeHipsRest;
-        float soleRest = float.NaN, floor0;
+        float soleRest = float.NaN, floor0, groundCorr;
         readonly Transform codeKnL, codeKnR;
         Transform hipsBone, footL, footR;
         Vector3 hipsBind;
@@ -343,6 +343,18 @@ namespace SamediRouge
         /// <summary>Recopie la pose du Rig sur le modèle (à appeler après l'animation du Rig).</summary>
         public void Apply()
         {
+            // héros (et boss) : les semelles posées exactement sur le sol, quelle que soit la pose ou l'échelle
+            // (on mesure le point le plus bas du modèle et on recale doucement le modèle entier)
+            if (!secondary && skins != null && rig.root != null)
+            {
+                float lo = float.MaxValue;
+                foreach (SkinnedMeshRenderer sk in skins) if (sk != null && sk.enabled) lo = Mathf.Min(lo, sk.bounds.min.y);
+                if (lo < 1e8f)
+                {
+                    float gap = (lo - rig.root.position.y) / Mathf.Max(0.01f, body.lossyScale.y);
+                    groundCorr = Mathf.Clamp(groundCorr + gap * 0.35f, -0.6f, 0.6f);
+                }
+            }
             Quaternion bodyRot = body.rotation;
             // bassin : suit la hauteur et les décalages du bassin dessiné
             Vector3 d = codeHips.localPosition - codeHipsRest;
@@ -372,6 +384,8 @@ namespace SamediRouge
                 float modelSole = Mathf.Min(body.InverseTransformPoint(footL.position).y, body.InverseTransformPoint(footR.position).y) - footH;
                 hipsBone.position = body.TransformPoint(body.InverseTransformPoint(hipsBone.position) + new Vector3(0f, codeSole - modelSole, 0f));
             }
+            // recalage au sol mesuré (héros) : appliqué au bassin, racine du squelette
+            if (!secondary && groundCorr != 0f) hipsBone.position += body.TransformVector(new Vector3(0f, -groundCorr, 0f));
             foreach (Relay r in relays)
             {
                 if (r.bone == null) continue;

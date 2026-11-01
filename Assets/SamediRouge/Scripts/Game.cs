@@ -13,7 +13,8 @@ namespace SamediRouge
         public Mode mode;
         public int lane, hp;
         public float x, y, z, depth = 0.5f, timer, vz, escape, bob;
-        public bool hit, dead, fled, vanish;   // vanish : ennemi assommé qui disparaît vite (arcade)
+        public bool hit, dead, fled, vanish;
+        public float vanishS;   // échelle de départ de l'ennemi qui disparaît (arcade)   // vanish : ennemi assommé qui disparaît vite (arcade)
         public int raid = -1; // magasin attaqué auquel appartient ce pillard (-1 : aucun)
         public GameObject ring; // cercle rouge au sol sous un ennemi
         public GameObject go;
@@ -1078,6 +1079,15 @@ namespace SamediRouge
                     if (e.go != null) Destroy(e.go);
                     return;
                 }
+                float k = Mathf.Clamp01(e.timer / VanishT), u = 1f - k;
+                e.z += (speed + 5f) * dt;                         // repoussé vers l'arrière (s'éloigne de la bande)
+                e.y = Mathf.Sin(u * Mathf.PI) * 0.7f;             // petit saut
+                if (e.go != null) e.go.transform.localPosition = new Vector3(e.x, e.y, e.z);
+                if (e.rig != null)
+                {
+                    e.rig.root.localScale = Vector3.one * e.vanishS * (0.2f + 0.8f * k);
+                    e.rig.root.localRotation = Quaternion.Euler(-70f * u, 180f, 0f);   // bascule en arrière
+                }
             }
             // une fois touché, l'objet appartient à la physique : on ne le replace plus
             if (!e.hit && e.go != null) e.go.transform.localPosition = new Vector3(e.x, e.y, e.z);
@@ -1110,6 +1120,8 @@ namespace SamediRouge
             if (e.crowd != null) foreach (Rig r in e.crowd) if (r.root != null) z = Mathf.Max(z, r.root.position.z);
             return z;
         }
+
+        const float VanishT = 0.32f;
 
         void TickVisual(Ent e, float dt)
         {
@@ -2177,10 +2189,14 @@ namespace SamediRouge
             if (Tuning.Arcade)
             {
                 // arcade : l'ennemi tombe en arrière sur place puis disparaît dans un petit nuage (pas de corps qui volent partout)
+                // arcade : l'ennemi est projeté un peu en arrière en basculant, rapetisse et disparaît dans un petit nuage
+                // (pas de corps en physique : plus de tête qui passe sous le sol)
                 Fx.Hit(chest);
-                e.rig.KO(new Vector3(Random.Range(-0.8f, 0.8f), 2.2f, speed * 0.85f + 1.5f), new Vector3(-6f, 0f, Random.Range(-1.5f, 1.5f)));
+                e.rig.Flash(Color.white, 0.12f);
                 e.vanish = true;
-                e.timer = 0.55f;
+                e.timer = VanishT;
+                e.vanishS = e.rig.root.localScale.x;
+                e.x = e.go != null ? e.go.transform.localPosition.x : e.x;
                 return;
             }
             if (combo % 5 == 0)
