@@ -69,7 +69,7 @@ namespace SamediRouge
         float ArcadeDifficulty()
         {
             int lv = streetIdx;
-            float d = lv < 3 ? lv * 0.05f : 0.12f * lv + Saw[lv % 5];
+            float d = lv == 0 ? 0f : 0.2f * lv + Saw[lv % 5];   // niveau 1 : découverte ; ensuite ça monte vite, en dents de scie
             int fails = Progress.Conquered(thief, lv) ? 0 : Mathf.Max(0, Progress.Tries(thief, lv) - 1);
             d -= 0.25f * Mathf.Min(fails, 2);
             return Mathf.Clamp(d, 0f, 3f);
@@ -161,11 +161,45 @@ namespace SamediRouge
         /// </summary>
         int ArcadeEnemyHp()
         {
+            if (arcPackHp > 0f)
+            {
+                // points de vie du groupe répartis : partie entière + arrondi au hasard, et parfois un costaud
+                float h = arcPackHp * (Random.value < 0.2f ? 1.8f : Random.Range(0.8f, 1.15f));
+                int hp = Mathf.FloorToInt(h) + (Random.value < h - Mathf.Floor(h) ? 1 : 0);
+                return Mathf.Clamp(hp, 1, 12);
+            }
             float prog = Mathf.Clamp01((pz + 35f - stageStartZ) / Mathf.Max(1f, StageLen));
             float tough = arcD * 0.9f + prog * (0.9f + 0.7f * arcD);
-            int hp = 1 + Mathf.FloorToInt(tough * 0.6f);
-            if (Random.value < Mathf.Clamp(0.12f + 0.2f * tough, 0f, 0.55f)) hp += 1 + Mathf.FloorToInt(tough * 0.5f);   // un costaud dans le groupe
-            return Mathf.Clamp(hp, 1, 8);
+            int b = 1 + Mathf.FloorToInt(tough * 0.6f);
+            if (Random.value < Mathf.Clamp(0.12f + 0.2f * tough, 0f, 0.55f)) b += 1 + Mathf.FloorToInt(tough * 0.5f);
+            return Mathf.Clamp(b, 1, 8);
+        }
+
+        float arcPackHp;
+
+        /// <summary>Coups par seconde que la bande peut envoyer (héros + volées des membres).</summary>
+        float ArcadePower()
+        {
+            float dmg = runTier >= 3 ? 2f : 1f;
+            float hero = dmg / (gear[GSmg] ? 0.11f : gear[GPistol] ? Tuning.AutoPistolRate : Tuning.AutoBareRate);
+            float mates = squad.Count > 0 ? dmg * Mathf.Min(3, squad.Count) / Mathf.Lerp(0.5f, 0.22f, squad.Count / (float)ArcadeMaxSquad) : 0f;
+            return hero + mates;
+        }
+
+        /// <summary>
+        /// Difficulté arcade : chaque groupe d'ennemis reçoit un total de points de vie calé sur ce que ta bande peut
+        /// abattre avant le contact, multiplié par la « pression » du niveau. Pression &lt; 1 : tout tombe avant
+        /// d'arriver ; &gt; 1 : une partie du groupe arrive sur la bande et chaque ennemi emporte un membre.
+        /// Elle monte au fil du parcours et d'un niveau à l'autre (avec les creux de la courbe en dents de scie).
+        /// </summary>
+        void SetPackHp(float z, int n, float share)
+        {
+            float prog = Mathf.Clamp01((z - stageStartZ) / Mathf.Max(1f, StageLen));
+            float k = Mathf.Min(2.2f, 0.85f + 0.4f * arcD + 0.6f * prog);
+            float t = 26f / Mathf.Max(6f, speed + 6f * Tuning.EnemyRush);   // temps entre l'entrée à portée et le contact
+            float budget = k * t * Mathf.Pow(ArcadePower(), 0.85f) * share;
+            arcPackHp = Mathf.Max(1f, budget / Mathf.Max(1, n));
+            Perf.Note("groupe " + n + " ennemis, pression " + k.ToString("0.00") + ", pv " + arcPackHp.ToString("0.0"));
         }
 
         void SpawnGate(float z)
@@ -494,7 +528,9 @@ namespace SamediRouge
             if (r < 0.6f)
             {
                 int n = Mathf.Clamp(3 + crowd / 3 + Mathf.RoundToInt(prog * (3f + 2f * arcD) + arcD * 2f), 3, 14);
+                SetPackHp(z, n, 1f);
                 SpawnPack(lanes[0], z, n);
+                arcPackHp = 0f;
                 for (int i = 0; i < 3; i++) Spawn(ET.Piece, lanes[2], z + 2f + i * 2.4f);
                 return 20f;
             }
@@ -502,8 +538,10 @@ namespace SamediRouge
             {
                 // barrage : deux groupes côte à côte, un couloir libre
                 int n = Mathf.Clamp(2 + crowd / 4 + Mathf.RoundToInt(prog * (2f + 2f * arcD) + arcD), 2, 10);
+                SetPackHp(z, n, 0.65f);   // deux groupes : on n'en affronte qu'un si on choisit bien son couloir
                 SpawnPack(lanes[0], z, n);
                 SpawnPack(lanes[1], z + 1.5f, n);
+                arcPackHp = 0f;
                 for (int i = 0; i < 3; i++) Spawn(ET.Piece, lanes[2], z + 2f + i * 2.4f);
                 return 22f;
             }

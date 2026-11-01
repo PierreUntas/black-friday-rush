@@ -1525,8 +1525,10 @@ namespace SamediRouge
                     break;
                 }
                 case Anim.Stand:
-                    hL = -10f; hR = 12f; kL = 10f; kR = 6f; sL = 8f; eL = -20f; sR = 6f; eR = -30f;
-                    hp.y = HipY - 0.015f + 0.012f * Mathf.Sin(t * 2.2f + seed);
+                    // debout bien droit : jambes presque tendues, buste et tête relevés
+                    hL = -4f; hR = 5f; kL = 3f; kR = 2f; sL = 6f; eL = -14f; sR = 5f; eR = -18f;
+                    spineX = -2f; neckX = -5f;
+                    hp.y = HipY - 0.004f + 0.006f * Mathf.Sin(t * 2.2f + seed);
                     neckZ = 6f * Mathf.Sin(t * 0.9f + seed);
                     break;
                 case Anim.Idle:

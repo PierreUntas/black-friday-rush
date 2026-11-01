@@ -349,30 +349,23 @@ namespace SamediRouge
         /// </summary>
         float MeasureSole()
         {
+            // BakeMesh(…, false) : sommets dans le repère du renderer sans son échelle (vérifié dans l'éditeur)
             float foot = Mathf.Min(footL.position.y, footR.position.y);
-            float lowA = float.MaxValue, lowB = float.MaxValue;
-            var tmp = new Mesh();
+            float low = float.MaxValue;
+            if (bakeTmp == null) bakeTmp = new Mesh();
             foreach (SkinnedMeshRenderer sk in skins)
             {
-                if (sk == null) continue;
-                sk.BakeMesh(tmp, false);
-                Matrix4x4 a = sk.transform.localToWorldMatrix;
+                if (sk == null || !sk.enabled) continue;
+                sk.BakeMesh(bakeTmp, false);
                 Matrix4x4 b = Matrix4x4.TRS(sk.transform.position, sk.transform.rotation, Vector3.one);
-                foreach (Vector3 v in tmp.vertices)
-                {
-                    float ya = a.MultiplyPoint3x4(v).y, yb = b.MultiplyPoint3x4(v).y;
-                    if (ya < lowA) lowA = ya;
-                    if (yb < lowB) lowB = yb;
-                }
+                foreach (Vector3 v in bakeTmp.vertices) { float y = b.MultiplyPoint3x4(v).y; if (y < low) low = y; }
             }
-            Object.Destroy(tmp);
-            if (lowA > 1e8f) return float.NaN;
-            float dA = foot - lowA, dB = foot - lowB, k = Mathf.Max(0.01f, body.lossyScale.y);
-            // la bonne lecture : semelle sous le pied, à quelques centimètres (corps ~2 unités de haut)
-            bool okA = dA > -0.02f * k && dA < 0.4f * k, okB = dB > -0.02f * k && dB < 0.4f * k;
-            float d = okA && (!okB || Mathf.Abs(dA) <= Mathf.Abs(dB)) ? dA : okB ? dB : Mathf.Clamp(dA, 0f, 0.3f * k);
-            return d / k;
+            if (low > 1e8f) return float.NaN;
+            return (foot - low) / Mathf.Max(0.01f, body.lossyScale.y);
         }
+
+        Mesh bakeTmp;
+        int soleN;
 
         public void Apply()
         {
@@ -381,7 +374,8 @@ namespace SamediRouge
             // puis à chaque image on recale le modèle pour que la semelle la plus basse touche le sol.
             if (!secondary && footL != null && footR != null && rig.root != null)
             {
-                if (float.IsNaN(soleOff)) soleOff = MeasureSole();
+                // re-mesure régulière : l'écart pied/semelle dépend de la pose (pointe, talon)
+                if (float.IsNaN(soleOff) || --soleN <= 0) { float m = MeasureSole(); if (!float.IsNaN(m)) soleOff = m; soleN = 20; }
                 if (!float.IsNaN(soleOff))
                 {
                     float k = Mathf.Max(0.01f, body.lossyScale.y);

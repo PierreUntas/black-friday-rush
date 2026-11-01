@@ -60,10 +60,12 @@ namespace SamediRouge
                 Progress.ResetAll();
                 PlayerPrefs.SetInt(KCrew, 0);
                 PlayerPrefs.SetInt(KIncome, 0);
+                PlayerPrefs.SetInt(KFirstRun, 0);
                 PlayerPrefs.Save();
                 selStreet = -1;
                 Snd.Play(Snd.I.whoosh, 0.6f);
                 ShowHomeScreen();
+                hud.ShowTitle(() => { if (st == St.Menu) StartStreet(HomeStreet()); });   // comme une première installation
             };
         }
 
@@ -92,7 +94,10 @@ namespace SamediRouge
             else
             {
                 ToMenu();
-                hud.ShowTitle(null);   // écran titre par-dessus la carte, un tap pour commencer
+                // arcade : la toute première fois, le tap sur l'écran titre lance directement la partie ;
+                // l'accueil (améliorations) n'apparaît qu'après le premier run
+                bool first = Tuning.Arcade && PlayerPrefs.GetInt(KFirstRun, 0) == 0;
+                hud.ShowTitle(first ? () => { if (st == St.Menu) StartStreet(HomeStreet()); } : (System.Action)null);
             }
 #if UNITY_EDITOR
             // outil de dev : Logs/sr-screen.txt (« thief », « cop », « upgrades », « tutorial ») ouvre un écran au Play
@@ -170,6 +175,18 @@ namespace SamediRouge
                 return hi > lo ? (hi - lo).ToString("0.00") + " m (échelle " + t.localScale.x.ToString("0.000") + ", bas " + lo.ToString("0.000") + " / sol " + t.position.y.ToString("0.000") + ")" : "?";
             };
             Ent foe = ents.Find(x => x.type == ET.Casseur && !x.hit && x.rig != null);
+ {
+                float la = 1e9f, lb = 1e9f; var tmp = new Mesh();
+                foreach (SkinnedMeshRenderer sk in P.root.GetComponentsInChildren<SkinnedMeshRenderer>())
+                {
+                    if (!sk.enabled) continue;
+                    sk.BakeMesh(tmp, false);
+                    Matrix4x4 a = sk.transform.localToWorldMatrix, b = Matrix4x4.TRS(sk.transform.position, sk.transform.rotation, Vector3.one);
+                    foreach (Vector3 v in tmp.vertices) { la = Mathf.Min(la, a.MultiplyPoint3x4(v).y); lb = Mathf.Min(lb, b.MultiplyPoint3x4(v).y); }
+                }
+                Destroy(tmp);
+                sb.Append("maillage réel héros : bas A " + la.ToString("0.000") + " B " + lb.ToString("0.000") + "\n");
+            }
             sb.Append("taille héros " + H(P.root) + " · coéquipier " + H(squad.Count > 0 ? squad[0].rig.root : null) + " · adversaire " + H(foe != null ? foe.rig.root : null) + "\n");
             try { System.IO.File.WriteAllText(System.IO.Path.Combine(Application.dataPath, "../Logs/sr-tris.txt"), sb.ToString()); } catch (System.Exception) { }
         }
@@ -326,6 +343,7 @@ namespace SamediRouge
 
         void ShowVictory()
         {
+            if (Tuning.Arcade) { PlayerPrefs.SetInt(KFirstRun, 1); PlayerPrefs.Save(); }   // l'accueil s'affichera désormais
             LogRun(true);
             metaScreen = MetaScreen.Result;
             bool already = Progress.Conquered(thief, streetIdx);
@@ -397,6 +415,7 @@ namespace SamediRouge
 
         void ShowDefeat()
         {
+            if (Tuning.Arcade) { PlayerPrefs.SetInt(KFirstRun, 1); PlayerPrefs.Save(); }   // l'accueil s'affichera désormais
             LogRun(false);
             metaScreen = MetaScreen.Result;
             int keep = Mathf.RoundToInt(coins * Tuning.DefeatKeep);
@@ -555,7 +574,7 @@ namespace SamediRouge
 
         // ------------------------------------------------------------------ accueil arcade (à la Hell Escape)
 
-        const string KCrew = "sr_arc_crew", KIncome = "sr_arc_income";
+        const string KCrew = "sr_arc_crew", KIncome = "sr_arc_income", KFirstRun = "sr_arc_played";
         const int HomeMax = 10;
         static int ArcLevel(string k) => Mathf.Clamp(PlayerPrefs.GetInt(k, 0), 0, HomeMax);
         static int ArcCost(int lv, int b, int step) => lv >= HomeMax ? -1 : b + step * lv + 10 * lv * lv;

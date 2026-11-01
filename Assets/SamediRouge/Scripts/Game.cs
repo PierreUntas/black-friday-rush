@@ -633,6 +633,7 @@ namespace SamediRouge
         {
             foreach (Ent e in ents) if (e.go != null) Destroy(e.go);
             ents.Clear();
+            packQueue.Clear();
             foreach (StoreRaid r in raids) if (r.beacon != null) Destroy(r.beacon.gameObject);
             raids.Clear();
         }
@@ -964,7 +965,7 @@ namespace SamediRouge
             UpdateSquad(dt, h);
             Perf.Mark("squad");
             if (st != St.Play) return;
-            if (Tuning.Arcade) ArcadeTick(dt);
+            if (Tuning.Arcade) { FlushPackQueue(); ArcadeTick(dt); }
             Perf.Mark("arcade");
 
             UpdateStage(dt);
@@ -2917,11 +2918,31 @@ namespace SamediRouge
                 int row = i / 3, col = i % 3;
                 float off = n == 1 ? 0f : (col - 1) * 0.85f + Random.Range(-0.15f, 0.15f);
                 if (row > 0 && n - row * 3 < 3) off += 0.42f * (row % 2 == 1 ? 1f : -1f);
-                Ent e = Spawn(ET.Casseur, ln, z + row * 1.15f + Random.Range(-0.2f, 0.2f), m);
-                e.x = Mathf.Clamp(e.x + off, -3.4f, 3.4f);
-                e.vz = vz;
-                e.go.transform.localPosition = new Vector3(e.x, 0f, e.z);
+                float ez = z + row * 1.15f + Random.Range(-0.2f, 0.2f);
+                if (Tuning.Arcade)
+                {
+                    // arcade : construction étalée sur plusieurs images (un groupe de 8 d'un coup = un à-coup)
+                    int hp = EnemyHp();
+                    packQueue.Enqueue(() => { hpQueue.Enqueue(hp); PackMember(ln, ez, m, off, vz); });
+                }
+                else PackMember(ln, ez, m, off, vz);
             }
+        }
+
+        readonly Queue<System.Action> packQueue = new Queue<System.Action>();
+
+        void PackMember(int ln, float z, Mode m, float off, float vz)
+        {
+            Ent e = Spawn(ET.Casseur, ln, z, m);
+            e.x = Mathf.Clamp(e.x + off, -3.4f, 3.4f);
+            e.vz = vz;
+            e.go.transform.localPosition = new Vector3(e.x, 0f, e.z);
+        }
+
+        /// <summary>Arcade : deux ennemis construits par image au plus.</summary>
+        void FlushPackQueue()
+        {
+            for (int k = 0; k < 2 && packQueue.Count > 0; k++) packQueue.Dequeue()();
         }
 
         Ent Spawn(ET type, int ln, float z, Mode? mode = null)
