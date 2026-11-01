@@ -2177,7 +2177,8 @@ namespace SamediRouge
             int pts = Mathf.RoundToInt(100f * ComboMult());
             score += pts;
             // chaque adversaire assommé lâche des pièces
-            int loot = thief ? Tuning.LootThief : Tuning.LootGuard;
+            // arcade : l'argent vient des pièces, des cartons de la finale et de la victoire, pas de chaque KO
+            int loot = Tuning.Arcade ? 0 : thief ? Tuning.LootThief : Tuning.LootGuard;
             coins += loot;
             starsKO += loot;
             if (!Tuning.Arcade) Fx.Coin(chest + Vector3.up * 0.3f);
@@ -2199,7 +2200,7 @@ namespace SamediRouge
                 e.x = e.go != null ? e.go.transform.localPosition.x : e.x;
                 return;
             }
-            if (combo % 5 == 0)
+            if (combo % 5 == 0 && !Tuning.Arcade)
             {
                 coins += Tuning.StarsCombo;
                 starsCombo += Tuning.StarsCombo;

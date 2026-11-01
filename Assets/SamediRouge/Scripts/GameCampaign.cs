@@ -330,7 +330,7 @@ namespace SamediRouge
             bool already = Progress.Conquered(thief, streetIdx);
             int bonus = already ? Mathf.RoundToInt(Tuning.VictoryBonus[streetIdx] * Tuning.ReplayBonusFactor) : Tuning.VictoryBonus[streetIdx];
             int crewN = squad.Count + 1;
-            if (Tuning.Arcade) bonus += crewN * 10;   // arcade : chaque membre de la bande rapporte au pillage
+            if (Tuning.Arcade) bonus += crewN * 4 + 40;   // arcade : chaque membre de la bande rapporte au pillage, + prime de victoire
             int total = coins + bonus;
             if (Tuning.Arcade) total = Mathf.RoundToInt(total * IncomeMult);   // amélioration « Revenus » de l'accueil
             Progress.Coins += total;
@@ -557,7 +557,7 @@ namespace SamediRouge
         const string KCrew = "sr_arc_crew", KIncome = "sr_arc_income";
         const int HomeMax = 10;
         static int ArcLevel(string k) => Mathf.Clamp(PlayerPrefs.GetInt(k, 0), 0, HomeMax);
-        static int ArcCost(int lv, int b, int step) => lv >= HomeMax ? -1 : b + step * lv + 5 * lv * lv;
+        static int ArcCost(int lv, int b, int step) => lv >= HomeMax ? -1 : b + step * lv + 10 * lv * lv;
         /// <summary>Membres de la bande dès le départ (amélioration « Bande »).</summary>
         static int StartCrew => ArcLevel(KCrew);
         /// <summary>Multiplicateur des gains (amélioration « Revenus ») : +20 % par niveau.</summary>
@@ -569,7 +569,8 @@ namespace SamediRouge
             return nx >= 0 ? nx : Tuning.Streets - 1;
         }
 
-        int HomeCost(int i) => i == 0 ? ArcCost(ArcLevel(KCrew), 40, 30) : i == 1 ? Progress.NextCost(thief, Tuning.Weapon) : ArcCost(ArcLevel(KIncome), 60, 40);
+        // économie arcade : une première partie rapporte de quoi acheter UNE amélioration (la batte, ~250 $)
+        int HomeCost(int i) => i == 0 ? ArcCost(ArcLevel(KCrew), 180, 70) : i == 1 ? Progress.NextCost(thief, Tuning.Weapon) : ArcCost(ArcLevel(KIncome), 220, 90);
 
         void ShowHomeScreen()
         {

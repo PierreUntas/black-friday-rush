@@ -668,7 +668,7 @@ namespace SamediRouge
             b.punch = 1f;
             if (b.hp > 0) return;
             b.broken = true;
-            int gain = b.max * 3;
+            int gain = b.max;
             coins += gain;
             Vector3 p = b.tr.position + Vector3.up * 0.8f;
             Fx.Debris(p);
