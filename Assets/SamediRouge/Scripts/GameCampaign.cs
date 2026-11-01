@@ -570,7 +570,9 @@ namespace SamediRouge
         }
 
         // économie arcade : une première partie rapporte de quoi acheter UNE amélioration (la batte, ~250 $)
-        int HomeCost(int i) => i == 0 ? ArcCost(ArcLevel(KCrew), 180, 70) : i == 1 ? Progress.NextCost(thief, Tuning.Weapon) : ArcCost(ArcLevel(KIncome), 220, 90);
+        // l'arme : on lance déjà la batte au départ, la carte vend donc le pistolet puis la mitraillette « au départ »
+        int ArcWeapon => Mathf.Clamp(Progress.GearLevel(thief, Tuning.Weapon), 1, 3);
+        int HomeCost(int i) => i == 0 ? ArcCost(ArcLevel(KCrew), 180, 70) : i == 1 ? (ArcWeapon == 1 ? 250 : ArcWeapon == 2 ? 900 : -1) : ArcCost(ArcLevel(KIncome), 220, 90);
 
         void ShowHomeScreen()
         {
@@ -597,10 +599,10 @@ namespace SamediRouge
 
         void RefreshHome()
         {
-            int crew = ArcLevel(KCrew), wl = Progress.GearLevel(thief, Tuning.Weapon), inc = ArcLevel(KIncome);
+            int crew = ArcLevel(KCrew), wl = ArcWeapon, inc = ArcLevel(KIncome);
             string[] names = { L("CREW", "BANDE"), L("WEAPON", "ARME"), L("INCOME", "REVENUS") };
-            Sprite[] icons = { GearIcons.Get("gang"), GearIcons.Upgrade(Tuning.Weapon, thief, Mathf.Clamp(wl + 1, 1, 3)), GearIcons.Art("dollar") };
-            string[] wNames = { L("Bat", "Batte"), L("Strong bat", "Batte renforcée"), L("Pistol", "Pistolet"), L("Submachine gun", "Mitraillette") };
+            Sprite[] icons = { GearIcons.Get("gang"), GearIcons.Upgrade(Tuning.Weapon, thief, Mathf.Clamp(wl + 1, 2, 3)), GearIcons.Art("dollar") };
+            string[] wNames = { "", L("Pistol at start", "Pistolet au départ"), L("SMG at start", "Mitraillette au départ"), L("Submachine gun", "Mitraillette") };
             string[] lv =
             {
                 "+" + crew + L(" at start", " au départ"),
@@ -621,7 +623,7 @@ namespace SamediRouge
                 Snd.Play(Snd.I.hurt, 0.3f);
                 return;
             }
-            if (i == 1) Progress.Buy(thief, Tuning.Weapon);
+            if (i == 1) { Progress.Coins -= cost; Progress.SetGearLevel(thief, Tuning.Weapon, ArcWeapon + 1); }
             else
             {
                 Progress.Coins -= cost;

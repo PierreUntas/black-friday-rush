@@ -24,7 +24,7 @@ namespace SamediRouge
         readonly List<Pair> pairs = new List<Pair>();
         readonly List<Relay> relays = new List<Relay>();
         readonly Vector3 codeHipsRest;
-        float soleRest = float.NaN, floor0, groundCorr;
+        float soleRest = float.NaN, floor0, groundCorr, soleOff = float.NaN;
         readonly Transform codeKnL, codeKnR;
         Transform hipsBone, footL, footR;
         Vector3 hipsBind;
@@ -143,6 +143,7 @@ namespace SamediRouge
             if (hips == null || head == null || toe == null) { Object.Destroy(m.gameObject); throw new System.Exception("squelette mixamorig introuvable"); }
             model = m;
             Name = name;
+            soleOff = float.NaN;
             hipsBone = hips;
 
             // face avant vers +Z, pieds au sol, taille du personnage du jeu
@@ -341,18 +342,52 @@ namespace SamediRouge
         }
 
         /// <summary>Recopie la pose du Rig sur le modèle (à appeler après l'animation du Rig).</summary>
+        /// <summary>
+        /// Écart (unités du corps) entre l'os du pied le plus bas et le point le plus bas du maillage, mesuré sur le modèle
+        /// déformé par la pose courante. Le repère du maillage cuit dépend de l'échelle : on garde l'interprétation
+        /// qui place la semelle juste sous l'os du pied.
+        /// </summary>
+        float MeasureSole()
+        {
+            float foot = Mathf.Min(footL.position.y, footR.position.y);
+            float lowA = float.MaxValue, lowB = float.MaxValue;
+            var tmp = new Mesh();
+            foreach (SkinnedMeshRenderer sk in skins)
+            {
+                if (sk == null) continue;
+                sk.BakeMesh(tmp, false);
+                Matrix4x4 a = sk.transform.localToWorldMatrix;
+                Matrix4x4 b = Matrix4x4.TRS(sk.transform.position, sk.transform.rotation, Vector3.one);
+                foreach (Vector3 v in tmp.vertices)
+                {
+                    float ya = a.MultiplyPoint3x4(v).y, yb = b.MultiplyPoint3x4(v).y;
+                    if (ya < lowA) lowA = ya;
+                    if (yb < lowB) lowB = yb;
+                }
+            }
+            Object.Destroy(tmp);
+            if (lowA > 1e8f) return float.NaN;
+            float dA = foot - lowA, dB = foot - lowB, k = Mathf.Max(0.01f, body.lossyScale.y);
+            // la bonne lecture : semelle sous le pied, à quelques centimètres (corps ~2 unités de haut)
+            bool okA = dA > -0.02f * k && dA < 0.4f * k, okB = dB > -0.02f * k && dB < 0.4f * k;
+            float d = okA && (!okB || Mathf.Abs(dA) <= Mathf.Abs(dB)) ? dA : okB ? dB : Mathf.Clamp(dA, 0f, 0.3f * k);
+            return d / k;
+        }
+
         public void Apply()
         {
-            // héros (et boss) : les semelles posées exactement sur le sol, quelle que soit la pose ou l'échelle
-            // (on mesure le point le plus bas du modèle et on recale doucement le modèle entier)
-            if (!secondary && skins != null && rig.root != null)
+            // héros (et boss) : les semelles posées exactement sur le sol, quelle que soit la pose ou l'échelle.
+            // On mesure une fois (modèle « cuit ») l'écart entre l'os du pied et le dessous de la semelle,
+            // puis à chaque image on recale le modèle pour que la semelle la plus basse touche le sol.
+            if (!secondary && footL != null && footR != null && rig.root != null)
             {
-                float lo = float.MaxValue;
-                foreach (SkinnedMeshRenderer sk in skins) if (sk != null && sk.enabled) lo = Mathf.Min(lo, sk.bounds.min.y);
-                if (lo < 1e8f)
+                if (float.IsNaN(soleOff)) soleOff = MeasureSole();
+                if (!float.IsNaN(soleOff))
                 {
-                    float gap = (lo - rig.root.position.y) / Mathf.Max(0.01f, body.lossyScale.y);
-                    groundCorr = Mathf.Clamp(groundCorr + gap * 0.35f, -0.6f, 0.6f);
+                    float k = Mathf.Max(0.01f, body.lossyScale.y);
+                    float meshLow = Mathf.Min(footL.position.y, footR.position.y) - soleOff * k;
+                    float gap = (meshLow - rig.root.position.y) / k;
+                    groundCorr = Mathf.Clamp(groundCorr + gap * 0.35f, -0.8f, 0.8f);
                 }
             }
             Quaternion bodyRot = body.rotation;

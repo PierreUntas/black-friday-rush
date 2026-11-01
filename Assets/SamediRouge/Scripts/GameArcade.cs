@@ -158,13 +158,15 @@ namespace SamediRouge
         {
             var g = new Gate { z = z };
             int n = squad.Count + 1;
+            bool x2 = n >= 6 && Random.value < 0.5f;
             // trois choix : toujours au moins un bon et un mauvais
             var opts = new List<(int v, bool m)>
             {
-                (Random.Range(2, 5) + n / 4, false),
-                (Random.Range(4, 8) + n / 3, false),
-                (n >= 3 ? (Random.value < 0.25f ? 3 : 2) : Random.Range(5, 9), n >= 3),
-                (-Mathf.RoundToInt((Random.Range(2, 4) + n / 4) * (1f + 0.5f * arcD)), false),
+                // peu généreuses : +1..+2 au début, les ×2 n'arrivent qu'avec une bande déjà formée
+                (Random.Range(1, 3) + n / 8, false),
+                (Random.Range(2, 4) + n / 6, false),
+                (x2 ? 2 : Random.Range(3, 5) + n / 6, x2),
+                (-Mathf.RoundToInt((Random.Range(2, 4) + n / 3) * (1f + 0.5f * arcD)), false),
             };
             int bad = 3;
             int[] pick = { Random.Range(0, 3), bad, -1 };
@@ -469,7 +471,7 @@ namespace SamediRouge
             float r = Random.value;
             if (r < 0.6f)
             {
-                int n = Mathf.Clamp(2 + crowd / 4 + Mathf.RoundToInt(prog * (3f + 2f * arcD) + arcD * 2f), 2, 12);
+                int n = Mathf.Clamp(3 + crowd / 3 + Mathf.RoundToInt(prog * (3f + 2f * arcD) + arcD * 2f), 3, 14);
                 SpawnPack(lanes[0], z, n);
                 for (int i = 0; i < 3; i++) Spawn(ET.Piece, lanes[2], z + 2f + i * 2.4f);
                 return 20f;
@@ -477,7 +479,7 @@ namespace SamediRouge
             if (r < 0.85f)
             {
                 // barrage : deux groupes côte à côte, un couloir libre
-                int n = Mathf.Clamp(2 + crowd / 6 + Mathf.RoundToInt(prog * (2f + 2f * arcD) + arcD), 2, 9);
+                int n = Mathf.Clamp(2 + crowd / 4 + Mathf.RoundToInt(prog * (2f + 2f * arcD) + arcD), 2, 10);
                 SpawnPack(lanes[0], z, n);
                 SpawnPack(lanes[1], z + 1.5f, n);
                 for (int i = 0; i < 3; i++) Spawn(ET.Piece, lanes[2], z + 2f + i * 2.4f);
@@ -708,10 +710,10 @@ namespace SamediRouge
         void GateHit(Gate g, int l)
         {
             if (g.used) return;
-            if (g.mul[l]) { if (++g.hits[l] % 4 == 0) g.val[l] = Mathf.Min(g.val[l] + 1, 5); }
+            if (g.mul[l]) { if (++g.hits[l] % 8 == 0) g.val[l] = Mathf.Min(g.val[l] + 1, 3); }
             else
             {
-                g.val[l] = Mathf.Min(g.val[l] + 1, 12);
+                if (++g.hits[l] % 3 == 0) g.val[l] = Mathf.Min(g.val[l] + 1, 6);
                 if (g.val[l] == 0) g.val[l] = 1;   // pas de porte « 0 »
             }
             bool good = g.mul[l] || g.val[l] > 0;
