@@ -577,7 +577,9 @@ namespace SamediRouge
             tip = -1;
             st = St.End;
             endT = 0f;
-            P.KO(new Vector3(0f, 3f, speed * 0.5f), new Vector3(Random.Range(-2f, 2f), 0f, Random.Range(-3f, 3f)));
+            // bloqué par un carton : le héros rebondit en arrière ; sinon il tombe en avant
+            if (Tuning.Arcade && blocked) P.KO(new Vector3(Random.Range(-1f, 1f), 4.5f, -6f), new Vector3(-6f, 0f, Random.Range(-2f, 2f)));
+            else P.KO(new Vector3(0f, 3f, speed * 0.5f), new Vector3(Random.Range(-2f, 2f), 0f, Random.Range(-3f, 3f)));
             slowMo = 0.8f;
             Snd.Play(Snd.I.crash, 0.9f);
             Haptics.Heavy();
@@ -798,7 +800,7 @@ namespace SamediRouge
             foreach (Ent e in ents) if (!e.dead && e.go != null) TickVisual(e, dt);
             foreach (Mate m in squad) { m.rig.anim = Anim.Stand; m.rig.Tick(dt); }
             // fin de course : on passe vite au bilan (pas de temps mort)
-            if (endT > 0.75f && pendingEnd != null)
+            if (endT > (Tuning.Arcade && blocked ? 2.2f : 0.75f) && pendingEnd != null)   // bloqué : on laisse voir le choc
             {
                 pendingEnd();
                 pendingEnd = null;
@@ -3464,7 +3466,7 @@ namespace SamediRouge
                 Vector3 body = P.root.position;
                 want = body + new Vector3(3.2f, 3.6f, -3.8f);
                 look = body + new Vector3(0f, 0.6f, 0f);
-                if (Tuning.Arcade && store != null)
+                if (Tuning.Arcade && store != null && !blocked)
                 {
                     // victoire arcade : plan large sur la façade du MEGA STORE pillé
                     Vector3 sp = store.transform.position;

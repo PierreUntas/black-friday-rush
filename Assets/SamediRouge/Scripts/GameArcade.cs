@@ -595,6 +595,7 @@ namespace SamediRouge
             lootEndZ = z0 + (rows - 1) * gap;
             finaleZ = lootEndZ + 22f;
             nextSpawnZ = 1e9f;
+            hud.Toast(L("SMASH THE CRATES!", "CASSE LES CARTONS !"));   // ils barrent la route jusqu'au MEGA STORE
             foreach (LootBox b in loot) if (b.tr != null) Destroy(b.tr.gameObject);
             loot.Clear();
             Material card = Art.Mat(new Color(0.78f, 0.56f, 0.32f), 0.25f);
@@ -769,6 +770,33 @@ namespace SamediRouge
         int LootDmg => Mathf.Clamp(Progress.GearLevel(thief, Tuning.Weapon), 1, 3);
         bool blocked;
 
+        /// <summary>
+        /// La bande s'écrase sur un carton pas cassé : choc bien visible (ralenti, flash rouge, la bande rebondit en arrière,
+        /// le carton tremble, « BLOQUÉ ! »), puis l'écran de défaite un peu plus tard pour qu'on comprenne ce qui s'est passé.
+        /// </summary>
+        void Blocked(LootBox b)
+        {
+            blocked = true;
+            cause = L("Blocked by the crates", "Bloqué par les cartons");
+            Vector3 at = b.tr.position + Vector3.up * 0.8f;
+            Fx.Debris(at);
+            Fx.Hit(at);
+            b.punch = 2.5f;
+            shake = Mathf.Max(shake, 0.9f);
+            fovKick = Mathf.Max(fovKick, 10f);
+            hud.Damage(1f);
+            hud.Flash(0.35f);
+            Snd.Play(Snd.I.crash, 1f);
+            Snd.Play(Snd.I.hurt, 0.8f);
+            Haptics.Heavy();
+            hud.Toast(L("BLOCKED!", "BLOQUÉ !"));
+            hud.FloatKey(new Vector3(px, 0.2f, pz - 1.5f), L("BREAK THE CRATES!", "CASSE LES CARTONS !"), Hud.Bad, true);   // sous le « BLOQUÉ ! », pas dessus
+            // la bande rebondit en arrière contre le mur de cartons
+            foreach (Mate m in squad)
+                if (m.rig != null) m.rig.KO(new Vector3(Random.Range(-2.5f, 2.5f), Random.Range(3f, 5f), -Random.Range(4f, 7f)), new Vector3(Random.Range(-6f, 6f), 0f, Random.Range(-4f, 4f)));
+            EndGame();
+        }
+
         void LootHit(LootBox b)
         {
             if (b.broken) return;
@@ -806,11 +834,7 @@ namespace SamediRouge
                 if (b.lane == l && pz >= b.z - 0.9f && st == St.Play)
                 {
                     // un carton pas cassé barre la route : la bande s'y écrase, partie perdue
-                    Fx.Debris(b.tr.position + Vector3.up * 0.6f);
-                    shake = Mathf.Max(shake, 0.4f);
-                    blocked = true;
-                    cause = L("Blocked by the crates", "Bloqué par les cartons");
-                    EndGame();
+                    Blocked(b);
                     return;
                 }
                 if (b.z < pz - 4f) { Destroy(b.tr.gameObject); loot.RemoveAt(i); }
@@ -894,8 +918,15 @@ namespace SamediRouge
                 for (int l = 0; l < 3; l++)
                     hud.Tag(new Vector3((l - 1) * Lane, 1.5f, g.z), GateText(g, l), Color.white, 2.2f);
             }
+            int myLane = Mathf.Clamp(Mathf.RoundToInt(px / Lane) + 1, 0, 2);
             foreach (LootBox b in loot)
-                if (!b.broken && b.z - pz < 60f) hud.Tag(new Vector3((b.lane - 1) * Lane, 1.9f, b.z), b.hp.ToString(), Color.white, 1.4f);
+            {
+                if (b.broken || b.z - pz >= 60f) continue;
+                // carton de ton couloir tout proche : chiffre rouge qui clignote (il va te bloquer)
+                bool danger = b.lane == myLane && b.z - pz < 12f && b.z > pz;
+                float pulse = danger ? 1f + 0.25f * Mathf.Abs(Mathf.Sin(Time.time * 12f)) : 1f;
+                hud.Tag(new Vector3((b.lane - 1) * Lane, 1.9f, b.z), b.hp.ToString(), danger ? Hud.Bad : Color.white, 1.4f * pulse);
+            }
             // compteur de la bande : il gonfle quand elle grossit, rougit quand elle perd du monde
             int crowd = squad.Count + 1 + pendingMates;
             if (tagCrowd >= 0 && crowd > tagCrowd) crowdPop = 1f;
