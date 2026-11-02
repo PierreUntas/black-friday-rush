@@ -1360,7 +1360,7 @@ namespace SamediRouge
             t.material = Art.Particle(null, Color.white);
             var g = new Gradient();
             // arcade : traînée sombre, lisible sur le carrelage clair du centre commercial
-            if (Tuning.Arcade) { t.material = Art.Particle(null, new Color(0.05f, 0.05f, 0.07f, 1f)); t.widthMultiplier = 0.07f; t.time = 0.045f; }   // traînée courte et fine
+            if (Tuning.Arcade) { t.material = Art.Particle(null, new Color(0.05f, 0.05f, 0.07f, 1f)); t.widthMultiplier = 0.18f; t.time = 0.06f; }   // goutte : traînée aussi large que la balle, qui s'effile vite
             Color c0 = Tuning.Arcade ? new Color(0.05f, 0.05f, 0.07f) : Color.white, c1 = Tuning.Arcade ? new Color(0.2f, 0.2f, 0.25f) : Pal.Jaune;
             g.SetKeys(new[] { new GradientColorKey(c0, 0f), new GradientColorKey(c1, 1f) },
                       new[] { new GradientAlphaKey(0.9f, 0f), new GradientAlphaKey(0f, 1f) });
