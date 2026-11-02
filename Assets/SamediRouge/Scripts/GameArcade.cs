@@ -53,7 +53,7 @@ namespace SamediRouge
         static bool devCenter;   // dev (éditeur) : caisses dans le couloir du milieu, pour tester la fusion sans diriger
         /// <summary>Caisses d'armes ramassées vers la prochaine fusion.</summary>
         int crates;
-        const int ArcadeMaxSquad = 24;
+        const int ArcadeMaxSquad = 18;
         /// <summary>Arcade : vitesse de course réduite, taille des personnages de ta bande (alignée sur les adversaires).</summary>
         const float ArcadeSpeed = 0.45f, CrewScale = 0.65f, MateScale = 0.62f, EnemyScale = 1f, FreeMax = 3.3f;
         float freeX;
@@ -219,9 +219,9 @@ namespace SamediRouge
         void SetPackHp(float z, int n, float share)
         {
             float prog = Mathf.Clamp01((z - stageStartZ) / Mathf.Max(1f, StageLen));
-            float k = Mathf.Min(2.4f, 1.0f + 0.4f * arcD + 0.7f * prog);
+            float k = Mathf.Min(2.6f, 1.15f + 0.5f * arcD + 0.8f * prog);
             float t = 26f / Mathf.Max(6f, speed + 6f * Tuning.EnemyRush);   // temps entre l'entrée à portée et le contact
-            float budget = k * t * Mathf.Pow(ArcadePower(), 0.85f) * share;
+            float budget = k * t * ArcadePower() * share;
             arcPackHp = Mathf.Max(1f, budget / Mathf.Max(1, n));
             Perf.Note("bande " + (squad.Count + 1) + " · groupe " + n + " ennemis, pression " + k.ToString("0.00") + ", pv " + arcPackHp.ToString("0.0"));
         }
@@ -230,14 +230,14 @@ namespace SamediRouge
         {
             var g = new Gate { z = z };
             int n = squad.Count + 1;
-            bool x2 = n >= 10 && Random.value < 0.3f;
+            bool x2 = n >= 12 && Random.value < 0.2f;
             // trois choix : toujours au moins un bon et un mauvais
             var opts = new List<(int v, bool m)>
             {
                 // peu généreuses : +1..+2 au début, les ×2 n'arrivent qu'avec une bande déjà formée
-                (Random.Range(1, 3) + n / 10, false),
-                (Random.Range(2, 4) + n / 8, false),
-                (x2 ? 2 : Random.Range(2, 5) + n / 8, x2),
+                (1 + n / 14, false),
+                (Random.Range(1, 3) + n / 12, false),
+                (x2 ? 2 : Random.Range(2, 4) + n / 12, x2),
                 (-Mathf.RoundToInt((Random.Range(2, 5) + n / 3) * (1f + 0.5f * arcD)), false),
             };
             int bad = 3;
@@ -816,7 +816,7 @@ namespace SamediRouge
             if (g.mul[l]) { }   // un ×2 reste un ×2
             else
             {
-                if (++g.hits[l] % 3 == 0) g.val[l] = Mathf.Min(g.val[l] + 1, 6);
+                if (++g.hits[l] % 4 == 0) g.val[l] = Mathf.Min(g.val[l] + 1, 4);
                 if (g.val[l] == 0) g.val[l] = 1;   // pas de porte « 0 »
             }
             bool good = g.mul[l] || g.val[l] > 0;

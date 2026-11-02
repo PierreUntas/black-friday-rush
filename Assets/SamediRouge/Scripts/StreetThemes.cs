@@ -340,7 +340,8 @@ namespace SamediRouge
                     // boutique de luxe : vitrine éclairée, cadre doré, auvent noir
                     Material m;
                     Texture2D lux = ShopArt(Random.Range(0, 12));
-                    if (lux != null) m = Art.Tex(lux, Vector2.one, 0.6f, lux, new Color(0.8f, 0.8f, 0.8f));   // devanture illustrée, éclairée la nuit
+                    if (Tuning.Arcade) m = Art.Mat(new Color(0.16f, 0.15f, 0.2f), 0.4f);   // arcade : pas de vitrines
+                    else if (lux != null) m = Art.Tex(lux, Vector2.one, 0.6f, lux, new Color(0.8f, 0.8f, 0.8f));   // devanture illustrée, éclairée la nuit
                     else
                     {
                         Art.Facade shop = Art.GetShop(Random.Range(0, Art.ShopCount));

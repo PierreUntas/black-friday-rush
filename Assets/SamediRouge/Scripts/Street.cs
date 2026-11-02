@@ -299,8 +299,20 @@ namespace SamediRouge
             return list.Count > 0 ? list[((v % list.Count) + list.Count) % list.Count] : null;
         }
 
+        static readonly Color[] PlainWall =
+        {
+            new Color(0.93f, 0.9f, 0.86f), new Color(0.88f, 0.9f, 0.93f), new Color(0.92f, 0.88f, 0.9f), new Color(0.89f, 0.92f, 0.88f)
+        };
+
         void Store(Transform t, int s, float zc, float x, float y, int v)
         {
+            if (Tuning.Arcade)
+            {
+                // arcade : pas de vitrines (retour YSO : seulement l'essentiel à l'écran) — panneaux pastel unis
+                Art.Part(t, Art.Cube, Art.Mat(PlainWall[((v % PlainWall.Length) + PlainWall.Length) % PlainWall.Length], 0.3f), new Vector3(s * (x + 0.3f), y + 2.4f, zc), new Vector3(0.6f, 4.8f, 9f));
+                Art.Part(t, Art.Cube, frameMat, new Vector3(s * (x - 0.05f), y + 2.4f, zc - 4.45f), new Vector3(0.12f, 4.8f, 0.12f), default, false);
+                return;
+            }
             Art.Facade f = Art.GetStore(v);
             bool looted = Theme == 1;
             // map 2 : vitrines plus sombres (lumières en partie coupées)
