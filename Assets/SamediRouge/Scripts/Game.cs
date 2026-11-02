@@ -1360,7 +1360,7 @@ namespace SamediRouge
             t.material = Art.Particle(null, Color.white);
             var g = new Gradient();
             // arcade : traînée sombre, lisible sur le carrelage clair du centre commercial
-            if (Tuning.Arcade) { t.material = Art.Particle(null, new Color(0.05f, 0.05f, 0.07f, 1f)); t.widthMultiplier = 0.14f; }
+            if (Tuning.Arcade) { t.material = Art.Particle(null, new Color(0.05f, 0.05f, 0.07f, 1f)); t.widthMultiplier = 0.07f; t.time = 0.045f; }   // traînée courte et fine
             Color c0 = Tuning.Arcade ? new Color(0.05f, 0.05f, 0.07f) : Color.white, c1 = Tuning.Arcade ? new Color(0.2f, 0.2f, 0.25f) : Pal.Jaune;
             g.SetKeys(new[] { new GradientColorKey(c0, 0f), new GradientColorKey(c1, 1f) },
                       new[] { new GradientAlphaKey(0.9f, 0f), new GradientAlphaKey(0f, 1f) });
@@ -2004,7 +2004,7 @@ namespace SamediRouge
                 Rig r = Rig.Build(thief ? Kind.Thief : Kind.Guard, world, new Vector3(px + sl.x, 0f, pz + sl.y), 0f, thief ? Rig.Crew : 0, true, MateArmor);
                 Rig.OutlineOverride = null;
                 AllyRing(r);
-                if (Tuning.Arcade) { r.root.localScale *= CrewScale; r.CrewWeapon(runTier); }   // à la taille des adversaires, même arme que le héros
+                if (Tuning.Arcade) { r.root.localScale *= MateScale; r.CrewWeapon(runTier); }   // à la taille des adversaires, même arme que le héros
                 squad.Add(new Mate { rig = r, x = px + sl.x, z = pz + sl.y, slot = squad.Count });
             }
         }
@@ -2427,7 +2427,8 @@ namespace SamediRouge
                     if (P.swingT >= 0f || gear[GShield]) { HitCasseur(e, false); return; }
                     e.hit = true;
                     RaidMemberGone(e, true);
-                    e.rig.KO(new Vector3(Mathf.Sign(e.x - px + 0.01f) * 3f, 3f, speed * 0.6f), new Vector3(0f, 0f, 5f));
+                    if (Tuning.Arcade) { Fx.Hit(new Vector3(e.x, 1.2f, e.z)); e.rig.Flash(Color.white, 0.12f); e.vanish = true; e.timer = VanishT; e.vanishS = e.rig.root.localScale.x; }   // arcade : pas de corps en physique
+                    else e.rig.KO(new Vector3(Mathf.Sign(e.x - px + 0.01f) * 3f, 3f, speed * 0.6f), new Vector3(0f, 0f, 5f));
                     Hurt(1, M(L("Tackled by a robber", "Plaqué par un voleur"), L("Tackled by a cop", "Plaqué par un policier")));
                     return;
                 case ET.Loup:

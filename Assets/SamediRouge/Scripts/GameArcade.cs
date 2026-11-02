@@ -55,7 +55,7 @@ namespace SamediRouge
         int crates;
         const int ArcadeMaxSquad = 24;
         /// <summary>Arcade : vitesse de course réduite, taille des personnages de ta bande (alignée sur les adversaires).</summary>
-        const float ArcadeSpeed = 0.52f, CrewScale = 0.8f, EnemyScale = 1f, FreeMax = 3.3f;
+        const float ArcadeSpeed = 0.52f, CrewScale = 0.763f, MateScale = 0.733f, EnemyScale = 1f, FreeMax = 3.3f;
         float freeX;
 
         /// <summary>
