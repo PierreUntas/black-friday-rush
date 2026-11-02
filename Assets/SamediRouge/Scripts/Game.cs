@@ -1305,8 +1305,9 @@ namespace SamediRouge
                 if (mt == null)
                 {
                     mt = Art.Node(world, "bolt", from.Value);
-                    Color mc = pink ? new Color(1f, 0.31f, 0.64f) : new Color(0.25f, 0.85f, 0.45f);
-                    Art.Part(mt, Art.Sphere, Art.Glow(mc, mc * 2f, 0.6f), Vector3.zero, Vector3.one * 0.12f, default, false);
+                    // balles noires : bien visibles sur le sol clair
+                    Art.Part(mt, Art.Sphere, Art.Mat(new Color(0.06f, 0.06f, 0.08f), 0.7f), Vector3.zero, Vector3.one * 0.17f, default, false);
+                    Trail(mt).emitting = true;
                 }
                 bolts.Add(new Bolt { tr = mt, target = target, smg = true, pool = mk });
                 return;
@@ -1335,7 +1336,8 @@ namespace SamediRouge
             {
                 tr = Art.Node(world, "bolt", muzzle);
                 // projectiles cartoon, non létaux : policiers = décharge du taser / fléchettes en mousse ; voleurs = billes de peinture
-                if (thief) Art.Part(tr, Art.Sphere, Art.Glow(c, c * 2f, 0.6f), Vector3.zero, Vector3.one * (smg ? 0.12f : 0.16f), default, false);
+                if (thief && Tuning.Arcade) Art.Part(tr, Art.Sphere, Art.Mat(new Color(0.06f, 0.06f, 0.08f), 0.7f), Vector3.zero, Vector3.one * (smg ? 0.17f : 0.2f), default, false);
+                else if (thief) Art.Part(tr, Art.Sphere, Art.Glow(c, c * 2f, 0.6f), Vector3.zero, Vector3.one * (smg ? 0.12f : 0.16f), default, false);
                 else if (smg)
                 {
                     Art.Part(tr, Art.Capsule, Art.Glow(c, c * 1.5f, 0.4f), Vector3.zero, new Vector3(0.07f, 0.16f, 0.07f), new Vector3(90f, 0f, 0f), false);
@@ -1357,7 +1359,10 @@ namespace SamediRouge
             t.widthCurve = AnimationCurve.Linear(0f, 1f, 1f, 0f);
             t.material = Art.Particle(null, Color.white);
             var g = new Gradient();
-            g.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Pal.Jaune, 1f) },
+            // arcade : traînée sombre, lisible sur le carrelage clair du centre commercial
+            if (Tuning.Arcade) { t.material = Art.Particle(null, new Color(0.05f, 0.05f, 0.07f, 1f)); t.widthMultiplier = 0.14f; }
+            Color c0 = Tuning.Arcade ? new Color(0.05f, 0.05f, 0.07f) : Color.white, c1 = Tuning.Arcade ? new Color(0.2f, 0.2f, 0.25f) : Pal.Jaune;
+            g.SetKeys(new[] { new GradientColorKey(c0, 0f), new GradientColorKey(c1, 1f) },
                       new[] { new GradientAlphaKey(0.9f, 0f), new GradientAlphaKey(0f, 1f) });
             t.colorGradient = g;
             t.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
