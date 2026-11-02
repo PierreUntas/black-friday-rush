@@ -767,6 +767,7 @@ namespace SamediRouge
                 P.anim = Anim.Run;
                 speed = 5f;
                 P.animRate = 0.75f;   // petite foulée tranquille
+                pz += 3.2f * dt;       // il avance vraiment : le décor défile derrière lui (la caméra recule avec lui)
                 P.root.localRotation = Quaternion.Euler(0f, 12f * Mathf.Sin(Time.unscaledTime * 0.7f), 0f);
             }
             else if (metaScreen == MetaScreen.Upgrades)
@@ -3489,7 +3490,7 @@ namespace SamediRouge
             float k = st == St.Play ? 1f - Mathf.Exp(-8f * udt) : 1f - Mathf.Exp(-3f * udt);
             camPos.x = Mathf.Lerp(camPos.x, want.x, k);
             camPos.y = Mathf.Lerp(camPos.y, want.y, k);
-            camPos.z = st == St.Play ? Mathf.Lerp(camPos.z, want.z, 1f - Mathf.Exp(-20f * udt)) : Mathf.Lerp(camPos.z, want.z, k);
+            camPos.z = st == St.Play || (st == St.Menu && metaScreen == MetaScreen.Home) ? Mathf.Lerp(camPos.z, want.z, 1f - Mathf.Exp(-20f * udt)) : Mathf.Lerp(camPos.z, want.z, k);
             fov = Mathf.Lerp(fov, wantFov, 1f - Mathf.Exp(-3f * udt));
             fovKick = Mathf.MoveTowards(fovKick, 0f, udt * 22f);
             if (slowMo <= 0f) zoom = Mathf.MoveTowards(zoom, 0f, udt * 2f);
