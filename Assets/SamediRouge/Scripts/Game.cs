@@ -881,6 +881,9 @@ namespace SamediRouge
                 // les flèches du clavier (éditeur) changent de couloir d'un coup
                 if (inp.keySwipes.Count > 0) freeX = (lane - 1) * Lane;
                 freeX = Mathf.Clamp(freeX + inp.dragDX / Mathf.Max(1f, Screen.width) * 9f, -FreeMax, FreeMax);
+#if UNITY_EDITOR
+                if (devAuto) freeX = Mathf.MoveTowards(freeX, AutoLaneX(), 7f * dt);
+#endif
                 tx = freeX;
                 px = Mathf.Lerp(px, tx, 1f - Mathf.Exp(-22f * dt));
                 lane = Mathf.Clamp(Mathf.RoundToInt(px / Lane) + 1, 0, 2);
@@ -1396,7 +1399,7 @@ namespace SamediRouge
                     bolts.RemoveAt(i);
                     continue;
                 }
-                Vector3 aim = new Vector3(e.x, 1.15f, e.z);
+                Vector3 aim = new Vector3(e.x, Tuning.Arcade ? 0.75f : 1.15f, e.z);
                 Vector3 d = aim - b.tr.position;
                 float step = (b.bat != null ? 24f : 75f) * dt;
                 if (d.magnitude <= step + 0.3f)
@@ -1974,7 +1977,20 @@ namespace SamediRouge
             P.Land(0.15f);
         }
 
+        int pendingMates;
+
         void AddMates(int n)
+        {
+            if (Tuning.Arcade && st == St.Play)
+            {
+                // arcade : les recrues d'une porte arrivent sur quelques images (en construire 8 d'un coup = un à-coup)
+                pendingMates = Mathf.Min(pendingMates + n, MaxSquad - squad.Count);
+                return;
+            }
+            BuildMates(n);
+        }
+
+        void BuildMates(int n)
         {
             for (int i = 0; i < n && squad.Count < MaxSquad; i++)
             {
@@ -1990,6 +2006,7 @@ namespace SamediRouge
 
         void ClearSquad()
         {
+            pendingMates = 0;
             foreach (Mate m in squad) if (m.rig != null && m.rig.root != null) Destroy(m.rig.root.gameObject);
             squad.Clear();
         }
@@ -1999,8 +2016,19 @@ namespace SamediRouge
         {
             Mate m = squad[i];
             squad.RemoveAt(i);
-            m.rig.KO(push, new Vector3(Random.Range(-5f, 5f), Random.Range(-3f, 3f), Random.Range(-6f, 6f)));
-            Destroy(m.rig.root.gameObject, 2.5f);
+            if (Tuning.Arcade)
+            {
+                // arcade : petit nuage, pas de corps en physique (plusieurs d'un coup faisaient ramer)
+                Vector3 at = m.rig.root.position;
+                Fx.Hit(at + Vector3.up * 0.5f);
+                Fx.Puff(at + Vector3.up * 0.3f);
+                Destroy(m.rig.root.gameObject);
+            }
+            else
+            {
+                m.rig.KO(push, new Vector3(Random.Range(-5f, 5f), Random.Range(-3f, 3f), Random.Range(-6f, 6f)));
+                Destroy(m.rig.root.gameObject, 2.5f);
+            }
             for (int k = 0; k < squad.Count; k++) squad[k].slot = k;
             hud.Float(new Vector3(m.x, 2f, m.z), "-1", Hud.Bad, true);
             Snd.Play(Snd.I.hurt, 0.35f);
@@ -2161,7 +2189,7 @@ namespace SamediRouge
         void HitCasseurIn(Ent e, bool byBuddy, float power, bool light, int dmg)
         {
             light |= byBuddy;
-            Vector3 chest = new Vector3(e.x, 1.2f, e.z);
+            Vector3 chest = new Vector3(e.x, Tuning.Arcade ? 0.8f : 1.2f, e.z);
             if (!Tuning.Arcade) Haptics.Pulse(light ? 8 : 18);
             if (!Tuning.Arcade) Fx.Hit(chest);
             if (!Tuning.Arcade || Time.unscaledTime - lastBonk > 0.07f)
@@ -2949,6 +2977,7 @@ namespace SamediRouge
         void FlushPackQueue()
         {
             for (int k = 0; k < 2 && packQueue.Count > 0; k++) packQueue.Dequeue()();
+            if (pendingMates > 0) { int b = Mathf.Min(2, pendingMates); pendingMates -= b; BuildMates(b); }
         }
 
         Ent Spawn(ET type, int ln, float z, Mode? mode = null)
@@ -2965,6 +2994,8 @@ namespace SamediRouge
             e.go.transform.SetParent(world, false);
             e.go.transform.localPosition = new Vector3(e.x, 0f, z);
             Transform t = e.go.transform;
+            // arcade : adversaires et boss à la même échelle que ta bande (mesuré : ~1 m contre 1,8 m avant)
+            if (Tuning.Arcade && (type == ET.Casseur || type == ET.Loup)) t.localScale = Vector3.one * EnemyScale;
 
             switch (type)
             {

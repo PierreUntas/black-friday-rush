@@ -116,6 +116,30 @@ namespace SamediRouge
         /// <summary>Outil de dev (éditeur) : exécute la commande de Logs/sr-screen.txt un peu après le démarrage.</summary>
         float devTrisAt = -1f;
 
+        /// <summary>Outil de dev : enregistre l'écran (avec l'interface) en images JPG à 30 i/s dans Logs/rec/, pour monter une vidéo.</summary>
+        System.Collections.IEnumerator DevRecord()
+        {
+#if UNITY_EDITOR
+            string dir = System.IO.Path.Combine(Application.dataPath, "../Logs/rec");
+            try { if (System.IO.Directory.Exists(dir)) System.IO.Directory.Delete(dir, true); System.IO.Directory.CreateDirectory(dir); } catch (System.Exception) { }
+            Time.captureFramerate = 30;
+            var m = System.Text.RegularExpressions.Regex.Match(devCmd, @"rec\s+(\d+)");
+            int frames = (m.Success ? int.Parse(m.Groups[1].Value) : 40) * 30;
+            for (int i = 0; i < frames; i++)
+            {
+                yield return new WaitForEndOfFrame();
+                Texture2D shot = ScreenCapture.CaptureScreenshotAsTexture();
+                byte[] jpg = shot.EncodeToJPG(85);
+                Destroy(shot);
+                try { System.IO.File.WriteAllBytes(System.IO.Path.Combine(dir, "f" + i.ToString("00000") + ".jpg"), jpg); } catch (System.Exception) { }
+            }
+            Time.captureFramerate = 0;
+            try { System.IO.File.WriteAllText(System.IO.Path.Combine(dir, "done.txt"), frames.ToString()); } catch (System.Exception) { }
+#else
+            yield break;
+#endif
+        }
+
         void DevTick(float udt)
         {
 #if UNITY_EDITOR
@@ -126,6 +150,8 @@ namespace SamediRouge
             if (devCmd.Contains("tris")) devTrisAt = Time.realtimeSinceStartup + 5f;
             Perf.On = devCmd.Contains("perf");
             devCenter = devCmd.Contains("center");
+            devAuto = devCmd.Contains("auto");
+            if (devCmd.Contains("rec")) StartCoroutine(DevRecord());
             if (devCmd.Contains("bossrush")) debugBossRush = true;
 #endif
             devCmdT = -1f; // une seule fois, à la première image

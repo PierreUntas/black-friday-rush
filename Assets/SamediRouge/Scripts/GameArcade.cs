@@ -55,7 +55,7 @@ namespace SamediRouge
         int crates;
         const int ArcadeMaxSquad = 24;
         /// <summary>Arcade : vitesse de course réduite, taille des personnages de ta bande (alignée sur les adversaires).</summary>
-        const float ArcadeSpeed = 0.65f, CrewScale = 0.45f, FreeMax = 3.3f;
+        const float ArcadeSpeed = 0.65f, CrewScale = 0.45f, EnemyScale = 0.56f, FreeMax = 3.3f;
         float freeX;
 
         /// <summary>
@@ -111,6 +111,7 @@ namespace SamediRouge
 
         void ArcadeStart()
         {
+            tagCrowd = -1;
             if (store != null) Destroy(store);
             finaleZ = -1f;
             foreach (Gate g in gates) if (g.go != null) Destroy(g.go);
@@ -159,6 +160,29 @@ namespace SamediRouge
         /// quelques costauds à 2 en fin de parcours ; ensuite casques puis gilets, qu'il faut une meilleure arme
         /// (ou une plus grosse bande) pour abattre avant qu'ils n'arrivent sur toi.
         /// </summary>
+#if UNITY_EDITOR
+        /// <summary>Outil de dev (vidéo, équilibrage) : pilote auto qui prend la meilleure porte, puis le panneau d'armes.</summary>
+        bool devAuto;
+        float AutoLaneX()
+        {
+            int crowd = squad.Count + 1;
+            foreach (Gate g in gates)
+            {
+                if (g.used || g.z < pz + 2f || g.z > pz + 30f) continue;
+                int best = 1;
+                float bv = -1e9f;
+                for (int l = 0; l < 3; l++)
+                {
+                    float v = g.mul[l] ? crowd * (g.val[l] - 1) : g.val[l];
+                    if (v > bv) { bv = v; best = l; }
+                }
+                return (best - 1) * Lane;
+            }
+            foreach (Craft c in crafts) if (!c.done && c.z > pz && c.z < pz + 32f) return (c.lane - 1) * Lane;
+            return 0f;
+        }
+#endif
+
         int ArcadeEnemyHp()
         {
             if (arcPackHp > 0f)
@@ -206,7 +230,7 @@ namespace SamediRouge
         {
             var g = new Gate { z = z };
             int n = squad.Count + 1;
-            bool x2 = n >= 10 && Random.value < 0.3f;
+            bool x2 = n >= 8 && n <= 14 && Random.value < 0.25f;   // ×2 rare, et plus du tout quand la bande est déjà grosse
             // trois choix : toujours au moins un bon et un mauvais
             var opts = new List<(int v, bool m)>
             {
@@ -306,11 +330,15 @@ namespace SamediRouge
             if (g.panel[l] != null) g.panel[l].gameObject.SetActive(false);
             Vector3 p = new Vector3((l - 1) * Lane, 1.4f, g.z);
             hud.FloatKey(p + Vector3.up, GateText(g, l), good ? Hud.Yellow : Hud.Bad, true);
+            Fx.Glass(p);   // le panneau vole en éclats
             if (good)
             {
                 Fx.Confetti(p);
                 Snd.Play(Snd.I.pickup, 0.8f, 0f);
                 P.Flash(Hud.StarGold, 0.15f);
+                fovKick = Mathf.Max(fovKick, 5f);   // un seul coup de zoom au passage, pas à chaque tir
+                foreach (Mate m in squad) m.rig.Land(0.35f);
+                Haptics.Pulse(12);
             }
             else
             {
@@ -463,6 +491,12 @@ namespace SamediRouge
             Fx.Confetti(IconBase);
             P.Flash(Hud.StarGold, 0.3f);
             Snd.Play(Snd.I.pickup, 1f, 0f);
+            Snd.Play(Snd.I.perfect, 0.7f, 0f);
+            hud.Flash(0.35f);
+            fovKick = Mathf.Max(fovKick, 7f);
+            hud.Toast(runTier >= 2 ? L("SMG!", "MITRAILLETTE !") : L("PISTOL!", "PISTOLET !"));
+            foreach (Mate m in squad) { m.rig.Land(0.4f); m.rig.Flash(Hud.StarGold, 0.2f); }
+            Haptics.Pulse(30, true);
         }
 
         /// <summary>Animation des armes au-dessus de la bande (attente, rapprochement, fusion, nouvelle arme qui descend dans la main).</summary>
@@ -723,6 +757,11 @@ namespace SamediRouge
             return best;
         }
 
+        int lootStreak;
+        float lootStreakT;
+        int tagCrowd = -1;
+        float crowdPop, crowdHurt;
+
         void LootHit(LootBox b)
         {
             if (b.broken) return;
@@ -736,7 +775,11 @@ namespace SamediRouge
             Fx.Debris(p);
             Fx.Coin(p);
             hud.FloatKey(p + Vector3.up * 0.6f, "+" + gain, Hud.StarGold, false);
-            Snd.Play(Snd.I.coin, 0.6f);
+            // cartons cassés à la suite : la note monte
+            lootStreak = Time.time - lootStreakT < 1.2f ? lootStreak + 1 : 0;
+            lootStreakT = Time.time;
+            Snd.PlayPitch(Snd.I.coin, 0.6f, 1f + 0.06f * Mathf.Min(lootStreak, 12));
+            Haptics.Pulse(8);
             Destroy(b.tr.gameObject);
         }
 
@@ -845,7 +888,15 @@ namespace SamediRouge
             }
             foreach (LootBox b in loot)
                 if (!b.broken && b.z - pz < 60f) hud.Tag(new Vector3((b.lane - 1) * Lane, 1.9f, b.z), b.hp.ToString(), Color.white, 1.4f);
-            if (finaleZ < 0f || pz < lootEndZ + 3f) hud.Tag(new Vector3(px, 2.6f, pz), (squad.Count + 1).ToString(), Hud.Yellow, 1.3f);
+            // compteur de la bande : il gonfle quand elle grossit, rougit quand elle perd du monde
+            int crowd = squad.Count + 1 + pendingMates;
+            if (tagCrowd >= 0 && crowd > tagCrowd) crowdPop = 1f;
+            if (tagCrowd >= 0 && crowd < tagCrowd) crowdHurt = 1f;
+            tagCrowd = crowd;
+            crowdPop = Mathf.MoveTowards(crowdPop, 0f, Time.deltaTime * 3f);
+            crowdHurt = Mathf.MoveTowards(crowdHurt, 0f, Time.deltaTime * 2.5f);
+            Color cc = Color.Lerp(Hud.Yellow, Hud.Bad, crowdHurt);
+            if (finaleZ < 0f || pz < lootEndZ + 3f) hud.Tag(new Vector3(px, 2.6f, pz), crowd.ToString(), cc, 1.3f * (1f + 0.6f * crowdPop + 0.3f * crowdHurt));
         }
     }
 }

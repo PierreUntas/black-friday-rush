@@ -40,6 +40,16 @@ namespace SamediRouge
 #if !UNITY_EDITOR
             Screen.orientation = ScreenOrientation.Portrait;
 #endif
+#if UNITY_EDITOR
+            // outil de dev : « lang en » / « lang fr » dans Logs/sr-screen.txt force la langue (vidéos pour l'éditeur anglophone)
+            try
+            {
+                string cmd = System.IO.File.ReadAllText(System.IO.Path.Combine(Application.dataPath, "../Logs/sr-screen.txt"));
+                if (cmd.Contains("lang en")) Loc.Set(false);
+                else if (cmd.Contains("lang fr")) Loc.Set(true);
+            }
+            catch (System.Exception) { }
+#endif
             if (Loc.Fr) Debug.Log("Samedi Rouge: FR"); // langue lue ici une fois (PlayerPrefs interdit dans les constructeurs)
             Art.Init(litMaterial, emissiveMaterial, particleMaterial);
             GlbModel.PreloadAll();
