@@ -218,6 +218,8 @@ namespace SamediRouge
                     foreach (Vector3 v in tmp.vertices) { la = Mathf.Min(la, a.MultiplyPoint3x4(v).y); lb = Mathf.Min(lb, b.MultiplyPoint3x4(v).y); }
                 }
                 Destroy(tmp);
+                sb.Append("écart semelle/sol depuis la dernière mesure : min " + Skin3D.DebugMinGap.ToString("0.000") + " max " + Skin3D.DebugMaxGap.ToString("0.000") + "\n");
+                Skin3D.DebugMinGap = 9f; Skin3D.DebugMaxGap = -9f;
                 sb.Append("maillage réel héros : bas A " + la.ToString("0.000") + " B " + lb.ToString("0.000") + "\n");
             }
             sb.Append("taille héros " + H(P.root) + " · coéquipier " + H(squad.Count > 0 ? squad[0].rig.root : null) + " · adversaire " + H(foe != null ? foe.rig.root : null) + "\n");

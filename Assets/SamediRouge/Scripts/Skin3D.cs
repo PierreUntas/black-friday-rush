@@ -390,6 +390,24 @@ namespace SamediRouge
         }
 
         Mesh bakeTmp;
+
+        /// <summary>Accueil : le héros seul à l'écran, on mesure son vrai point le plus bas à chaque image.</summary>
+        public static bool PreciseGround;
+        public static float DebugMinGap = 9f, DebugMaxGap = -9f;
+
+        float MeshLow()
+        {
+            float low = float.MaxValue;
+            if (bakeTmp == null) bakeTmp = new Mesh();
+            foreach (SkinnedMeshRenderer sk in skins)
+            {
+                if (sk == null || !sk.enabled) continue;
+                sk.BakeMesh(bakeTmp, false);
+                Matrix4x4 b = Matrix4x4.TRS(sk.transform.position, sk.transform.rotation, Vector3.one);
+                foreach (Vector3 v in bakeTmp.vertices) { float y = b.MultiplyPoint3x4(v).y; if (y < low) low = y; }
+            }
+            return low;
+        }
         int soleN;
 
         public void Apply()
@@ -405,10 +423,14 @@ namespace SamediRouge
                 {
                     float k = Mathf.Max(0.01f, body.lossyScale.y);
                     float meshLow = Mathf.Min(footL.position.y, footR.position.y) - soleOff * k;
-                    float gap = (meshLow - rig.root.position.y) / k;
+                    // accueil : mesure exacte du point le plus bas du maillage à chaque image (un seul personnage à l'écran)
+                    if (PreciseGround) { float lowNow = MeshLow(); if (lowNow < 1e8f) { meshLow = lowNow; DebugMinGap = Mathf.Min(DebugMinGap, lowNow - rig.root.position.y); DebugMaxGap = Mathf.Max(DebugMaxGap, lowNow - rig.root.position.y); } }
+                    float gap = (meshLow - (PreciseGround ? 0.04f : 0f) - rig.root.position.y) / k;   // accueil : la semelle la plus basse vise 4 cm, le retard du lissage la ramène à fleur de sol
                     // debout : recalage franc ; en course, les pieds quittent le sol à chaque foulée : on moyenne
                     // très doucement (sinon le corps tressaute de haut en bas)
-                    float gain = rig.anim == Anim.Stand || rig.anim == Anim.Idle ? 0.35f : 0.02f;
+                    // en course : on remonte vite si un pied s'enfonce, on redescend très lentement → la semelle la plus basse
+                    // de la foulée effleure le sol, sans tressautement
+                    float gain = rig.anim == Anim.Stand || rig.anim == Anim.Idle ? 0.35f : gap < 0f ? 0.15f : 0.004f;
                     groundCorr = Mathf.Clamp(groundCorr + gap * gain, -0.8f, 0.8f);
                 }
             }

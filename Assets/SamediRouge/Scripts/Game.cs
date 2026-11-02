@@ -765,6 +765,7 @@ namespace SamediRouge
             {
                 // accueil arcade : le héros court sur place, face à la caméra (prêt à partir)
                 P.anim = Anim.Run;
+                Skin3D.PreciseGround = true;
                 speed = 5f;
                 P.animRate = 0.75f;   // petite foulée tranquille
                 pz += 3.2f * dt;       // il avance vraiment : le décor défile derrière lui (la caméra recule avec lui)
@@ -773,6 +774,7 @@ namespace SamediRouge
             else if (metaScreen == MetaScreen.Upgrades)
             {
                 P.animRate = 1f;
+                Skin3D.PreciseGround = false;
                 // aperçu de l'équipement : le personnage se tourne doucement face à la caméra
                 P.anim = Anim.Stand;
                 P.root.localRotation = Quaternion.Euler(0f, 25f * Mathf.Sin(Time.unscaledTime * 0.8f), 0f);
@@ -806,6 +808,7 @@ namespace SamediRouge
         void PlayTick(float dt)
         {
             P.animRate = 1f;
+            Skin3D.PreciseGround = false;
             // vitesse qui monte avec la distance
             // journal d'équilibrage : temps de course, vie à 25 / 50 / 75 % du parcours
             runT += dt;
@@ -3413,7 +3416,8 @@ namespace SamediRouge
             }
             if (hi <= lo) return;
             float h = (hi - lo) * 0.5f, m = (hi + lo) * 0.5f;
-            float k = fitInit ? 1f - Mathf.Exp(-4f * udt) : 1f;
+            // accueil : le héros court (bras, batte et jambes bougent à chaque foulée) : cadrage quasi figé, sinon la caméra tremble
+            float k = fitInit ? 1f - Mathf.Exp((metaScreen == MetaScreen.Home ? -0.25f : -4f) * udt) : 1f;
             fitInit = true;
             fitHalf = Mathf.Lerp(fitHalf, h, k);
             fitMid = Mathf.Lerp(fitMid, m, k);
