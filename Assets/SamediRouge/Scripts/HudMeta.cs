@@ -956,10 +956,16 @@ namespace SamediRouge
             if (minimalResult)
             {
                 resUpg.SetActive(false);
-                resMap.SetActive(!victory);   // après un K.-O., on peut revenir à l'accueil (améliorations)
-                resMap.GetComponent<RectTransform>().anchoredPosition = new Vector2(0f, 228f);
-                if (resMapLabel != null) resMapLabel.text = L("HOME", "ACCUEIL");
+                resMap.SetActive(false);
                 resMore.gameObject.SetActive(false);
+                if (!victory)
+                {
+                    // arcade, partie perdue : un seul gros bouton qui ramène à l'accueil pour s'améliorer
+                    // (acheter le pistolet, un complice…) avant de retenter — c'est tout l'intérêt de la défaite
+                    resRetry.SetActive(false);
+                    resCont.SetActive(true);
+                    if (resContLabel != null) resContLabel.text = L("UPGRADE", "AMÉLIORER");
+                }
             }
             resRoot.transform.localScale = Vector3.one * 0.94f;
         }
