@@ -400,13 +400,16 @@ namespace SamediRouge
             if (!secondary && footL != null && footR != null && rig.root != null)
             {
                 // re-mesure régulière : l'écart pied/semelle dépend de la pose (pointe, talon)
-                if (float.IsNaN(soleOff) || --soleN <= 0) { float m = MeasureSole(); if (!float.IsNaN(m)) soleOff = m; soleN = 20; }
+                if (float.IsNaN(soleOff) || --soleN <= 0) { float m = MeasureSole(); if (!float.IsNaN(m)) soleOff = float.IsNaN(soleOff) ? m : Mathf.Lerp(soleOff, m, 0.3f); soleN = 20; }
                 if (!float.IsNaN(soleOff))
                 {
                     float k = Mathf.Max(0.01f, body.lossyScale.y);
                     float meshLow = Mathf.Min(footL.position.y, footR.position.y) - soleOff * k;
                     float gap = (meshLow - rig.root.position.y) / k;
-                    groundCorr = Mathf.Clamp(groundCorr + gap * 0.35f, -0.8f, 0.8f);
+                    // debout : recalage franc ; en course, les pieds quittent le sol à chaque foulée : on moyenne
+                    // très doucement (sinon le corps tressaute de haut en bas)
+                    float gain = rig.anim == Anim.Stand || rig.anim == Anim.Idle ? 0.35f : 0.02f;
+                    groundCorr = Mathf.Clamp(groundCorr + gap * gain, -0.8f, 0.8f);
                 }
             }
             Quaternion bodyRot = body.rotation;
