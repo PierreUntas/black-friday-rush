@@ -418,8 +418,6 @@ namespace SamediRouge
                 Quaternion delta = Quaternion.Inverse(bodyRot) * p.code.rotation;
                 p.bone.rotation = bodyRot * (delta * p.corr * p.bind);
             }
-            // debout (accueil, fin de niveau) : les deux pieds bien à plat sur le sol
-            if (rig.anim == Anim.Stand) { FlatFoot(footL, toeL, restL); FlatFoot(footR, toeR, restR); }
             // poings fermés sur l'arme tenue, mains ouvertes sinon
             if (fingers.Count > 0)
             {
