@@ -13,6 +13,7 @@ namespace SamediRouge
     public class Rig
     {
         public Kind kind;
+        GameObject blob;
         public Transform root, body, hips, spine, neck, shL, shR, elL, elR, hipL, hipR, knL, knR, handR, handL;
         public Transform baton, shield, gilet, helmet, pistol, holster, smg, cap, stars, sign, pave, bar;
         public TrailRenderer trail;
@@ -222,6 +223,10 @@ namespace SamediRouge
             r.skin = r.root.GetComponentsInChildren<MeshRenderer>(true);
             if (outline) Art.Outline(r.root, OutlineOverride != null ? 0.032f : k == Kind.Shopper ? 0.018f : 0.022f, OutlineOverride);
             r.renderers = r.root.GetComponentsInChildren<MeshRenderer>(true);
+            // ombre de contact douce sous les pieds (héros et bande) : l'ombre portée du soleil se décolle un peu
+            // du personnage sur mobile, cette tache sombre l'ancre au sol
+            if ((k == Kind.Thief || k == Kind.Guard) && (variant < 0 || variant == Crew))
+                r.blob = Art.Decal(r.root, Art.Particle(Art.SoftDot, new Color(0f, 0f, 0f, 0.5f)), new Vector3(0f, 0.025f, 0f), new Vector2(1.5f, 1.2f)).gameObject;
             Perf.End("··outline", q0); q0 = Perf.Begin();
             // TEST : policier joué en personnage 3D complet (Meshy), animé par ce squelette
             if (Use3DHero && (k == Kind.Guard || k == Kind.Thief) && variant < 0)
@@ -1397,6 +1402,7 @@ namespace SamediRouge
             if (v == visible || renderers == null) return;
             visible = v;
             foreach (MeshRenderer mr in renderers) if (mr != null) mr.enabled = v;
+            if (blob != null) blob.SetActive(v);
             if (skin3d != null) skin3d.SetVisible(v);
         }
 
@@ -1528,7 +1534,7 @@ namespace SamediRouge
                     // debout bien droit : jambes presque tendues, buste et tête relevés
                     hL = -2f; hR = 3f; kL = 1f; kR = 1f; sL = 0f; eL = -2f; sR = 0f; eR = -3f;
                     sLz = -1f; sRz = 1f;   // bras le long du corps
-                    spineX = -7f; neckX = -11f;   // buste redressé, tête haute
+                    spineX = -11f; neckX = -13f;   // buste bien redressé, épaules en arrière, tête haute
                     hp.y = HipY - 0.004f + 0.006f * Mathf.Sin(t * 2.2f + seed);
                     neckZ = 6f * Mathf.Sin(t * 0.9f + seed);
                     break;

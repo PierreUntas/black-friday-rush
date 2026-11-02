@@ -26,7 +26,27 @@ namespace SamediRouge
         readonly Vector3 codeHipsRest;
         float soleRest = float.NaN, floor0, groundCorr, soleOff = float.NaN;
         readonly Transform codeKnL, codeKnR;
-        Transform hipsBone, footL, footR;
+        Transform hipsBone, footL, footR, toeL, toeR;
+        float restL, restR;
+
+        /// <summary>Inclinaison (radians, vers le bas) de l'axe cheville → orteil, dans le repère du corps.</summary>
+        float Pitch(Transform foot, Transform toe)
+        {
+            if (foot == null || toe == null) return 0f;
+            Vector3 d = body.InverseTransformVector(toe.position - foot.position);
+            return Mathf.Atan2(-d.y, Mathf.Sqrt(d.x * d.x + d.z * d.z));
+        }
+
+        /// <summary>Remet le pied à plat : l'axe cheville → orteil reprend l'inclinaison de la pose de repos.</summary>
+        void FlatFoot(Transform foot, Transform toe, float rest)
+        {
+            if (foot == null || toe == null) return;
+            Vector3 d = body.InverseTransformVector(toe.position - foot.position);
+            Vector3 flat = new Vector3(d.x, 0f, d.z);
+            if (flat.sqrMagnitude < 1e-6f) return;
+            Vector3 want = flat.normalized * Mathf.Cos(rest) + Vector3.down * Mathf.Sin(rest);
+            foot.rotation = Quaternion.FromToRotation(body.TransformDirection(d), body.TransformDirection(want)) * foot.rotation;
+        }
         Vector3 hipsBind;
         float footH, headK, wideK, tallK;
         SkinnedMeshRenderer[] skins;
@@ -177,6 +197,11 @@ namespace SamediRouge
             hipsBind = body.InverseTransformPoint(hips.position);
             footL = Find(m, "LeftFoot"); footR = Find(m, "RightFoot");
             if (footL != null) footH = body.InverseTransformPoint(footL.position).y;
+            // orteils : pour remettre les pieds à plat quand le personnage est debout (pose de repos du modèle = pieds à plat)
+            toeL = Find(m, "LeftToe_End") ?? Find(m, "LeftToeBase");
+            toeR = Find(m, "RightToe_End") ?? Find(m, "RightToeBase");
+            restL = Pitch(footL, toeL);
+            restR = Pitch(footR, toeR);
 
             // articulations du jeu → os du modèle (direction de repos des membres : vers le bas, un peu écartés)
             pairs.Clear();
@@ -393,6 +418,8 @@ namespace SamediRouge
                 Quaternion delta = Quaternion.Inverse(bodyRot) * p.code.rotation;
                 p.bone.rotation = bodyRot * (delta * p.corr * p.bind);
             }
+            // debout (accueil, fin de niveau) : les deux pieds bien à plat sur le sol
+            if (rig.anim == Anim.Stand) { FlatFoot(footL, toeL, restL); FlatFoot(footR, toeR, restR); }
             // poings fermés sur l'arme tenue, mains ouvertes sinon
             if (fingers.Count > 0)
             {
