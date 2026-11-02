@@ -55,7 +55,7 @@ namespace SamediRouge
         int crates;
         const int ArcadeMaxSquad = 24;
         /// <summary>Arcade : vitesse de course réduite, taille des personnages de ta bande (alignée sur les adversaires).</summary>
-        const float ArcadeSpeed = 0.65f, CrewScale = 0.45f, EnemyScale = 0.56f, FreeMax = 3.3f;
+        const float ArcadeSpeed = 0.65f, CrewScale = 0.45f, EnemyScale = 1f, FreeMax = 3.3f;
         float freeX;
 
         /// <summary>
@@ -230,7 +230,7 @@ namespace SamediRouge
         {
             var g = new Gate { z = z };
             int n = squad.Count + 1;
-            bool x2 = n >= 8 && n <= 14 && Random.value < 0.25f;   // ×2 rare, et plus du tout quand la bande est déjà grosse
+            bool x2 = n >= 10 && Random.value < 0.3f;
             // trois choix : toujours au moins un bon et un mauvais
             var opts = new List<(int v, bool m)>
             {

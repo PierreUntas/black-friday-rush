@@ -1399,7 +1399,7 @@ namespace SamediRouge
                     bolts.RemoveAt(i);
                     continue;
                 }
-                Vector3 aim = new Vector3(e.x, Tuning.Arcade ? 0.75f : 1.15f, e.z);
+                Vector3 aim = new Vector3(e.x, 1.15f, e.z);
                 Vector3 d = aim - b.tr.position;
                 float step = (b.bat != null ? 24f : 75f) * dt;
                 if (d.magnitude <= step + 0.3f)
@@ -2189,7 +2189,7 @@ namespace SamediRouge
         void HitCasseurIn(Ent e, bool byBuddy, float power, bool light, int dmg)
         {
             light |= byBuddy;
-            Vector3 chest = new Vector3(e.x, Tuning.Arcade ? 0.8f : 1.2f, e.z);
+            Vector3 chest = new Vector3(e.x, 1.2f, e.z);
             if (!Tuning.Arcade) Haptics.Pulse(light ? 8 : 18);
             if (!Tuning.Arcade) Fx.Hit(chest);
             if (!Tuning.Arcade || Time.unscaledTime - lastBonk > 0.07f)
