@@ -111,6 +111,7 @@ namespace SamediRouge
 
         void ArcadeStart()
         {
+            blocked = false;
             tagCrowd = -1;
             if (store != null) Destroy(store);
             finaleZ = -1f;
@@ -602,7 +603,8 @@ namespace SamediRouge
             for (int r = 0; r < rows; r++)
                 for (int l = 0; l < 3; l++)
                 {
-                    int hp = Mathf.Max(1, 1 + Mathf.RoundToInt(r * 0.7f * (1f + 0.5f * arcD)) + Random.Range(0, 2) + runTier);
+                    // cartons solides : avec la batte de départ on ne passe pas, avec le pistolet acheté (dégâts ×2) on passe
+                    int hp = 13 + Mathf.RoundToInt(r * 3f + 3f * arcD) + Random.Range(0, 3);
                     var b = new LootBox { lane = l, z = z0 + r * gap + Random.Range(-0.6f, 0.6f), hp = hp, max = hp };
                     b.tr = Art.Node(world, "loot", new Vector3((l - 1) * Lane, 0f, b.z));
                     float k = 0.8f + 0.06f * Mathf.Min(hp, 8);   // les cartons solides sont plus gros
@@ -762,10 +764,15 @@ namespace SamediRouge
         int tagCrowd = -1;
         float crowdPop, crowdHurt;
 
+        /// <summary>Dégâts d'un tir sur un carton : dépendent de l'arme ACHETÉE (batte 1, pistolet 2, mitraillette 3),
+        /// pas de l'arme gagnée en course — c'est l'amélioration de l'accueil qui ouvre le MEGA STORE.</summary>
+        int LootDmg => Mathf.Clamp(Progress.GearLevel(thief, Tuning.Weapon), 1, 3);
+        bool blocked;
+
         void LootHit(LootBox b)
         {
             if (b.broken) return;
-            b.hp--;
+            b.hp -= LootDmg;
             b.punch = 1f;
             if (b.hp > 0) return;
             b.broken = true;
@@ -796,14 +803,15 @@ namespace SamediRouge
                     b.punch = Mathf.Max(0f, b.punch - Time.deltaTime * 6f);
                     b.tr.localScale = Vector3.one * (1f + 0.15f * b.punch);
                 }
-                if (b.lane == l && pz >= b.z - 0.9f)
+                if (b.lane == l && pz >= b.z - 0.9f && st == St.Play)
                 {
-                    b.broken = true;
+                    // un carton pas cassé barre la route : la bande s'y écrase, partie perdue
                     Fx.Debris(b.tr.position + Vector3.up * 0.6f);
-                    shake = Mathf.Max(shake, 0.15f);
-                    Destroy(b.tr.gameObject);
-                    loot.RemoveAt(i);
-                    continue;
+                    shake = Mathf.Max(shake, 0.4f);
+                    blocked = true;
+                    cause = L("Blocked by the crates", "Bloqué par les cartons");
+                    EndGame();
+                    return;
                 }
                 if (b.z < pz - 4f) { Destroy(b.tr.gameObject); loot.RemoveAt(i); }
             }

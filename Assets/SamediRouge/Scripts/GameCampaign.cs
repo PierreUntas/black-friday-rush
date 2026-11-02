@@ -454,6 +454,8 @@ namespace SamediRouge
             LogRun(false);
             metaScreen = MetaScreen.Result;
             int keep = Mathf.RoundToInt(coins * Tuning.DefeatKeep);
+            // arcade, bloqué par les cartons : on garde tout le butin et un bonus « presque ! » (de quoi viser le pistolet)
+            if (Tuning.Arcade && blocked) keep = Mathf.Max(coins + 60, 160);
             Progress.Coins += keep;
             float progress = Mathf.Clamp01((pz - stageStartZ) / StageLen);
             string where = boss != null ? L("the boss", "le boss") : Mathf.RoundToInt(progress * 100f) + L("% of the street", " % de la rue");
@@ -461,7 +463,7 @@ namespace SamediRouge
             string tip = boss != null && superCount == 0 ? L("Tip: jump, then tap as you land = NINJA STRIKE x3!", "Astuce : saute, puis tape à l'atterrissage = COUP NINJA x3 !") : DefeatTip();
             if (GiveFirstWeapon()) tip = FirstWeaponTip(false);
             hud.minimalResult = Tuning.Arcade;
-            if (Tuning.Arcade) { hud.ShowResult(false, L("KNOCKED OUT", "K.-O."), "", "", keep, Progress.Coins, null, ""); return; }
+            if (Tuning.Arcade) { hud.ShowResult(false, blocked ? L("BLOCKED!", "BLOQUÉ !") : L("KNOCKED OUT", "K.-O."), "", "", keep, Progress.Coins, null, ""); blocked = false; return; }
             hud.ShowResult(false, L("KNOCKED OUT", "K.-O."), Tuning.StreetNames[streetIdx], body, keep, Progress.Coins, Tracks(), tip);
         }
 
@@ -627,7 +629,7 @@ namespace SamediRouge
         // économie arcade : une première partie rapporte de quoi acheter UNE amélioration (la batte, ~250 $)
         // l'arme : on lance déjà la batte au départ, la carte vend donc le pistolet puis la mitraillette « au départ »
         int ArcWeapon => Mathf.Clamp(Progress.GearLevel(thief, Tuning.Weapon), 1, 3);
-        int HomeCost(int i) => i == 0 ? ArcCost(ArcLevel(KCrew), 180, 70) : i == 1 ? (ArcWeapon == 1 ? 250 : ArcWeapon == 2 ? 900 : -1) : ArcCost(ArcLevel(KIncome), 220, 90);
+        int HomeCost(int i) => i == 0 ? ArcCost(ArcLevel(KCrew), 180, 70) : i == 1 ? (ArcWeapon == 1 ? 150 : ArcWeapon == 2 ? 900 : -1) : ArcCost(ArcLevel(KIncome), 220, 90);
 
         void ShowHomeScreen()
         {
