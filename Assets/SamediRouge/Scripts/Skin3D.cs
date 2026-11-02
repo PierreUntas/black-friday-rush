@@ -425,7 +425,7 @@ namespace SamediRouge
                     float meshLow = Mathf.Min(footL.position.y, footR.position.y) - soleOff * k;
                     // accueil : mesure exacte du point le plus bas du maillage à chaque image (un seul personnage à l'écran)
                     if (PreciseGround) { float lowNow = MeshLow(); if (lowNow < 1e8f) { meshLow = lowNow; DebugMinGap = Mathf.Min(DebugMinGap, lowNow - rig.root.position.y); DebugMaxGap = Mathf.Max(DebugMaxGap, lowNow - rig.root.position.y); } }
-                    float gap = (meshLow - (PreciseGround ? 0.02f : 0f) - rig.root.position.y) / k;   // accueil : la semelle la plus basse vise 4 cm, le retard du lissage la ramène à fleur de sol
+                    float gap = (meshLow - (PreciseGround ? 0.005f : 0f) - rig.root.position.y) / k;   // accueil : la semelle la plus basse vise 4 cm, le retard du lissage la ramène à fleur de sol
                     // debout : recalage franc ; en course, les pieds quittent le sol à chaque foulée : on moyenne
                     // très doucement (sinon le corps tressaute de haut en bas)
                     // en course : on remonte vite si un pied s'enfonce, on redescend très lentement → la semelle la plus basse
