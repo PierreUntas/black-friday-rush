@@ -103,7 +103,10 @@ namespace SamediRouge
 
         public void HideHome() { if (homeRoot != null) homeRoot.SetActive(false); }
 
-        public void PopHome(int i) { if (homeCard[i] != null) homeCard[i].transform.localScale = Vector3.one * 1.12f; }
+        public void PopHome(int i) { if (homeCard[i] != null) homeCard[i].transform.localScale = Vector3.one * 1.04f; }
+
+        // cartes un peu réduites : même gonflées (achat possible), elles ne se chevauchent plus
+        const float CardK = 0.9f;
 
         void TickHome(float udt)
         {
@@ -114,8 +117,8 @@ namespace SamediRouge
             homeSwipe.transform.localScale = Vector3.one * (1f + 0.04f * Mathf.Sin(Time.unscaledTime * 4.4f));
             for (int i = 0; i < 3; i++)
                 homeCard[i].transform.localScale = homeAfford[i]
-                    ? Vector3.one * BuyPulse(Time.unscaledTime, i * 0.2f) * 0.97f + Vector3.one * 0.03f
-                    : Vector3.MoveTowards(homeCard[i].transform.localScale, Vector3.one, udt * 1.5f);
+                    ? (Vector3.one * BuyPulse(Time.unscaledTime, i * 0.2f) * 0.97f + Vector3.one * 0.03f) * CardK
+                    : Vector3.MoveTowards(homeCard[i].transform.localScale, Vector3.one * CardK, udt * 1.5f);
         }
     }
 }
