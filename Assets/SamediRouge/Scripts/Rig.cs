@@ -1526,8 +1526,9 @@ namespace SamediRouge
                 }
                 case Anim.Stand:
                     // debout bien droit : jambes presque tendues, buste et tête relevés
-                    hL = -4f; hR = 5f; kL = 3f; kR = 2f; sL = 6f; eL = -14f; sR = 5f; eR = -18f;
-                    spineX = -2f; neckX = -5f;
+                    hL = -2f; hR = 3f; kL = 1f; kR = 1f; sL = 0f; eL = -2f; sR = 0f; eR = -3f;
+                    sLz = -1f; sRz = 1f;   // bras le long du corps
+                    spineX = -7f; neckX = -11f;   // buste redressé, tête haute
                     hp.y = HipY - 0.004f + 0.006f * Mathf.Sin(t * 2.2f + seed);
                     neckZ = 6f * Mathf.Sin(t * 0.9f + seed);
                     break;
