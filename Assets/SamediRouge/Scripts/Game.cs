@@ -765,11 +765,13 @@ namespace SamediRouge
             {
                 // accueil arcade : le héros court sur place, face à la caméra (prêt à partir)
                 P.anim = Anim.Run;
-                speed = 5f;   // petite foulée tranquille
+                speed = 5f;
+                P.animRate = 0.42f;   // petite foulée tranquille
                 P.root.localRotation = Quaternion.Euler(0f, 12f * Mathf.Sin(Time.unscaledTime * 0.7f), 0f);
             }
             else if (metaScreen == MetaScreen.Upgrades)
             {
+                P.animRate = 1f;
                 // aperçu de l'équipement : le personnage se tourne doucement face à la caméra
                 P.anim = Anim.Stand;
                 P.root.localRotation = Quaternion.Euler(0f, 25f * Mathf.Sin(Time.unscaledTime * 0.8f), 0f);
@@ -802,6 +804,7 @@ namespace SamediRouge
 
         void PlayTick(float dt)
         {
+            P.animRate = 1f;
             // vitesse qui monte avec la distance
             // journal d'équilibrage : temps de course, vie à 25 / 50 / 75 % du parcours
             runT += dt;

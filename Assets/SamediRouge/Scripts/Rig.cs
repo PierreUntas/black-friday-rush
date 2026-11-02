@@ -14,6 +14,8 @@ namespace SamediRouge
     {
         public Kind kind;
         GameObject blob;
+        /// <summary>Vitesse de l'animation (1 = normale) : l'accueil fait courir le héros au ralenti.</summary>
+        public float animRate = 1f;
         public Transform root, body, hips, spine, neck, shL, shR, elL, elR, hipL, hipR, knL, knR, handR, handL;
         public Transform baton, shield, gilet, helmet, pistol, holster, smg, cap, stars, sign, pave, bar;
         public TrailRenderer trail;
@@ -965,7 +967,7 @@ namespace SamediRouge
             }
             if (shield != null) shield.gameObject.SetActive(g[3] && !smgOn);
             if (pistol != null) pistol.gameObject.SetActive(g[4] && !smgOn);
-            if (holster != null) holster.gameObject.SetActive(g[4]);
+            if (holster != null) holster.gameObject.SetActive(g[4] && !Tuning.Arcade);   // arcade : pas d'étui (un pavé noir sur la cuisse du modèle 3D)
             if (smg != null) smg.gameObject.SetActive(smgOn);
             aiming = smgOn;
             if (batonTrail != null)
@@ -1450,7 +1452,7 @@ namespace SamediRouge
             foreach (Transform e in eyes) e.localScale = new Vector3(0.042f, 0.052f * lid, 0.02f);
 
             float rate = anim == Anim.Run || anim == Anim.Charge ? 8f + speed * 0.33f : anim == Anim.Walk ? 4.4f + speed * 0.6f : 6f;
-            phase += dt * rate;
+            phase += dt * rate * animRate;
             float s = Mathf.Sin(phase), c = Mathf.Cos(phase);
             // bras et tête en léger retard sur les jambes (mouvement secondaire)
             float sa = Mathf.Sin(phase - 0.35f), sh = Mathf.Sin(phase * 2f - 0.6f);
