@@ -765,7 +765,7 @@ namespace SamediRouge
             {
                 // accueil arcade : le héros court sur place, face à la caméra (prêt à partir)
                 P.anim = Anim.Run;
-                speed = 9f;
+                speed = 5f;   // petite foulée tranquille
                 P.root.localRotation = Quaternion.Euler(0f, 12f * Mathf.Sin(Time.unscaledTime * 0.7f), 0f);
             }
             else if (metaScreen == MetaScreen.Upgrades)
