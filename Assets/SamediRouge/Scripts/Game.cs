@@ -1630,7 +1630,7 @@ namespace SamediRouge
             bossType = tutorialMode ? 0 : campaign ? Tuning.StreetBoss[streetIdx] : bossOrder[(stage - 1) % 6];
             int baseHp = tutorialMode ? Tuning.TutorialBossHp : campaign ? Mathf.RoundToInt(Tuning.BossHp[Mathf.Clamp(streetIdx + debugDiff, 0, Tuning.Streets - 1)] * Tuning.BossHpMult) : 6 + (stage - 1) * 3;
             bossMaxHp = gear[GSmg] ? baseHp * 3 : baseHp;
-            if (Tuning.Arcade) bossMaxHp = Mathf.RoundToInt(bossMaxHp * 2f * (1f + squad.Count / 6f) * (1f + 0.6f * arcD));   // boss plus coriace (trop vite tombé)   // grosse bande : le boss tient le temps d'un vrai combat
+            if (Tuning.Arcade) bossMaxHp = Mathf.RoundToInt(bossMaxHp * 2.5f * (1f + squad.Count / 6f) * (1f + 0.6f * arcD));   // boss plus coriace (trop vite tombé)   // grosse bande : le boss tient le temps d'un vrai combat
             hpAtBoss = hearts;
             bossAttacks = 0;
             bossCharging = false;
