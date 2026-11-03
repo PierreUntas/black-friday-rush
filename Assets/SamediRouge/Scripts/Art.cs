@@ -360,6 +360,41 @@ namespace SamediRouge
 
         public static Texture2D SoftDot => Radial("softdot", 64, 0f, 1.8f);
 
+        /// <summary>Arc de coup de batte (« swoosh ») : croissant plein en haut, fondu aux extrémités.</summary>
+        public static Texture2D ArcTex
+        {
+            get
+            {
+                const string name = "swoosh";
+                if (texCache.TryGetValue(name, out Texture2D cached)) return cached;
+                const int n = 96;
+                Texture2D t = NewTex(name, n, n, false);
+                var px = new Color32[n * n];
+                for (int y = 0; y < n; y++)
+                for (int x = 0; x < n; x++)
+                {
+                    float dx = (x + 0.5f) / n * 2f - 1f, dy = (y + 0.5f) / n * 2f - 1f;
+                    float d = Mathf.Sqrt(dx * dx + dy * dy);
+                    float ang = Mathf.Atan2(dy, dx);                       // 0 à droite, π/2 en haut
+                    float band = Mathf.Clamp01(1f - Mathf.Abs(d - 0.78f) / 0.17f);
+                    float along = Mathf.Clamp01(Mathf.Sin(ang));          // seulement la moitié haute, plus épais au sommet
+                    float a = Mathf.Pow(band, 0.7f) * along;
+                    px[y * n + x] = new Color32(255, 255, 255, (byte)(Mathf.Clamp01(a) * 255f));
+                }
+                return Finish(t, px);
+            }
+        }
+
+        public static Material Swoosh()
+        {
+            Shader sh = Shader.Find("Sprites/Default");
+            Material m = sh != null ? new Material(sh) : new Material(partSrc);
+            m.mainTexture = ArcTex;
+            m.color = new Color(1f, 0.9f, 0.3f, 1f);
+            m.renderQueue = 3150;
+            return m;
+        }
+
         /// <summary>Ombre de contact (tache sombre en fondu) : mélange alpha classique — le matériau « particule » du jeu est additif,
         /// une tache noire y restait invisible (personnages qui semblaient flotter).</summary>
         public static Material Shadow(float alpha)

@@ -22,6 +22,7 @@ namespace SamediRouge
                 pool[i] = gameObject.AddComponent<AudioSource>();
                 pool[i].playOnAwake = false;
                 pool[i].spatialBlend = 0f;
+                pool[i].volume = 0.55f;   // son global plus doux (retour : un peu fort)
             }
             Build();
         }

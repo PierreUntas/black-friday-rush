@@ -70,7 +70,7 @@ namespace SamediRouge
         float nextGearZ, shootCd, smgT, gearGap = 110f;
 
         // escouade : collègues recrutés en route qui courent et frappent avec toi
-        class Mate { public Rig rig; public float x, z, cd; public int slot; }
+        class Mate { public Rig rig; public float x, z, cd, lunge; public int slot; }
         readonly List<Mate> squad = new List<Mate>();
         // équilibrage : plan de parcours calibré (variante), vies des adversaires du segment, escouade selon l'amélioration
         Balance.Plan plan;
@@ -1630,7 +1630,7 @@ namespace SamediRouge
             bossType = tutorialMode ? 0 : campaign ? Tuning.StreetBoss[streetIdx] : bossOrder[(stage - 1) % 6];
             int baseHp = tutorialMode ? Tuning.TutorialBossHp : campaign ? Mathf.RoundToInt(Tuning.BossHp[Mathf.Clamp(streetIdx + debugDiff, 0, Tuning.Streets - 1)] * Tuning.BossHpMult) : 6 + (stage - 1) * 3;
             bossMaxHp = gear[GSmg] ? baseHp * 3 : baseHp;
-            if (Tuning.Arcade) bossMaxHp = Mathf.RoundToInt(bossMaxHp * 3f * (1f + squad.Count / 6f) * (1f + 0.6f * arcD));   // boss plus coriace (trop vite tombé)   // grosse bande : le boss tient le temps d'un vrai combat
+            if (Tuning.Arcade) bossMaxHp = Mathf.RoundToInt(bossMaxHp * 2f * (1f + squad.Count / 6f) * (1f + 0.6f * arcD));   // boss plus coriace (trop vite tombé)   // grosse bande : le boss tient le temps d'un vrai combat
             hpAtBoss = hearts;
             bossAttacks = 0;
             bossCharging = false;
@@ -1821,6 +1821,7 @@ namespace SamediRouge
                     ThrowBox(e, bossTargetLane);
                     if (lvl >= 2 && Random.value < 0.4f) ThrowBox(e, Mathf.Clamp(bossTargetLane + (Random.value < 0.5f ? -1 : 1), 0, 2));
                     e.timer = Mathf.Max(0.7f, 1.5f - lvl * 0.12f);
+                    if (Tuning.Arcade) e.timer *= 0.55f;   // arcade : il lance ses cartons plus souvent (combat plus court mais plus nerveux)
                     break;
                 case 1:
                 {
@@ -2081,11 +2082,14 @@ namespace SamediRouge
         void MateStrike(Mate m, Ent e)
         {
             m.cd = 0.6f;
+            m.lunge = 0.3f;
             Rig r = m.rig;
-            r.swingStyle = Random.Range(0, 3);
+            r.swingStyle = Random.Range(0, 2);   // coups latéraux, les plus lisibles vus de derrière
+            r.swingSlow = 1.6f;
             r.swingT = 0f;
             Vector3 chest = new Vector3(e.x, 1.2f, e.z);
             Fx.Hit(chest);
+            SpawnSwoosh(new Vector3((m.x + e.x) * 0.5f, 1.15f, (m.z + e.z) * 0.5f), r.swingStyle == 1);
             if (Time.unscaledTime - lastBam > 0.35f)
             {
                 lastBam = Time.unscaledTime;
@@ -2145,6 +2149,12 @@ namespace SamediRouge
                     // champ de cartons : la bande se resserre en colonne derrière le héros et passe par SA brèche, pas à travers les cartons
                     tx = px + ((m.slot % 3) - 1) * 0.5f;
                     tz = pz - 1.1f - (m.slot / 3) * 0.7f;
+                }
+                if (m.lunge > 0f)
+                {
+                    // coup de batte : il se fend vers le vigile (on voit l'élan)
+                    m.lunge -= dt;
+                    tz += 1.3f;
                 }
                 m.x = Mathf.Lerp(m.x, tx, 1f - Mathf.Exp((charge ? -11f : -7f) * dt));
                 m.z = Mathf.Lerp(m.z, tz, 1f - Mathf.Exp((charge ? -8f : -5f) * dt));
@@ -2513,6 +2523,7 @@ namespace SamediRouge
                         // arcade : au contact, le héros lui met un coup de batte (on voit l'échange), mais encaisse quand même le choc
                         P.swingStyle = Random.Range(0, 3);
                         P.swingT = 0f;
+                        SpawnSwoosh(new Vector3((px + e.x) * 0.5f, 1.2f, (pz + e.z) * 0.5f), Random.value < 0.5f);
                         if (Time.unscaledTime - lastBam > 0.35f) { lastBam = Time.unscaledTime; hud.FloatKey(new Vector3(e.x, 2.1f, e.z), Random.value < 0.5f ? "BAM!" : "POW!", Hud.Yellow, true); }
                     }
                     if (Tuning.Arcade) { Fx.Hit(new Vector3(e.x, 1.2f, e.z)); e.rig.Flash(Color.white, 0.12f); e.vanish = true; e.batted = true; e.timer = BattedT; e.vanishS = e.rig.root.localScale.x; }   // arcade : pas de corps en physique

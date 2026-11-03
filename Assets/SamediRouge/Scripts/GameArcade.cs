@@ -270,9 +270,47 @@ namespace SamediRouge
 
         static string GateText(Gate g, int l) => g.mul[l] ? "×" + g.val[l] : (g.val[l] > 0 ? "+" + g.val[l] : g.val[l].ToString());
 
+        class Swoosh { public Transform t; public Material m; public float life; public bool flip; }
+        readonly List<Swoosh> swooshes = new List<Swoosh>();
+        const float SwooshT = 0.28f;
+
+        /// <summary>Arc jaune d'un coup de batte, face caméra : grandit et s'efface en 0,3 s.</summary>
+        void SpawnSwoosh(Vector3 at, bool flip)
+        {
+            Swoosh w = null;
+            foreach (Swoosh x in swooshes) if (x.life <= 0f && x.t != null) { w = x; break; }
+            if (w == null)
+            {
+                if (swooshes.Count >= 10) return;
+                Material m = Art.Swoosh();
+                MeshRenderer r = Art.Part(world, Art.Quad, m, at, Vector3.one, default, false);
+                w = new Swoosh { t = r.transform, m = m };
+                swooshes.Add(w);
+            }
+            w.life = SwooshT;
+            w.flip = flip;
+            w.t.localPosition = at;
+            w.t.gameObject.SetActive(true);
+        }
+
+        void SwooshTick(float dt)
+        {
+            foreach (Swoosh w in swooshes)
+            {
+                if (w.t == null || w.life <= 0f) continue;
+                w.life -= dt;
+                if (w.life <= 0f) { w.t.gameObject.SetActive(false); continue; }
+                float u = 1f - w.life / SwooshT;
+                if (cam != null) w.t.rotation = Quaternion.LookRotation(w.t.position - cam.transform.position) * Quaternion.Euler(0f, 0f, (w.flip ? 1f : -1f) * (40f - 110f * u));
+                w.t.localScale = Vector3.one * (1.1f + 1.1f * u);
+                w.m.color = new Color(1f, 0.9f, 0.3f, 1f - u * u);
+            }
+        }
+
         /// <summary>Portes franchies, tirs de la bande, nettoyage.</summary>
         void ArcadeTick(float dt)
         {
+            SwooshTick(dt);
             FinaleTick();
             if (st != St.Play) return;
             MergeTick(dt);

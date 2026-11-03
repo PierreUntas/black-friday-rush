@@ -24,6 +24,8 @@ namespace SamediRouge
         public float swingT = -1f, throwT = -1f, shootT = -1f;
         /// <summary>Style du prochain coup : 0 coup droit, 1 revers, 2 coup par-dessus la tête.</summary>
         public int swingStyle;
+        /// <summary>Ralentit le coup de batte (bande en arcade : coup plus ample, qu'on voie passer).</summary>
+        public float swingSlow = 1f;
         /// <summary>Variante de casseur membre de ta bande (batte, brassard rouge).</summary>
         public const int Crew = 100;
         /// <summary>Variante de boss : BossLook + numéro de tenue (0-5 boss voleurs, 6-11 boss vigiles).</summary>
@@ -1594,7 +1596,7 @@ namespace SamediRouge
             if (swingT >= 0f)
             {
                 swingT += dt;
-                float dur = (swingStyle == 2 ? 0.36f : 0.3f) * (heavy ? 1.12f : 1f);
+                float dur = (swingStyle == 2 ? 0.36f : 0.3f) * (heavy ? 1.12f : 1f) * swingSlow;
                 float u = swingT / dur;
                 if (u >= 1f)
                 {
