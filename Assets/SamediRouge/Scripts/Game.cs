@@ -364,6 +364,11 @@ namespace SamediRouge
             demo = false;
             if (P != null) P.SetVisible(true);   // caché en entrant dans le MEGA STORE (arcade)
             if (store != null) { Destroy(store); store = null; }
+            // cartons de la finale : on ne les garde pas sur l'accueil (le héros passait au travers)
+            foreach (LootBox b in loot) if (b.tr != null) Destroy(b.tr.gameObject);
+            loot.Clear();
+            finaleZ = -1f;
+            lootEndZ = -1f;
             ClearMergeIcons();
             pendingEnd = null;
             warn.gameObject.SetActive(false);
