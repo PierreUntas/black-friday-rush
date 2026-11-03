@@ -207,7 +207,7 @@ namespace SamediRouge
                 float r = Random.value;
                 float zp = Random.Range(4f, Chunk - 4f);
                 propZ[s < 0 ? 0 : 1] = zp;
-                if (Tuning.Arcade) { if (r < 0.3f) Palm(t, s, zp); }   // arcade : décor plus calme
+                if (Tuning.Arcade) { }   // arcade : décor épuré, pas de pots de fleurs
                 else if (r < 0.45f) Palm(t, s, zp);
                 else if (r < 0.75f) Bench(t, s, zp);
             }

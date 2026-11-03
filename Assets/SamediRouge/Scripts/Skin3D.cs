@@ -183,7 +183,14 @@ namespace SamediRouge
 
             // texture du modèle (matériau du jeu, compatible URP)
             Perf.End("···fit", pq); pq = Perf.Begin();
-            Texture2D tex = Resources.Load<Texture2D>("SamediRouge/Characters/" + name + "_tex");
+            // arcade : code couleur lisible — notre bande en bleu (comme les bonnes portes), les vigiles en noir (contour rouge = danger)
+            Texture2D tex = null;
+            if (Tuning.Arcade)
+            {
+                string alt = name.StartsWith("voleur") ? name + "_bleu" : name == "flic" || name == "boss_chef_securite" ? name + "_noir" : null;
+                if (alt != null) tex = Resources.Load<Texture2D>("SamediRouge/Characters/" + alt + "_tex");
+            }
+            if (tex == null) tex = Resources.Load<Texture2D>("SamediRouge/Characters/" + name + "_tex");
             Material mat = tex != null ? Art.Tex(tex, Vector2.one, 0.35f) : Art.Mat(Color.white, 0.35f);
             skins = m.GetComponentsInChildren<SkinnedMeshRenderer>(true);
             foreach (SkinnedMeshRenderer s in skins)
