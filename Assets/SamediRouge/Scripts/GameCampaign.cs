@@ -162,6 +162,8 @@ namespace SamediRouge
             var gm = System.Text.RegularExpressions.Regex.Match(devCmd, @"gear\s+(\d)(\d)(\d)(\d)");
             if (gm.Success)
                 for (int g = 0; g < 4; g++) Progress.SetGearLevel(thief, g, int.Parse(gm.Groups[g + 1].Value));
+            var cm = System.Text.RegularExpressions.Regex.Match(devCmd, @"crew\s+(\d+)");
+            if (cm.Success) PlayerPrefs.SetInt(KCrew, int.Parse(cm.Groups[1].Value));
             if (devCmd.Contains("upgrades")) OpenUpgrades();
             if (devCmd.Contains("home")) ToMenu();
             if (devCmd.Contains("tutorial")) StartTutorial(0);
