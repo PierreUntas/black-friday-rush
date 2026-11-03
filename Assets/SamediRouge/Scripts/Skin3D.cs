@@ -69,6 +69,48 @@ namespace SamediRouge
         static Transform boneRoot;
         static readonly Dictionary<string, Transform> boneIndex = new Dictionary<string, Transform>();
 
+        static Material accentMat;
+
+        /// <summary>Vigiles (arcade) : brassards et casquette rouges, bien visibles de loin — le rouge = l'adversaire.</summary>
+        void Accents(Transform m)
+        {
+            if (accentMat == null) accentMat = Art.Mat(new Color(0.95f, 0.1f, 0.08f), 0.35f);
+            Band(Find(m, "LeftArm"), Find(m, "LeftForeArm"));
+            Band(Find(m, "RightArm"), Find(m, "RightForeArm"));
+            Transform head = Find(m, "Head"), top = Find(m, "HeadTop_End");
+            if (head == null || top == null) return;
+            Vector3 up = top.position - head.position;
+            float hh = up.magnitude;
+            if (hh < 1e-4f) return;
+            up /= hh;
+            Vector3 fwd = Vector3.ProjectOnPlane(holder.forward, up).normalized;
+            Quaternion q = Quaternion.LookRotation(fwd, up);
+            Vector3 c = head.position + up * hh * 0.82f;
+            Piece(head, Art.Cylinder, c, q, new Vector3(hh * 1.15f, hh * 0.1f, hh * 1.15f));            // calotte (cylindre Unity : 2 de haut)
+            Piece(head, Art.Cube, c + fwd * hh * 0.62f - up * hh * 0.1f, q, new Vector3(hh * 0.95f, hh * 0.07f, hh * 0.6f));   // visière
+        }
+
+        void Band(Transform a, Transform b)
+        {
+            if (a == null || b == null) return;
+            Vector3 d = b.position - a.position;
+            float l = d.magnitude;
+            if (l < 1e-4f) return;
+            Quaternion q = Quaternion.FromToRotation(Vector3.up, d / l);
+            Piece(a, Art.Cylinder, a.position + d * 0.45f, q, new Vector3(l * 0.58f, l * 0.1f, l * 0.58f));
+        }
+
+        void Piece(Transform bone, Mesh mesh, Vector3 pos, Quaternion rot, Vector3 worldSize)
+        {
+            MeshRenderer r = Art.Part(holder, mesh, accentMat, Vector3.zero, Vector3.one, default, false);
+            Transform t = r.transform;
+            t.position = pos;
+            t.rotation = rot;
+            t.SetParent(bone, true);
+            Vector3 ls = bone.lossyScale;
+            t.localScale = new Vector3(worldSize.x / Mathf.Max(1e-5f, ls.x), worldSize.y / Mathf.Max(1e-5f, ls.y), worldSize.z / Mathf.Max(1e-5f, ls.z));
+        }
+
         static Transform Find(Transform t, string bone)
         {
             if (t == null) return null;
@@ -183,11 +225,12 @@ namespace SamediRouge
 
             // texture du modèle (matériau du jeu, compatible URP)
             Perf.End("···fit", pq); pq = Perf.Begin();
-            // arcade : code couleur lisible — notre bande en bleu (comme les bonnes portes), les vigiles en noir (contour rouge = danger)
+            // arcade : code couleur lisible — notre bande de voleurs en noir, les vigiles en bleu (avec des touches rouges, voir Accents)
             Texture2D tex = null;
+            bool guard = name == "flic" || name == "boss_chef_securite";
             if (Tuning.Arcade)
             {
-                string alt = name.StartsWith("voleur") ? name + "_bleu" : name == "flic" || name == "boss_chef_securite" ? name + "_noir" : null;
+                string alt = name.StartsWith("voleur") ? name + "_noir" : guard ? name + "_bleu" : null;
                 if (alt != null) tex = Resources.Load<Texture2D>("SamediRouge/Characters/" + alt + "_tex");
             }
             if (tex == null) tex = Resources.Load<Texture2D>("SamediRouge/Characters/" + name + "_tex");
@@ -200,6 +243,7 @@ namespace SamediRouge
                 s.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;   // son ombre au sol : sans elle, le personnage semble flotter
             }
 
+            if (Tuning.Arcade && guard) Accents(m);
             Perf.End("···mat", pq); pq = Perf.Begin();
             hipsBind = body.InverseTransformPoint(hips.position);
             footL = Find(m, "LeftFoot"); footR = Find(m, "RightFoot");
