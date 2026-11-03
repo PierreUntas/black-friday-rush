@@ -2150,12 +2150,10 @@ namespace SamediRouge
                     tx = px + ((m.slot % 3) - 1) * 0.5f;
                     tz = pz - 1.1f - (m.slot / 3) * 0.7f;
                 }
-                if (m.lunge > 0f)
-                {
-                    // coup de batte : il se fend vers le vigile (on voit l'élan)
-                    m.lunge -= dt;
-                    tz += 1.3f;
-                }
+                // coup de batte : il se fend vers le vigile — décalage VISUEL seulement (sa position de jeu ne bouge pas,
+                // sinon il allait se jeter dans le groupe de vigiles et la bande fondait)
+                float lungeZ = 0f;
+                if (m.lunge > 0f) { m.lunge -= dt; lungeZ = Mathf.Sin(Mathf.Clamp01(1f - m.lunge / 0.3f) * Mathf.PI) * 0.7f; }
                 m.x = Mathf.Lerp(m.x, tx, 1f - Mathf.Exp((charge ? -11f : -7f) * dt));
                 m.z = Mathf.Lerp(m.z, tz, 1f - Mathf.Exp((charge ? -8f : -5f) * dt));
                 Rig r = m.rig;
@@ -2163,7 +2161,7 @@ namespace SamediRouge
                 r.vy = vy;
                 r.lean = (tx - m.x) * 9f;
                 r.anim = py > 0.05f ? Anim.Jump : slide > 0f ? Anim.Slide : Anim.Run;
-                r.root.localPosition = new Vector3(m.x, py, m.z);
+                r.root.localPosition = new Vector3(m.x, py, m.z + lungeZ);
                 r.root.localRotation = Quaternion.Euler(0f, (tx - m.x) * 6f, 0f);
                 r.Tick(dt);
 
