@@ -2091,6 +2091,12 @@ namespace SamediRouge
                         tz = Mathf.Min(target.z - 1.1f, pz + 2.2f - (m.slot / 3) * 0.6f);
                     }
                 }
+                if (Tuning.Arcade && InCrateField)
+                {
+                    // champ de cartons : la bande se resserre en colonne derrière le héros et passe par SA brèche, pas à travers les cartons
+                    tx = px + ((m.slot % 3) - 1) * 0.5f;
+                    tz = pz - 1.1f - (m.slot / 3) * 0.7f;
+                }
                 m.x = Mathf.Lerp(m.x, tx, 1f - Mathf.Exp((charge ? -11f : -7f) * dt));
                 m.z = Mathf.Lerp(m.z, tz, 1f - Mathf.Exp((charge ? -8f : -5f) * dt));
                 Rig r = m.rig;

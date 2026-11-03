@@ -40,8 +40,11 @@ namespace SamediRouge
             public Transform tr;
             public int lane, hp, max;
             public float z, punch;
-            public bool broken;
+            public bool broken, dodged;
         }
+
+        /// <summary>Champ de cartons de la finale en cours : la bande se resserre derrière le héros pour passer par la même brèche.</summary>
+        bool InCrateField => finaleZ >= 0f && pz < lootEndZ + 3f && loot.Count > 0;
 
         readonly List<LootBox> loot = new List<LootBox>();
         float lootEndZ = -1f;
@@ -760,6 +763,14 @@ namespace SamediRouge
             return best;
         }
 
+        /// <summary>Pas de carton intact dans ce couloir à hauteur de z (même rangée).</summary>
+        bool LaneOpen(int lane, float z)
+        {
+            foreach (LootBox o in loot)
+                if (!o.broken && o.lane == lane && Mathf.Abs(o.z - z) < 1.6f) return false;
+            return true;
+        }
+
         int lootStreak;
         float lootStreakT;
         int tagCrowd = -1;
@@ -831,8 +842,16 @@ namespace SamediRouge
                     b.punch = Mathf.Max(0f, b.punch - Time.deltaTime * 6f);
                     b.tr.localScale = Vector3.one * (1f + 0.15f * b.punch);
                 }
-                if (b.lane == l && pz >= b.z - 0.9f && st == St.Play)
+                if (b.lane == l && !b.dodged && pz >= b.z - 0.9f && st == St.Play)
                 {
+                    // le héros est au bord de son couloir et le couloir voisin est dégagé : il se faufile par la brèche au lieu de s'écraser
+                    int n = px < (l - 1) * Lane ? l - 1 : l + 1;
+                    if (n >= 0 && n <= 2 && Mathf.Abs(px - (n - 1) * Lane) < 1.9f && LaneOpen(n, b.z))
+                    {
+                        b.dodged = true;
+                        freeX = (n - 1) * Lane;
+                        continue;
+                    }
                     // un carton pas cassé barre la route : la bande s'y écrase, partie perdue
                     Blocked(b);
                     return;
