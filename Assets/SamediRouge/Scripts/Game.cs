@@ -2051,8 +2051,30 @@ namespace SamediRouge
                 Destroy(m.rig.root.gameObject, 2.5f);
             }
             for (int k = 0; k < squad.Count; k++) squad[k].slot = k;
-            hud.Float(new Vector3(m.x, 2f, m.z), "-1", Hud.Bad, true);
+            if (Tuning.Arcade) hud.FloatKey(new Vector3(m.x, 1.8f, m.z), "-1", Hud.Bad, false); else hud.Float(new Vector3(m.x, 2f, m.z), "-1", Hud.Bad, true);   // arcade : on voit qu'on perd un voleur
             Snd.Play(Snd.I.hurt, 0.35f);
+        }
+
+        float lastBam;
+
+        /// <summary>Arcade : un voleur de la bande frappe le vigile qui lui fonce dessus (coup de batte animé, impact, « BAM ! »).</summary>
+        void MateStrike(Mate m, Ent e)
+        {
+            m.cd = 0.6f;
+            Rig r = m.rig;
+            r.swingStyle = Random.Range(0, 3);
+            r.swingT = 0f;
+            Vector3 chest = new Vector3(e.x, 1.2f, e.z);
+            Fx.Hit(chest);
+            if (Time.unscaledTime - lastBam > 0.35f)
+            {
+                lastBam = Time.unscaledTime;
+                string[] w = { "BAM!", "POW!", "BONK!" };
+                hud.FloatKey(chest + Vector3.up * 0.9f, w[Random.Range(0, w.Length)], Hud.Yellow, false);   // FloatKey : visible même en mode « HUD calme »
+                Haptics.Pulse(10);
+            }
+            HitCasseur(e, true, 0.8f);
+            if (e.rig != null && !e.hit) e.rig.Flash(Color.white, 0.08f);
         }
 
         readonly List<Ent> threats = new List<Ent>();
@@ -2110,7 +2132,7 @@ namespace SamediRouge
 
                 // il frappe les adversaires juste devant lui
                 m.cd -= dt;
-                Ent hitE = null, touch = null;
+                Ent hitE = null, touch = null, strike = null;
                 foreach (Ent e in ents)
                 {
                     if (e.hit || e.dead) continue;
@@ -2118,6 +2140,7 @@ namespace SamediRouge
                     if (e.type == ET.Casseur || e.type == ET.Loup)
                     {
                         if (dx < 1.2f && dz > -0.2f && dz < 3.2f && hitE == null) hitE = e;
+                        if (e.type == ET.Casseur && dx < 0.95f && dz > 0.2f && dz < 1.7f && strike == null) strike = e;
                         if (dx < 0.55f && dz > -0.4f && dz < 0.5f && !e.fled) touch = e;
                     }
                     else if ((dx < 0.9f || e.type == ET.Onde) && Mathf.Abs(dz) < e.depth + 0.2f)
@@ -2141,9 +2164,18 @@ namespace SamediRouge
                     if (st != St.Play) return;
                     continue;
                 }
+                if (Tuning.Arcade && strike != null && m.cd <= 0f)
+                {
+                    // arcade : un vigile arrive au contact → le voleur lui met un coup de batte (bien visible),
+                    // c'est ce coup qui fait l'échange ; si le vigile tient debout, il emporte le voleur juste après
+                    MateStrike(m, strike);
+                    if (st != St.Play) return;
+                }
                 if (touch != null)
                 {
-                    if (touch.type == ET.Casseur) HitCasseur(touch, true, 0.8f); // échange un pour un
+                    if (touch.type == ET.Casseur && !(Tuning.Arcade && m.cd > 0f)) { if (Tuning.Arcade) MateStrike(m, touch); else HitCasseur(touch, true, 0.8f); } // échange un pour un
+                    if (st != St.Play) return;
+                    if (Tuning.Arcade && touch.type == ET.Casseur && touch.hit) continue;   // arcade : le coup l'a mis K.-O. avant qu'il ne te touche
                     LoseMate(i, new Vector3(Random.Range(-3f, 3f), 4f, speed * 0.4f));
                     if (st != St.Play) return;
                 }
@@ -2449,6 +2481,13 @@ namespace SamediRouge
                     if (P.swingT >= 0f || gear[GShield]) { HitCasseur(e, false); return; }
                     e.hit = true;
                     RaidMemberGone(e, true);
+                    if (Tuning.Arcade)
+                    {
+                        // arcade : au contact, le héros lui met un coup de batte (on voit l'échange), mais encaisse quand même le choc
+                        P.swingStyle = Random.Range(0, 3);
+                        P.swingT = 0f;
+                        if (Time.unscaledTime - lastBam > 0.35f) { lastBam = Time.unscaledTime; hud.FloatKey(new Vector3(e.x, 2.1f, e.z), Random.value < 0.5f ? "BAM!" : "POW!", Hud.Yellow, true); }
+                    }
                     if (Tuning.Arcade) { Fx.Hit(new Vector3(e.x, 1.2f, e.z)); e.rig.Flash(Color.white, 0.12f); e.vanish = true; e.timer = VanishT; e.vanishS = e.rig.root.localScale.x; }   // arcade : pas de corps en physique
                     else e.rig.KO(new Vector3(Mathf.Sign(e.x - px + 0.01f) * 3f, 3f, speed * 0.6f), new Vector3(0f, 0f, 5f));
                     Hurt(1, M(L("Tackled by a robber", "Plaqué par un voleur"), L("Tackled by a cop", "Plaqué par un policier")));
