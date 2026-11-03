@@ -14,7 +14,9 @@ namespace SamediRouge
         /// </summary>
         public const bool Arcade = true;
         /// <summary>Version de test pour l'éditeur : un seul camp, les voleurs (le choix du camp est masqué).</summary>
-        public const bool OnlyThief = true;
+        public const bool OnlyThief = true;   // un seul camp jouable (voir PlayCop)
+        /// <summary>Essai (branche v2-cop) : le camp unique jouable est le policier au lieu du voleur.</summary>
+        public const bool PlayCop = true;
         /// <summary>Arcade : délai entre deux tirs automatiques (s) avec le pistolet, et à mains nues.</summary>
         public const float AutoPistolRate = 0.28f, AutoBareRate = 0.45f;
 
