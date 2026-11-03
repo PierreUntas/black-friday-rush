@@ -13,7 +13,7 @@ namespace SamediRouge
         public Mode mode;
         public int lane, hp;
         public float x, y, z, depth = 0.5f, timer, vz, escape, bob;
-        public bool hit, dead, fled, vanish;
+        public bool hit, dead, fled, vanish, batted;   // batted : assommé d'un coup de batte (arcade) → envolée plus spectaculaire
         public float vanishS;   // échelle de départ de l'ennemi qui disparaît (arcade)   // vanish : ennemi assommé qui disparaît vite (arcade)
         public int raid = -1; // magasin attaqué auquel appartient ce pillard (-1 : aucun)
         public GameObject ring; // cercle rouge au sol sous un ennemi
@@ -384,6 +384,7 @@ namespace SamediRouge
             st = St.Menu;
             ClearEnts();
             ResetPlayerRig();
+            fitInit = false;   // nouveau héros : cadrage recalculé d'un coup, comme au lancement (sinon la caméra restait trop près)
             speed = 7.5f;
             lane = 1;
             px = 0f;
@@ -795,7 +796,19 @@ namespace SamediRouge
             P.speed = speed;
             P.root.localPosition = new Vector3(px, 0f, pz);
             P.Tick(dt);
+            // accueil : ombre de contact posée dans le monde, sous les pieds → il court SUR le sol
+            bool sh = metaScreen == MetaScreen.Home && showRig;
+            if (sh && homeShadow == null) homeShadow = Art.Decal(world, Art.Shadow(0.6f), Vector3.zero, new Vector2(1.3f, 1.05f)).transform;
+            if (homeShadow != null)
+            {
+                if (homeShadow.gameObject.activeSelf != sh) homeShadow.gameObject.SetActive(sh);
+                homeShadow.localPosition = new Vector3(px, 0.05f, pz + 0.05f);
+            }
         }
+
+        Transform homeShadow;
+
+
 
         void EndTick(float dt, float udt)
         {
@@ -816,6 +829,7 @@ namespace SamediRouge
         {
             P.animRate = 1f;
             Skin3D.PreciseGround = false;
+            if (homeShadow != null && homeShadow.gameObject.activeSelf) homeShadow.gameObject.SetActive(false);
             // vitesse qui monte avec la distance
             // journal d'équilibrage : temps de course, vie à 25 / 50 / 75 % du parcours
             runT += dt;
@@ -1111,14 +1125,15 @@ namespace SamediRouge
                     if (e.go != null) Destroy(e.go);
                     return;
                 }
-                float k = Mathf.Clamp01(e.timer / VanishT), u = 1f - k;
-                e.z += (speed + 5f) * dt;                         // repoussé vers l'arrière (s'éloigne de la bande)
-                e.y = Mathf.Sin(u * Mathf.PI) * 0.7f;             // petit saut
+                float vt = e.batted ? BattedT : VanishT;
+                float k = Mathf.Clamp01(e.timer / vt), u = 1f - k;
+                e.z += (speed + (e.batted ? 10f : 5f)) * dt;      // repoussé vers l'arrière (s'éloigne de la bande)
+                e.y = Mathf.Sin(u * Mathf.PI) * (e.batted ? 1.9f : 0.7f);   // petit saut — grande envolée après un coup de batte
                 if (e.go != null) e.go.transform.localPosition = new Vector3(e.x, e.y, e.z);
                 if (e.rig != null)
                 {
-                    e.rig.root.localScale = Vector3.one * e.vanishS * (0.2f + 0.8f * k);
-                    e.rig.root.localRotation = Quaternion.Euler(-70f * u, 180f, 0f);   // bascule en arrière
+                    e.rig.root.localScale = Vector3.one * e.vanishS * (e.batted ? 0.35f + 0.65f * Mathf.Sqrt(k) : 0.2f + 0.8f * k);
+                    e.rig.root.localRotation = e.batted ? Quaternion.Euler(-420f * u, 180f, 140f * u) : Quaternion.Euler(-70f * u, 180f, 0f);   // bascule (ou vrille) en arrière
                 }
             }
             // une fois touché, l'objet appartient à la physique : on ne le replace plus
@@ -1153,7 +1168,7 @@ namespace SamediRouge
             return z;
         }
 
-        const float VanishT = 0.32f;
+        const float VanishT = 0.32f, BattedT = 0.75f;
 
         void TickVisual(Ent e, float dt)
         {
@@ -1615,7 +1630,7 @@ namespace SamediRouge
             bossType = tutorialMode ? 0 : campaign ? Tuning.StreetBoss[streetIdx] : bossOrder[(stage - 1) % 6];
             int baseHp = tutorialMode ? Tuning.TutorialBossHp : campaign ? Mathf.RoundToInt(Tuning.BossHp[Mathf.Clamp(streetIdx + debugDiff, 0, Tuning.Streets - 1)] * Tuning.BossHpMult) : 6 + (stage - 1) * 3;
             bossMaxHp = gear[GSmg] ? baseHp * 3 : baseHp;
-            if (Tuning.Arcade) bossMaxHp = Mathf.RoundToInt(bossMaxHp * (1f + squad.Count / 8f) * (1f + 0.6f * arcD));   // grosse bande : le boss tient le temps d'un vrai combat
+            if (Tuning.Arcade) bossMaxHp = Mathf.RoundToInt(bossMaxHp * 3f * (1f + squad.Count / 6f) * (1f + 0.6f * arcD));   // boss plus coriace (trop vite tombé)   // grosse bande : le boss tient le temps d'un vrai combat
             hpAtBoss = hearts;
             bossAttacks = 0;
             bossCharging = false;
@@ -2080,6 +2095,13 @@ namespace SamediRouge
             }
             HitCasseur(e, true, 0.8f);
             if (e.rig != null && !e.hit) e.rig.Flash(Color.white, 0.08f);
+            if (e.vanish && !e.batted)
+            {
+                // assommé : il s'envole en vrillant, bien visible au-dessus de la mêlée
+                e.batted = true;
+                e.timer = BattedT;
+                Snd.PlayPitch(Snd.I.bonk, 0.9f, Random.Range(0.8f, 0.95f));
+            }
         }
 
         readonly List<Ent> threats = new List<Ent>();
@@ -2145,7 +2167,7 @@ namespace SamediRouge
                     if (e.type == ET.Casseur || e.type == ET.Loup)
                     {
                         if (dx < 1.2f && dz > -0.2f && dz < 3.2f && hitE == null) hitE = e;
-                        if (e.type == ET.Casseur && dx < 0.95f && dz > 0.2f && dz < 1.7f && strike == null) strike = e;
+                        if (e.type == ET.Casseur && dx < 1.1f && dz > 0.2f && dz < 2.2f && strike == null) strike = e;
                         if (dx < 0.55f && dz > -0.4f && dz < 0.5f && !e.fled) touch = e;
                     }
                     else if ((dx < 0.9f || e.type == ET.Onde) && Mathf.Abs(dz) < e.depth + 0.2f)
@@ -2493,7 +2515,7 @@ namespace SamediRouge
                         P.swingT = 0f;
                         if (Time.unscaledTime - lastBam > 0.35f) { lastBam = Time.unscaledTime; hud.FloatKey(new Vector3(e.x, 2.1f, e.z), Random.value < 0.5f ? "BAM!" : "POW!", Hud.Yellow, true); }
                     }
-                    if (Tuning.Arcade) { Fx.Hit(new Vector3(e.x, 1.2f, e.z)); e.rig.Flash(Color.white, 0.12f); e.vanish = true; e.timer = VanishT; e.vanishS = e.rig.root.localScale.x; }   // arcade : pas de corps en physique
+                    if (Tuning.Arcade) { Fx.Hit(new Vector3(e.x, 1.2f, e.z)); e.rig.Flash(Color.white, 0.12f); e.vanish = true; e.batted = true; e.timer = BattedT; e.vanishS = e.rig.root.localScale.x; }   // arcade : pas de corps en physique
                     else e.rig.KO(new Vector3(Mathf.Sign(e.x - px + 0.01f) * 3f, 3f, speed * 0.6f), new Vector3(0f, 0f, 5f));
                     Hurt(1, M(L("Tackled by a robber", "Plaqué par un voleur"), L("Tackled by a cop", "Plaqué par un policier")));
                     return;

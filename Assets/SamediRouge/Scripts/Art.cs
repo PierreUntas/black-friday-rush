@@ -359,6 +359,22 @@ namespace SamediRouge
         }
 
         public static Texture2D SoftDot => Radial("softdot", 64, 0f, 1.8f);
+
+        /// <summary>Ombre de contact (tache sombre en fondu) : mélange alpha classique — le matériau « particule » du jeu est additif,
+        /// une tache noire y restait invisible (personnages qui semblaient flotter).</summary>
+        public static Material Shadow(float alpha)
+        {
+            string key = "SH|" + alpha.ToString("0.00");
+            if (mats.TryGetValue(key, out Material m) && m != null) return m;
+            Shader sh = Shader.Find("Sprites/Default");
+            if (sh == null) return Particle(SoftDot, new Color(0f, 0f, 0f, alpha));
+            m = new Material(sh);
+            m.mainTexture = SoftDot;
+            m.color = new Color(0f, 0f, 0f, alpha);
+            m.renderQueue = 3050;   // après le sol et les décors au sol
+            mats[key] = m;
+            return m;
+        }
         public static Texture2D HardDot => Radial("harddot", 32, 0.75f, 1f);
 
         public static Texture2D SmokeTex

@@ -228,7 +228,10 @@ namespace SamediRouge
             // ombre de contact douce sous les pieds (héros et bande) : l'ombre portée du soleil se décolle un peu
             // du personnage sur mobile, cette tache sombre l'ancre au sol
             if ((k == Kind.Thief || k == Kind.Guard) && (variant < 0 || variant == Crew))
-                r.blob = Art.Decal(r.root, Art.Particle(Art.SoftDot, new Color(0f, 0f, 0f, 0.5f)), new Vector3(0f, 0.025f, 0f), new Vector2(1.5f, 1.2f)).gameObject;
+                r.blob = variant < 0
+                    // héros : ombre de contact plus marquée et un peu plus haute (au-dessus des dalles) — il doit avoir l'air de courir SUR le sol
+                    ? Art.Decal(r.root, Art.Shadow(0.55f), new Vector3(0f, 0.04f, 0f), new Vector2(1.2f, 1f)).gameObject
+                    : Art.Decal(r.root, Art.Shadow(0.4f), new Vector3(0f, 0.03f, 0f), new Vector2(1.2f, 1f)).gameObject;
             Perf.End("··outline", q0); q0 = Perf.Begin();
             // TEST : policier joué en personnage 3D complet (Meshy), animé par ce squelette
             if (Use3DHero && (k == Kind.Guard || k == Kind.Thief) && variant < 0)

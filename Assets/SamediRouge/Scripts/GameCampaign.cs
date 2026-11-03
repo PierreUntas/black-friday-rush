@@ -111,6 +111,14 @@ namespace SamediRouge
         }
 
         string devCmd;
+
+#if UNITY_EDITOR
+        System.Collections.IEnumerator DevThen(float t, System.Action a)
+        {
+            yield return new WaitForSecondsRealtime(t);
+            a();
+        }
+#endif
         float devCmdT = -1f;
 
         /// <summary>Outil de dev (éditeur) : exécute la commande de Logs/sr-screen.txt un peu après le démarrage.</summary>
@@ -465,7 +473,15 @@ namespace SamediRouge
             string tip = boss != null && superCount == 0 ? L("Tip: jump, then tap as you land = NINJA STRIKE x3!", "Astuce : saute, puis tape à l'atterrissage = COUP NINJA x3 !") : DefeatTip();
             if (GiveFirstWeapon()) tip = FirstWeaponTip(false);
             hud.minimalResult = Tuning.Arcade;
-            if (Tuning.Arcade) { hud.ShowResult(false, blocked ? L("BLOCKED!", "BLOQUÉ !") : L("KNOCKED OUT", "K.-O."), "", "", keep, Progress.Coins, null, ""); blocked = false; return; }
+            if (Tuning.Arcade)
+            {
+                hud.ShowResult(false, blocked ? L("BLOCKED!", "BLOQUÉ !") : L("KNOCKED OUT", "K.-O."), "", "", keep, Progress.Coins, null, "");
+                blocked = false;
+#if UNITY_EDITOR
+                if (devCmd != null && devCmd.Contains("autoupg")) StartCoroutine(DevThen(2.5f, ToMenu));   // test : « AMÉLIORER » tout seul
+#endif
+                return;
+            }
             hud.ShowResult(false, L("KNOCKED OUT", "K.-O."), Tuning.StreetNames[streetIdx], body, keep, Progress.Coins, Tracks(), tip);
         }
 
