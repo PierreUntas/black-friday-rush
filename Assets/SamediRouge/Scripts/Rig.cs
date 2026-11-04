@@ -26,6 +26,8 @@ namespace SamediRouge
         public int swingStyle;
         /// <summary>Ralentit le coup de batte (bande en arcade : coup plus ample, qu'on voie passer).</summary>
         public float swingSlow = 1f;
+        /// <summary>Modèle 3D imposé au prochain adversaire construit (arcade : types d'ennemis variés), null = vigile.</summary>
+        public static string EnemySkin;
         /// <summary>Variante de casseur membre de ta bande (batte, brassard rouge).</summary>
         public const int Crew = 100;
         /// <summary>Variante de boss : BossLook + numéro de tenue (0-5 boss voleurs, 6-11 boss vigiles).</summary>
@@ -244,7 +246,7 @@ namespace SamediRouge
             // TEST : pillards adverses en 3D (un seul modèle partagé), ta bande de voleurs avec le modèle du héros
             else if (Use3DEnemies && k == Kind.Thief && variant >= 0) r.skin3d = Skin3D.Attach(r, variant == Crew ? (Skin3D.Available("voleur_lo") ? "voleur_lo" : "voleur") : "pillard");
             // policiers adverses et recrues du policier : modèle « flic » (uniforme marine)
-            else if (Use3DEnemies && k == Kind.Guard && variant >= 0) r.skin3d = Skin3D.Attach(r, "flic");
+            else if (Use3DEnemies && k == Kind.Guard && variant >= 0) r.skin3d = Skin3D.Attach(r, EnemySkin != null && Skin3D.Available(EnemySkin) ? EnemySkin : "flic");
             // boss : un modèle costaud par camp (tenues 6-11 et 13 = boss policiers, les autres = boss voleurs)
             else if (Use3DEnemies && k == Kind.Boss)
             {

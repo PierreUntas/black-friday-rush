@@ -115,6 +115,7 @@ namespace SamediRouge
         void ArcadeStart()
         {
             blocked = false;
+            for (int i = 0; i < kindSeen.Length; i++) kindSeen[i] = false;
             tagCrowd = -1;
             if (store != null) Destroy(store);
             finaleZ = -1f;
@@ -206,11 +207,13 @@ namespace SamediRouge
         float arcPackHp;
 
         /// <summary>Coups par seconde que la bande peut envoyer (héros + volées des membres).</summary>
+        const float MateRate = 0.95f;   // cadence de tir d'un membre de la bande (s)
+
         float ArcadePower()
         {
             float dmg = runTier >= 3 ? 2f : 1f;
             float hero = dmg / (gear[GSmg] ? 0.11f : gear[GPistol] ? Tuning.AutoPistolRate : Tuning.AutoBareRate);
-            float mates = squad.Count > 0 ? dmg * Mathf.Min(3, squad.Count) / Mathf.Lerp(0.5f, 0.22f, squad.Count / (float)ArcadeMaxSquad) : 0f;
+            float mates = dmg * squad.Count / MateRate;   // chacun tire à son rythme
             return hero + mates;
         }
 
@@ -327,38 +330,40 @@ namespace SamediRouge
                 if (g.z < pz - 12f) { if (g.go != null) Destroy(g.go); gates.RemoveAt(i); }
             }
 
-            // la bande tire toute seule : quelques membres à la fois, sur les adversaires les plus proches
-            mateVolleyT -= dt;
-            if (mateVolleyT <= 0f && squad.Count > 0)
+            // la bande tire toute seule : CHAQUE membre tire à son rythme sur l'adversaire le plus proche devant lui (retour YSO)
+            foreach (Mate m in squad)
             {
-                mateVolleyT = Mathf.Lerp(0.5f, 0.22f, squad.Count / (float)ArcadeMaxSquad);
-                int shots = Mathf.Min(3, squad.Count);
-                for (int s = 0; s < shots; s++)
+                m.shotT -= dt;
+                if (m.shotT > 0f) continue;
+                Ent best = null;
+                float bd = 1e9f;
+                foreach (Ent e in ents)
                 {
-                    Mate m = squad[Random.Range(0, squad.Count)];
-                    Ent best = null;
-                    float bd = 1e9f;
-                    foreach (Ent e in ents)
-                    {
-                        if (e.hit || e.dead) continue;
-                        if (e.type != ET.Casseur && e.type != ET.Loup) continue;
-                        float d = e.z - m.z;
-                        if (d < 1f || d > 26f) continue;
-                        if (Mathf.Abs(e.x - m.x) > 2.6f && e.type != ET.Loup) continue;
-                        if (d < bd) { bd = d; best = e; }
-                    }
-                    if (best != null) Shoot(best, true, new Vector3(m.x, 1.3f, m.z + 0.4f));
-                    else if (loot.Count > 0)
-                    {
-                        int ml = Mathf.Clamp(Mathf.RoundToInt(m.x / Lane) + 1, 0, 2);
-                        LootBox lb = NearestLoot(ml, m.z, 24f) ?? NearestLoot(-1, m.z, 24f);
-                        if (lb != null)
-                        {
-                            Shoot(null, true, new Vector3(m.x, 1.3f, m.z + 0.4f));
-                            bolts[bolts.Count - 1].loot = lb;
-                        }
-                    }
+                    if (e.hit || e.dead) continue;
+                    if (e.type != ET.Casseur && e.type != ET.Loup) continue;
+                    float d = e.z - m.z;
+                    if (d < 1f || d > 26f) continue;
+                    if (Mathf.Abs(e.x - m.x) > 2.6f && e.type != ET.Loup) continue;
+                    if (d < bd) { bd = d; best = e; }
                 }
+                if (best != null)
+                {
+                    Shoot(best, true, new Vector3(m.x, 1.3f, m.z + 0.4f));
+                    m.shotT = MateRate * Random.Range(0.85f, 1.15f);
+                }
+                else if (loot.Count > 0)
+                {
+                    int ml = Mathf.Clamp(Mathf.RoundToInt(m.x / Lane) + 1, 0, 2);
+                    LootBox lb = NearestLoot(ml, m.z, 24f) ?? NearestLoot(-1, m.z, 24f);
+                    if (lb != null)
+                    {
+                        Shoot(null, true, new Vector3(m.x, 1.3f, m.z + 0.4f));
+                        bolts[bolts.Count - 1].loot = lb;
+                        m.shotT = MateRate * Random.Range(0.85f, 1.15f);
+                    }
+                    else m.shotT = 0.15f;
+                }
+                else m.shotT = 0.15f;   // rien à viser : il regarde de nouveau un peu plus tard
             }
         }
 
@@ -537,6 +542,13 @@ namespace SamediRouge
             hud.Flash(0.35f);
             fovKick = Mathf.Max(fovKick, 7f);
             hud.Toast(runTier >= 2 ? L("SMG!", "MITRAILLETTE !") : L("PISTOL!", "PISTOLET !"));
+            // le héros évolue aussi en pleine course (nouvelle tenue) : la progression se voit
+            int form = RunForm;
+            if (form > HomeForm + runTier - 1 && form <= 3)
+            {
+                P.SetLevels(helmetLv, form, weaponLv);
+                hud.FloatKey(new Vector3(px, 3f, pz), L("EVOLUTION!", "ÉVOLUTION !"), Hud.StarGold, true);
+            }
             foreach (Mate m in squad) { m.rig.Land(0.4f); m.rig.Flash(Hud.StarGold, 0.2f); }
             Haptics.Pulse(30, true);
         }
@@ -898,15 +910,29 @@ namespace SamediRouge
             }
         }
 
-        /// <summary>Une porte touchée : +1 (les portes négatives remontent vers le positif), et ×N+1 tous les 4 coups.</summary>
+        /// <summary>
+        /// Une porte touchée — règle simple et visible (retour YSO) : CHAQUE tir ajoute +1, sans plafond
+        /// (les portes négatives remontent vers le positif). Une porte ×N gagne +1 au multiplicateur tous les 5 tirs.
+        /// </summary>
         void GateHit(Gate g, int l)
         {
             if (g.used) return;
-            if (g.mul[l]) { }   // un ×2 reste un ×2
+            Vector3 at = new Vector3((l - 1) * Lane, 2.3f, g.z);
+            if (g.mul[l])
+            {
+                if (++g.hits[l] % 5 == 0)
+                {
+                    g.val[l]++;
+                    hud.FloatKey(at, "×" + g.val[l] + "!", Hud.Yellow, true);
+                    Snd.PlayPitch(Snd.I.pickup, 0.5f, 1.3f);
+                }
+            }
             else
             {
-                if (++g.hits[l] % 4 == 0) g.val[l] = Mathf.Min(g.val[l] + 1, 4);
+                g.val[l]++;
                 if (g.val[l] == 0) g.val[l] = 1;   // pas de porte « 0 »
+                hud.FloatKey(at, "+1", Hud.Yellow, false);
+                Snd.PlayPitch(Snd.I.tick, 0.35f, 1f + 0.05f * Mathf.Clamp(g.val[l], -5, 12));
             }
             bool good = g.mul[l] || g.val[l] > 0;
             if (g.panel[l] != null)

@@ -161,8 +161,8 @@ namespace SamediRouge
             for (float z = 3f; z < Chunk; z += 12f)
                 Art.Part(t, Art.Cube, iron, new Vector3(0f, springY, z), new Vector3(radius * 2f, 0.1f, 0.1f), default, false);
 
-            // tableau des départs suspendu
-            if (Random.value < 0.5f)
+            // tableau des départs suspendu (pas en arcade : il passait devant la caméra et cachait les portes)
+            if (!Tuning.Arcade && Random.value < 0.5f)
             {
                 float zb = Random.Range(8f, Chunk - 8f);
                 if (Prop(t, "dec_tableau", 6.4f, new Vector3(0f, 6.4f, zb), 180f)) goto boardDone;

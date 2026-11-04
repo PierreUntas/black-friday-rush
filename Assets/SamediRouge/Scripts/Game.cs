@@ -70,7 +70,7 @@ namespace SamediRouge
         float nextGearZ, shootCd, smgT, gearGap = 110f;
 
         // escouade : collègues recrutés en route qui courent et frappent avec toi
-        class Mate { public Rig rig; public float x, z, cd, lunge; public int slot; }
+        class Mate { public Rig rig; public float x, z, cd, lunge, shotT; public int slot; }
         readonly List<Mate> squad = new List<Mate>();
         // équilibrage : plan de parcours calibré (variante), vies des adversaires du segment, escouade selon l'amélioration
         Balance.Plan plan;
@@ -3068,11 +3068,48 @@ namespace SamediRouge
 
         readonly Queue<System.Action> packQueue = new Queue<System.Action>();
 
+        struct EnemyKind { public string skin, en, fr; public float hp, speed, scale; }
+        /// <summary>Arcade (retour YSO : « toujours les mêmes ennemis ») : un nouveau type d'adversaire débloqué à chaque niveau.</summary>
+        static readonly EnemyKind[] EnemyKinds =
+        {
+            new EnemyKind { skin = null, en = "", fr = "", hp = 1f, speed = 1f, scale = 1f },                                                  // vigile
+            new EnemyKind { skin = "policier_niv1", en = "COPS!", fr = "LA POLICE !", hp = 1.2f, speed = 1.1f, scale = 1f },                   // policier
+            new EnemyKind { skin = "boss_roller", en = "ROLLER COPS!", fr = "FLICS EN ROLLERS !", hp = 0.6f, speed = 1.55f, scale = 0.95f },    // rapide, fragile
+            new EnemyKind { skin = "policier_niv3", en = "RIOT POLICE!", fr = "LES CRS !", hp = 2.2f, speed = 0.75f, scale = 1.12f },          // lourd
+            new EnemyKind { skin = "boss_videur", en = "BOUNCERS!", fr = "LES VIDEURS !", hp = 2.8f, speed = 0.7f, scale = 1.18f },             // très costaud
+        };
+        readonly bool[] kindSeen = new bool[5];
+
+        int PickEnemyKind()
+        {
+            int unlocked = Mathf.Clamp(streetIdx, 0, EnemyKinds.Length - 1);   // niveau 1 : vigiles seuls, puis un nouveau type par niveau
+            if (unlocked == 0 || Random.value < 0.45f) return 0;
+            // le dernier type débloqué apparaît plus souvent : c'est la nouveauté du niveau
+            if (Random.value < 0.45f) return unlocked;
+            return Random.Range(1, unlocked + 1);
+        }
+
         void PackMember(int ln, float z, Mode m, float off, float vz)
         {
+            int kind = Tuning.Arcade && thief ? PickEnemyKind() : 0;
+            if (kind > 0) Rig.EnemySkin = EnemyKinds[kind].skin;
             Ent e = Spawn(ET.Casseur, ln, z, m);
+            Rig.EnemySkin = null;
             e.x = Mathf.Clamp(e.x + off, -3.4f, 3.4f);
             e.vz = vz;
+            if (kind > 0)
+            {
+                EnemyKind k = EnemyKinds[kind];
+                e.hp = Mathf.Clamp(Mathf.RoundToInt(e.hp * k.hp), 1, 18);
+                e.vz *= k.speed;
+                e.go.transform.localScale *= k.scale;
+                if (!kindSeen[kind])
+                {
+                    // nouveau type d'adversaire : on le présente (comme les nouveaux ennemis de chaque époque dans Hell Escape)
+                    kindSeen[kind] = true;
+                    hud.Toast(L(k.en, k.fr));
+                }
+            }
             e.go.transform.localPosition = new Vector3(e.x, 0f, e.z);
         }
 

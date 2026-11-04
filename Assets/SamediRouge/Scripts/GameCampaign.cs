@@ -262,7 +262,7 @@ namespace SamediRouge
             // bouclier gagné : encaisse 1 à 3 coups par course
             shieldLv = tutorialMode ? 0 : Progress.GearLevel(thief, Tuning.Shield);
             shieldHits = shieldLv;
-            P.SetLevels(helmetLv, vestLv, weaponLv);
+            P.SetLevels(helmetLv, Tuning.Arcade ? HomeForm : vestLv, weaponLv);
             P.SetPermShield(shieldLv);
             hud.SetRunGear(thief, helmetLv, vestLv, weaponLv, shieldLv);
             ApplyGear();
@@ -275,15 +275,16 @@ namespace SamediRouge
 
             int theme = tutorialMode ? 0 : Diff;
             streetIdx = Mathf.Clamp(streetIdx, 0, Tuning.Streets - 1);
+            int map = tutorialMode ? 0 : ArcMap(streetIdx);
+            if (Tuning.Arcade && !tutorialMode) theme = Tuning.MapFirst[map];   // arcade : ambiance du décor du niveau
             Color fog = Tuning.StreetFog[theme];
             RenderSettings.fogColor = fog;
             cam.backgroundColor = fog;
-            int map = tutorialMode ? 0 : Tuning.MapOf(streetIdx);
             street.SetTheme(Tuning.MapTheme[map], pz);
             ThemeLighting(Tuning.MapTheme[map]);
-            street.SetTint(Tuning.StreetFloor[theme]);
+            street.SetTint(Tuning.Arcade && Tuning.MapTheme[map] == 0 ? Color.white : Tuning.StreetFloor[theme]);
             // arme de la map : la matraque renforcée à partir de la map 2
-            weaponTier = Tuning.MapWeaponTier[map];
+            weaponTier = Tuning.MapWeaponTier[tutorialMode ? 0 : Tuning.MapOf(streetIdx)];
             if (weaponTier >= 1) gear[GBaton] = true;
             P.SetHeavy(weaponTier >= 1);
             P.SetHeavyLevel(weaponLv);
@@ -649,6 +650,18 @@ namespace SamediRouge
         int ArcWeapon => Mathf.Clamp(Progress.GearLevel(thief, Tuning.Weapon), 1, 3);
         int HomeCost(int i) => i == 0 ? ArcCost(ArcLevel(KCrew), 180, 70) : i == 1 ? (ArcWeapon == 1 ? 150 : ArcWeapon == 2 ? 900 : -1) : ArcCost(ArcLevel(KIncome), 220, 90);
 
+        /// <summary>
+        /// Arcade : « forme » du héros (0 à 3), à la Hell Escape — il évolue visiblement (nouvelle tenue) avec les achats de l'accueil,
+        /// et encore d'un cran à chaque arme gagnée en course. Les tenues voleur_niv1..3 existent déjà.
+        /// </summary>
+        /// <summary>Arcade (retour YSO : « le décor ne change pas ») : un nouveau décor tous les 2 niveaux, en boucle
+        /// (galerie marchande, rue commerçante, gare, docks, quartier chic de nuit).</summary>
+        static int ArcMap(int street) => Tuning.Arcade ? (Mathf.Max(0, street) / 2) % Tuning.Maps : Tuning.MapOf(street);
+
+        int HomeForm => Mathf.Clamp((ArcLevel(KCrew) + ArcLevel(KIncome) + ArcWeapon - 1 + 1) / 2, 0, 3);
+        int RunForm => Mathf.Clamp(HomeForm + runTier, 0, 3);
+        int formShown = -1;
+
         void ShowHomeScreen()
         {
             metaScreen = MetaScreen.Home;
@@ -661,7 +674,8 @@ namespace SamediRouge
             int si = HomeStreet();
             selStreet = si;
             PreviewGear();
-            int map = Tuning.MapOf(si);
+            formShown = HomeForm;
+            int map = ArcMap(si);
             int theme = Tuning.MapTheme[map];
             street.SetTheme(theme, pz);
             ThemeLighting(theme);
@@ -706,9 +720,19 @@ namespace SamediRouge
                 PlayerPrefs.SetInt(k, ArcLevel(k) + 1);
                 PlayerPrefs.Save();
             }
+            int formBefore = formShown;
             Snd.Play(Snd.I.pickup, 0.9f, 0f);
             Haptics.Pulse(40, true);
             PreviewGear();
+            formShown = HomeForm;
+            if (formShown > formBefore)
+            {
+                // nouvelle forme du héros : on le fête (il change de tenue sous nos yeux)
+                hud.Toast(L("EVOLUTION!", "ÉVOLUTION !"));
+                Fx.Confetti(P.root.position + Vector3.up * 1.2f);
+                Snd.Play(Snd.I.perfect, 0.8f, 0f);
+                P.Flash(Hud.StarGold, 0.35f);
+            }
             P.Land(0.3f);
             P.Flash(new Color(1f, 0.95f, 0.6f), 0.15f);
             RefreshHome();
@@ -731,7 +755,7 @@ namespace SamediRouge
         void PreviewGear()
         {
             int h = Progress.GearLevel(thief, 0), v = Progress.GearLevel(thief, 1), w = Progress.GearLevel(thief, 2);
-            P.SetLevels(h, v, w);
+            P.SetLevels(h, Tuning.Arcade ? HomeForm : v, w);
             PowerScale(h + v + w);
             for (int i = 0; i < gear.Length; i++) gear[i] = false;
             gear[GHelmet] = h >= 1;
