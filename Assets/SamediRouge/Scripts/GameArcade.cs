@@ -56,7 +56,7 @@ namespace SamediRouge
         static bool devCenter;   // dev (éditeur) : caisses dans le couloir du milieu, pour tester la fusion sans diriger
         /// <summary>Caisses d'armes ramassées vers la prochaine fusion.</summary>
         int crates;
-        const int ArcadeMaxSquad = 100;   // une vraie foule (retour : 18 c'était trop peu)
+        const int ArcadeMaxSquad = 99;   // une vraie foule : 99 voleurs + le héros = 100 (retour : 18 c'était trop peu)
         /// <summary>Arcade : vitesse de course réduite, taille des personnages de ta bande (alignée sur les adversaires).</summary>
         const float ArcadeSpeed = 0.38f, CrewScale = 0.65f, MateScale = 0.48f, EnemyScale = 1f, FreeMax = 3.3f;
         float freeX;
@@ -234,6 +234,8 @@ namespace SamediRouge
         {
             float prog = Mathf.Clamp01((z - stageStartZ) / Mathf.Max(1f, StageLen));
             float k = Mathf.Min(2.6f, 1.15f + 0.5f * arcD + 0.8f * prog);
+            // grosse foule : pression un peu moindre (sinon chaque groupe la décimait : 97 → 34 en une rencontre)
+            k *= Mathf.Lerp(1f, 0.8f, Mathf.Clamp01((squad.Count - 20) / 79f));
             float t = 26f / Mathf.Max(6f, speed + 6f * Tuning.EnemyRush);   // temps entre l'entrée à portée et le contact
             float budget = k * t * ArcadePower() * share;
             arcPackHp = Mathf.Max(1f, budget / Mathf.Max(1, n));
@@ -351,7 +353,7 @@ namespace SamediRouge
                     if (e.hit || e.dead) continue;
                     if (e.type != ET.Casseur && e.type != ET.Loup) continue;
                     float d = e.z - m.z;
-                    if (d < 1f || d > 26f) continue;
+                    if (d < 1f || d > (e.type == ET.Loup ? 45f : 26f)) continue;   // le boss se tient loin : toute la bande le vise
                     if (Mathf.Abs(e.x - m.x) > 2.6f && e.type != ET.Loup) continue;
                     if (d < bd) { bd = d; best = e; }
                 }

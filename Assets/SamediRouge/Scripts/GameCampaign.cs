@@ -757,6 +757,7 @@ namespace SamediRouge
         void PreviewGear()
         {
             int h = Progress.GearLevel(thief, 0), v = Progress.GearLevel(thief, 1), w = Progress.GearLevel(thief, 2);
+            if (Tuning.Arcade) w = Mathf.Max(1, w);   // arcade : le héros a toujours sa batte (il la lance en jeu dès le départ)
             P.SetLevels(h, Tuning.Arcade ? HomeForm : v, w);
             PowerScale(h + v + w);
             for (int i = 0; i < gear.Length; i++) gear[i] = false;

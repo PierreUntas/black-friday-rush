@@ -2206,7 +2206,7 @@ namespace SamediRouge
                     if (st != St.Play) return;
                     continue;
                 }
-                if (Tuning.Arcade && strike != null && m.cd <= 0f)
+                if (false && Tuning.Arcade && strike != null && m.cd <= 0f)   // coups de batte de la bande retirés (retour : mouvement bizarre, brouillait la lecture)
                 {
                     // arcade : un vigile arrive au contact → le voleur lui met un coup de batte (bien visible),
                     // c'est ce coup qui fait l'échange ; si le vigile tient debout, il emporte le voleur juste après
@@ -2215,7 +2215,7 @@ namespace SamediRouge
                 }
                 if (touch != null)
                 {
-                    if (touch.type == ET.Casseur && !(Tuning.Arcade && m.cd > 0f)) { if (Tuning.Arcade) MateStrike(m, touch); else HitCasseur(touch, true, 0.8f); } // échange un pour un
+                    if (touch.type == ET.Casseur && !Tuning.Arcade) HitCasseur(touch, true, 0.8f); // échange un pour un (arcade : voir plus bas)
                     if (st != St.Play) return;
                     if (Tuning.Arcade && touch.type == ET.Casseur && touch.hit) continue;   // arcade : le coup l'a mis K.-O. avant qu'il ne te touche
                     LoseMate(i, new Vector3(Random.Range(-3f, 3f), 4f, speed * 0.4f));
@@ -2224,7 +2224,7 @@ namespace SamediRouge
                     {
                         // la foule l'encercle : chaque voleur emporté lui coûte un gros morceau de vie
                         // (sinon un vigile costaud traversait toute une grosse bande à lui seul)
-                        HitCasseur(touch, true, 0.5f, true, 1 + touch.hp / 3);
+                        HitCasseur(touch, true, 0.5f, true, squad.Count >= 20 ? 999 : 2 + touch.hp / 2);   // grosse foule : échange un pour un (le vigile tombe avec lui)   // échange : le voleur emporté entame sérieusement le vigile (2 à 3 voleurs par costaud)
                         if (st != St.Play) return;
                     }
                 }
@@ -2234,6 +2234,7 @@ namespace SamediRouge
         /// <summary>La mitraillette tire toute seule sur l'adversaire le plus proche devant toi.</summary>
         void UpdateSmg(float dt)
         {
+            if (Tuning.Arcade && runT < 2f) return;   // début de niveau : on laisse le décor apparaître avant le premier lancer
             if (Tuning.Arcade) AutoMelee();
             if (!gear[GSmg] && !Tuning.Arcade) return;
             smgT -= dt;
@@ -3614,7 +3615,7 @@ namespace SamediRouge
                 {
                     // grosse bande : la caméra prend de la hauteur pour voir la foule et la route devant
                     float ck = Mathf.Clamp01(squad.Count / 24f), ck2 = Mathf.Clamp01((squad.Count - 24) / 76f);
-                    want += new Vector3(0f, 2.6f + 2.2f * ck + 2.4f * ck2, -0.4f - 1f * ck - 2.2f * ck2);   // grosse foule : la caméra recule encore
+                    want += new Vector3(0f, 2.6f + 2.2f * ck + 0.6f * ck2, -0.4f - 1f * ck - 4f * ck2);   // grosse foule : la caméra RECULE (en montant elle passait au-dessus du plafond de la galerie : écran blanc)
                 }
                 look = Tuning.Arcade ? new Vector3(px * 0.4f, 0.4f, pz + 6.5f) : new Vector3(px * 0.4f, 1.25f, pz + 9f);
                 wantFov = (portrait ? 66f : 54f) + Mathf.InverseLerp(12f, 26f, speed) * 7f;

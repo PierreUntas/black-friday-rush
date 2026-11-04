@@ -251,7 +251,7 @@ namespace SamediRouge
             }
 
             // banderole SALE suspendue (décor, au-dessus des couloirs)
-            if (Theme == 0 && Random.value < 0.3f)
+            if (Theme == 0 && !Tuning.Arcade && Random.value < 0.3f)   // pas en arcade : la caméra (grosse foule) passait dedans
             {
                 float zb = Random.Range(6f, Chunk - 6f);
                 Art.Part(t, Art.Cube, banner, new Vector3(0f, 10.6f, zb), new Vector3(8f, 1.6f, 0.06f), default, false);
