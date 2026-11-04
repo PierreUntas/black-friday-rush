@@ -56,9 +56,9 @@ namespace SamediRouge
         static bool devCenter;   // dev (éditeur) : caisses dans le couloir du milieu, pour tester la fusion sans diriger
         /// <summary>Caisses d'armes ramassées vers la prochaine fusion.</summary>
         int crates;
-        const int ArcadeMaxSquad = 18;
+        const int ArcadeMaxSquad = 100;   // une vraie foule (retour : 18 c'était trop peu)
         /// <summary>Arcade : vitesse de course réduite, taille des personnages de ta bande (alignée sur les adversaires).</summary>
-        const float ArcadeSpeed = 0.38f, CrewScale = 0.65f, MateScale = 0.62f, EnemyScale = 1f, FreeMax = 3.3f;
+        const float ArcadeSpeed = 0.38f, CrewScale = 0.65f, MateScale = 0.48f, EnemyScale = 1f, FreeMax = 3.3f;
         float freeX;
 
         /// <summary>
@@ -99,14 +99,21 @@ namespace SamediRouge
             // arcade : une foule compacte en tournesol autour et juste derrière le héros (lisible, ne cache pas l'écran)
             if (blob == null)
             {
+                // foule compacte et régulière (maillage en quinconce) : les places les plus proches du héros d'abord,
+                // la foule s'élargit jusqu'aux bords de la piste puis s'allonge vers l'arrière (jusqu'à 100 voleurs)
                 var l = new List<Vector2>();
-                for (int j = 0; l.Count < 40; j++)
-                {
-                    float r = 0.62f * Mathf.Sqrt(j + 1.2f), a = j * 2.39996f + 1.2f;
-                    var v = new Vector2(Mathf.Clamp(Mathf.Cos(a) * r * 1.1f, -2.9f, 2.9f), -0.5f + Mathf.Sin(a) * r * 0.65f);
-                    if (v.sqrMagnitude < 0.45f || (Mathf.Abs(v.x) < 0.55f && v.y > 0f)) continue;   // pas sur le héros ni juste devant lui
-                    l.Add(v);
-                }
+                const float sx = 0.46f, sy = 0.4f;
+                for (int iy = -40; iy <= 4; iy++)
+                    for (int ix = -7; ix <= 7; ix++)
+                    {
+                        float x = ix * sx + ((iy & 1) != 0 ? sx * 0.5f : 0f), y = iy * sy - 0.3f;
+                        if (Mathf.Abs(x) > 2.95f) continue;
+                        if (Mathf.Abs(x) < 0.45f && y > -0.5f) continue;   // pas sur le héros ni juste devant lui
+                        if (y > 0.9f) continue;
+                        l.Add(new Vector2(x, y));
+                    }
+                l.Sort((p1, p2) => (p1.x * p1.x * 0.55f + (p1.y + 0.5f) * (p1.y + 0.5f)).CompareTo(p2.x * p2.x * 0.55f + (p2.y + 0.5f) * (p2.y + 0.5f)));
+                if (l.Count > ArcadeMaxSquad + 4) l.RemoveRange(ArcadeMaxSquad + 4, l.Count - ArcadeMaxSquad - 4);
                 blob = l.ToArray();
             }
             return blob[Mathf.Min(i, blob.Length - 1)];
@@ -195,7 +202,7 @@ namespace SamediRouge
                 // points de vie du groupe répartis : partie entière + arrondi au hasard, et parfois un costaud
                 float h = arcPackHp * (Random.value < 0.2f ? 1.8f : Random.Range(0.8f, 1.15f));
                 int hp = Mathf.FloorToInt(h) + (Random.value < h - Mathf.Floor(h) ? 1 : 0);
-                return Mathf.Clamp(hp, 1, 12);
+                return Mathf.Clamp(hp, 1, 45);   // grosse foule : des vigiles plus coriaces
             }
             float prog = Mathf.Clamp01((pz + 35f - stageStartZ) / Mathf.Max(1f, StageLen));
             float tough = arcD * 0.9f + prog * (0.9f + 0.7f * arcD);
@@ -331,6 +338,8 @@ namespace SamediRouge
             }
 
             // la bande tire toute seule : CHAQUE membre tire à son rythme sur l'adversaire le plus proche devant lui (retour YSO)
+            // grosse foule : chacun tire moins souvent mais plus fort (même puissance de feu, beaucoup moins de projectiles à l'écran)
+            int salvo = Mathf.Max(1, Mathf.CeilToInt(squad.Count / 24f));
             foreach (Mate m in squad)
             {
                 m.shotT -= dt;
@@ -348,8 +357,10 @@ namespace SamediRouge
                 }
                 if (best != null)
                 {
+                    int nb = bolts.Count;
                     Shoot(best, true, new Vector3(m.x, 1.3f, m.z + 0.4f));
-                    m.shotT = MateRate * Random.Range(0.85f, 1.15f);
+                    if (bolts.Count > nb) bolts[bolts.Count - 1].mult = salvo;
+                    m.shotT = MateRate * salvo * Random.Range(0.85f, 1.15f);
                 }
                 else if (loot.Count > 0)
                 {
@@ -359,7 +370,8 @@ namespace SamediRouge
                     {
                         Shoot(null, true, new Vector3(m.x, 1.3f, m.z + 0.4f));
                         bolts[bolts.Count - 1].loot = lb;
-                        m.shotT = MateRate * Random.Range(0.85f, 1.15f);
+                        bolts[bolts.Count - 1].mult = salvo;
+                        m.shotT = MateRate * salvo * Random.Range(0.85f, 1.15f);
                     }
                     else m.shotT = 0.15f;
                 }
@@ -615,7 +627,7 @@ namespace SamediRouge
             float r = Random.value;
             if (r < 0.6f)
             {
-                int n = Mathf.Clamp(3 + crowd / 3 + Mathf.RoundToInt(prog * (3f + 2f * arcD) + arcD * 2f), 3, 14);
+                int n = Mathf.Clamp(3 + Mathf.Min(crowd, 30) / 3 + Mathf.Max(0, crowd - 30) / 8 + Mathf.RoundToInt(prog * (3f + 2f * arcD) + arcD * 2f), 3, 22);
                 SetPackHp(z, n, 1f);
                 SpawnPack(lanes[0], z, n);
                 arcPackHp = 0f;
@@ -625,7 +637,7 @@ namespace SamediRouge
             if (r < 0.85f)
             {
                 // barrage : deux groupes côte à côte, un couloir libre
-                int n = Mathf.Clamp(2 + crowd / 4 + Mathf.RoundToInt(prog * (2f + 2f * arcD) + arcD), 2, 10);
+                int n = Mathf.Clamp(2 + Mathf.Min(crowd, 30) / 4 + Mathf.Max(0, crowd - 30) / 10 + Mathf.RoundToInt(prog * (2f + 2f * arcD) + arcD), 2, 16);
                 SetPackHp(z, n, 0.65f);   // deux groupes : on n'en affronte qu'un si on choisit bien son couloir
                 SpawnPack(lanes[0], z, n);
                 SpawnPack(lanes[1], z + 1.5f, n);
@@ -658,7 +670,7 @@ namespace SamediRouge
                 for (int l = 0; l < 3; l++)
                 {
                     // cartons solides : avec la batte de départ on ne passe pas, avec le pistolet acheté (dégâts ×2) on passe
-                    int hp = 13 + Mathf.RoundToInt(r * 3f + 3f * arcD) + Random.Range(0, 3);
+                    int hp = 13 + Mathf.RoundToInt(r * 3f + 3f * arcD + squad.Count * 0.35f) + Random.Range(0, 3);   // grosse foule : cartons plus solides
                     var b = new LootBox { lane = l, z = z0 + r * gap + Random.Range(-0.6f, 0.6f), hp = hp, max = hp };
                     b.tr = Art.Node(world, "loot", new Vector3((l - 1) * Lane, 0f, b.z));
                     float k = 0.8f + 0.06f * Mathf.Min(hp, 8);   // les cartons solides sont plus gros
@@ -858,10 +870,10 @@ namespace SamediRouge
             EndGame();
         }
 
-        void LootHit(LootBox b)
+        void LootHit(LootBox b, int mult = 1)
         {
             if (b.broken) return;
-            b.hp -= LootDmg;
+            b.hp -= LootDmg * mult;
             b.punch = 1f;
             if (b.hp > 0) return;
             b.broken = true;
@@ -911,8 +923,8 @@ namespace SamediRouge
         }
 
         /// <summary>
-        /// Une porte touchée — règle simple et visible (retour YSO) : CHAQUE tir ajoute +1, sans plafond
-        /// (les portes négatives remontent vers le positif). Une porte ×N gagne +1 au multiplicateur tous les 5 tirs.
+        /// Une porte touchée — règle simple et visible (retour YSO) : +1 tous les 2 tirs, sans plafond
+        /// (les portes négatives remontent vers le positif). Une porte ×N gagne +1 au multiplicateur tous les 6 tirs.
         /// </summary>
         void GateHit(Gate g, int l)
         {
@@ -920,14 +932,14 @@ namespace SamediRouge
             Vector3 at = new Vector3((l - 1) * Lane, 2.3f, g.z);
             if (g.mul[l])
             {
-                if (++g.hits[l] % 5 == 0)
+                if (++g.hits[l] % 6 == 0)
                 {
                     g.val[l]++;
                     hud.FloatKey(at, "×" + g.val[l] + "!", Hud.Yellow, true);
                     Snd.PlayPitch(Snd.I.pickup, 0.5f, 1.3f);
                 }
             }
-            else
+            else if (++g.hits[l] % 2 == 0)   // +1 tous les 2 tirs (retour : montait trop vite)
             {
                 g.val[l]++;
                 if (g.val[l] == 0) g.val[l] = 1;   // pas de porte « 0 »

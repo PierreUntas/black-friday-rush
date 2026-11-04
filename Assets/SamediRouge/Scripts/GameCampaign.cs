@@ -177,6 +177,8 @@ namespace SamediRouge
             if (devCmd.Contains("tutorial")) StartTutorial(0);
             var sm = System.Text.RegularExpressions.Regex.Match(devCmd, @"street\s+(\d+)");
             if (sm.Success) StartStreet(int.Parse(sm.Groups[1].Value));
+            var mm = System.Text.RegularExpressions.Regex.Match(devCmd, @"mates\s+(\d+)");
+            if (mm.Success) AddMates(int.Parse(mm.Groups[1].Value));   // test : grosse foule d'entrée
         }
 
 #if UNITY_EDITOR
@@ -654,9 +656,9 @@ namespace SamediRouge
         /// Arcade : « forme » du héros (0 à 3), à la Hell Escape — il évolue visiblement (nouvelle tenue) avec les achats de l'accueil,
         /// et encore d'un cran à chaque arme gagnée en course. Les tenues voleur_niv1..3 existent déjà.
         /// </summary>
-        /// <summary>Arcade (retour YSO : « le décor ne change pas ») : un nouveau décor tous les 2 niveaux, en boucle
+        /// <summary>Arcade (retour YSO : « le décor ne change pas ») : un nouveau décor à chaque niveau, en boucle
         /// (galerie marchande, rue commerçante, gare, docks, quartier chic de nuit).</summary>
-        static int ArcMap(int street) => Tuning.Arcade ? (Mathf.Max(0, street) / 2) % Tuning.Maps : Tuning.MapOf(street);
+        static int ArcMap(int street) => Tuning.Arcade ? Mathf.Max(0, street) % Tuning.Maps : Tuning.MapOf(street);   // nouveau décor à chaque niveau
 
         int HomeForm => Mathf.Clamp((ArcLevel(KCrew) + ArcLevel(KIncome) + ArcWeapon - 1 + 1) / 2, 0, 3);
         int RunForm => Mathf.Clamp(HomeForm + runTier, 0, 3);

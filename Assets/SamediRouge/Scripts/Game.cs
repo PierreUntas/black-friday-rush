@@ -123,7 +123,7 @@ namespace SamediRouge
         bool demo;
         float demoT, autoT;
 
-        class Bolt { public string pool; public Transform tr; public Ent target; public bool smg; public Transform bat; public float spin; public Gate gate; public Craft craft; public LootBox loot; public int lane; }
+        class Bolt { public string pool; public Transform tr; public Ent target; public bool smg; public Transform bat; public float spin; public Gate gate; public Craft craft; public LootBox loot; public int lane; public int mult = 1; }
         int smgShots;
         readonly List<Bolt> bolts = new List<Bolt>();
         int hearts, coins, combo, idle;
@@ -1425,7 +1425,7 @@ namespace SamediRouge
                     {
                         FreeBolt(b);
                         bolts.RemoveAt(i);
-                        if (b.gate != null) GateHit(b.gate, b.lane); else if (b.craft != null) CraftHit(b.craft); else LootHit(b.loot);
+                        if (b.gate != null) GateHit(b.gate, b.lane); else if (b.craft != null) CraftHit(b.craft); else LootHit(b.loot, b.mult);
                         continue;
                     }
                     b.tr.position += pd / pd.magnitude * ps;
@@ -1449,7 +1449,7 @@ namespace SamediRouge
                     bolts.RemoveAt(i);
                     Fx.Sparkle(aim);
                     if (e.type == ET.Manif) Bavure(e);
-                    else HitCasseur(e, false, b.smg ? 0.9f : 1.2f, b.smg, Tuning.Arcade && runTier >= 3 ? 2 : 1);
+                    else HitCasseur(e, false, b.smg ? 0.9f : 1.2f, b.smg, (Tuning.Arcade && runTier >= 3 ? 2 : 1) * b.mult);
                     if (st != St.Play) return;
                     continue;
                 }
@@ -2054,16 +2054,23 @@ namespace SamediRouge
         }
 
         /// <summary>Le collègue est mis au tapis (adversaire ou obstacle) : il quitte l'escouade.</summary>
+        int loseFxFrame, loseFxN;
+
         void LoseMate(int i, Vector3 push)
         {
             Mate m = squad[i];
             squad.RemoveAt(i);
             if (Tuning.Arcade)
             {
-                // arcade : petit nuage, pas de corps en physique (plusieurs d'un coup faisaient ramer)
+                // arcade : petit nuage, pas de corps en physique (plusieurs d'un coup faisaient ramer).
+                // Grosse foule qui passe une porte négative : quelques nuages seulement par image (sinon l'écran devenait tout blanc)
                 Vector3 at = m.rig.root.position;
-                Fx.Hit(at + Vector3.up * 0.5f);
-                Fx.Puff(at + Vector3.up * 0.3f);
+                if (loseFxFrame != Time.frameCount) { loseFxFrame = Time.frameCount; loseFxN = 0; }
+                if (loseFxN++ < 5)
+                {
+                    Fx.Hit(at + Vector3.up * 0.5f);
+                    Fx.Puff(at + Vector3.up * 0.3f);
+                }
                 Destroy(m.rig.root.gameObject);
             }
             else
@@ -2072,7 +2079,7 @@ namespace SamediRouge
                 Destroy(m.rig.root.gameObject, 2.5f);
             }
             for (int k = 0; k < squad.Count; k++) squad[k].slot = k;
-            if (Tuning.Arcade) hud.FloatKey(new Vector3(m.x, 1.8f, m.z), "-1", Hud.Bad, false); else hud.Float(new Vector3(m.x, 2f, m.z), "-1", Hud.Bad, true);   // arcade : on voit qu'on perd un voleur
+            if (Tuning.Arcade) { if (loseFxN <= 5) hud.FloatKey(new Vector3(m.x, 1.8f, m.z), "-1", Hud.Bad, false); } else hud.Float(new Vector3(m.x, 2f, m.z), "-1", Hud.Bad, true);   // arcade : on voit qu'on perd un voleur
             Snd.Play(Snd.I.hurt, 0.35f);
         }
 
@@ -2213,6 +2220,13 @@ namespace SamediRouge
                     if (Tuning.Arcade && touch.type == ET.Casseur && touch.hit) continue;   // arcade : le coup l'a mis K.-O. avant qu'il ne te touche
                     LoseMate(i, new Vector3(Random.Range(-3f, 3f), 4f, speed * 0.4f));
                     if (st != St.Play) return;
+                    if (Tuning.Arcade && touch.type == ET.Casseur && !touch.hit && !touch.dead)
+                    {
+                        // la foule l'encercle : chaque voleur emporté lui coûte un gros morceau de vie
+                        // (sinon un vigile costaud traversait toute une grosse bande à lui seul)
+                        HitCasseur(touch, true, 0.5f, true, 1 + touch.hp / 3);
+                        if (st != St.Play) return;
+                    }
                 }
             }
         }
@@ -3599,8 +3613,8 @@ namespace SamediRouge
                 if (Tuning.Arcade)
                 {
                     // grosse bande : la caméra prend de la hauteur pour voir la foule et la route devant
-                    float ck = Mathf.Clamp01(squad.Count / (float)ArcadeMaxSquad);
-                    want += new Vector3(0f, 2.6f + 2.2f * ck, -0.4f - 1f * ck);
+                    float ck = Mathf.Clamp01(squad.Count / 24f), ck2 = Mathf.Clamp01((squad.Count - 24) / 76f);
+                    want += new Vector3(0f, 2.6f + 2.2f * ck + 2.4f * ck2, -0.4f - 1f * ck - 2.2f * ck2);   // grosse foule : la caméra recule encore
                 }
                 look = Tuning.Arcade ? new Vector3(px * 0.4f, 0.4f, pz + 6.5f) : new Vector3(px * 0.4f, 1.25f, pz + 9f);
                 wantFov = (portrait ? 66f : 54f) + Mathf.InverseLerp(12f, 26f, speed) * 7f;
