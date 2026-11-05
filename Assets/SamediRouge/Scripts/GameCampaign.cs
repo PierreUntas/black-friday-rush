@@ -400,6 +400,10 @@ namespace SamediRouge
             if (Tuning.Arcade) bonus += crewN * 4 + 40;   // arcade : chaque membre de la bande rapporte au pillage, + prime de victoire
             int total = coins + bonus;
             if (Tuning.Arcade) total = Mathf.RoundToInt(total * IncomeMult * stairMult);   // amélioration « Revenus » de l'accueil × hauteur atteinte sur l'escalator
+            // dernier niveau d'un quartier (première fois) : coffre de fin de quartier, et le quartier suivant s'ouvre
+            bool zoneDone = Tuning.Arcade && !already && (streetIdx + 1) % Hud.ZoneLen == 0;
+            int zoneBonus = zoneDone ? 400 * ((streetIdx + 1) / Hud.ZoneLen) : 0;
+            total += zoneBonus;
             Progress.Coins += total;
             var openBefore = new bool[Tuning.Maps];
             for (int m = 0; m < Tuning.Maps; m++) openBefore[m] = Progress.MapUnlocked(thief, m);
@@ -424,7 +428,9 @@ namespace SamediRouge
             {
                 // arcade (retours YSO) : écran de fin minimal — le gain, une amélioration (l'arme de départ), CONTINUER
                 hud.minimalResult = true;
-                hud.ShowResult(true, L("MEGA STORE RAIDED!", "MEGA STORE PILLÉ !") + (stairMult > 1 ? "  ×" + stairMult : ""), "", "", total, Progress.Coins, null, "", L("CONTINUE", "CONTINUER"));
+                string title = zoneDone ? L("DISTRICT " + ((streetIdx + 1) / Hud.ZoneLen) + " CLEARED!", "QUARTIER " + ((streetIdx + 1) / Hud.ZoneLen) + " TERMINÉ !")
+                                        : L("MEGA STORE RAIDED!", "MEGA STORE PILLÉ !") + (stairMult > 1 ? "  ×" + stairMult : "");
+                hud.ShowResult(true, title, "", "", total, Progress.Coins, null, "", L("CONTINUE", "CONTINUER"));
                 return;
             }
             hud.minimalResult = false;
@@ -669,7 +675,7 @@ namespace SamediRouge
             metaScreen = MetaScreen.Home;
             menuFreeBottom = 760f;
             menuFill = 0.34f;
-            menuDrop = 0.1f;
+            menuDrop = 0.17f;   // héros un peu plus bas : la carte de progression du quartier est au-dessus
             menuFit = true;   // cadrage sur la taille réelle du personnage (comme la page Équipement)
             campaign = false;
             tutorialMode = false;
@@ -702,6 +708,12 @@ namespace SamediRouge
             };
             int[] costs = { HomeCost(0), HomeCost(1), HomeCost(2) };
             hud.ShowHome(HomeStreet() + 1, Progress.Coins, names, icons, lv, costs);
+            // carte de progression : quartier en cours (5 niveaux), animation quand on vient de gagner un niveau
+            int level = HomeStreet() + 1, zone = (level - 1) / Hud.ZoneLen;
+            int seen = PlayerPrefs.GetInt("sr_zone_seen", level);
+            bool lastZone = (zone + 1) * Hud.ZoneLen >= Tuning.Streets;
+            hud.SetZone(level, Tuning.MapNames[zone % Tuning.Maps], lastZone ? null : Tuning.MapNames[(zone + 1) % Tuning.Maps], level > seen);
+            PlayerPrefs.SetInt("sr_zone_seen", level);
         }
 
         void HomeBuy(int i)
