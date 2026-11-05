@@ -1054,9 +1054,12 @@ namespace SamediRouge
                             e.z -= e.vz * dt;
                             if (Tuning.Arcade && FreeMove && e.z - pz < 24f && e.z > pz)
                             {
-                                // arcade : les vigiles se rabattent sur ta bande, on ne peut plus simplement les éviter
-                                float dx = px - e.x;
-                                if (Mathf.Abs(dx) > 0.7f) e.x += Mathf.Sign(dx) * Mathf.Min(Mathf.Abs(dx) - 0.7f, (2.4f + 0.8f * arcD) * dt);
+                                // arcade : les vigiles se rabattent sur ta bande (chacun vise un point de la foule, pas seulement le héros) :
+                                // on ne peut plus simplement les esquiver d'un glissé
+                                float spread = Mathf.Min(2.6f, 0.35f + 0.22f * Mathf.Sqrt(squad.Count));
+                                float aim = px + ((e.GetHashCode() & 7) / 7f - 0.5f) * 2f * spread;
+                                float dx = aim - e.x;
+                                if (Mathf.Abs(dx) > 0.15f) e.x += Mathf.Sign(dx) * Mathf.Min(Mathf.Abs(dx) - 0.15f, (4f + 1f * arcD) * dt);
                             }
                             e.rig.anim = e.z - pz < 16f ? Anim.Charge : Anim.Run;
                             e.rig.speed = e.vz;
@@ -1203,6 +1206,7 @@ namespace SamediRouge
             if (inputDebug) hud.InputDebug(air ? "AIR HIT x" + Tuning.AirMult + (spam ? " (spam)" : "") : "TAP" + (spam ? " (spam)" : ""));
 
             float reach = Heavy ? 6.3f : gear[GBaton] ? 5.8f : 3.4f;
+            if (Tuning.Arcade) reach = 1.6f;   // arcade : le coup de batte du héros ne touche qu'au contact (il fauchait les groupes avant qu'ils n'atteignent la foule)
             float range = gear[GPistol] && !gear[GSmg] ? 32f : reach;
 
             // cible la plus proche dans le couloir (un client compris : attention à qui on vise)
@@ -2192,7 +2196,9 @@ namespace SamediRouge
                     {
                         if (dx < 1.2f && dz > -0.2f && dz < 3.2f && hitE == null) hitE = e;
                         if (e.type == ET.Casseur && dx < 1.1f && dz > 0.2f && dz < 2.2f && strike == null) strike = e;
-                        if (dx < 0.55f && dz > -0.4f && dz < 0.5f && !e.fled) touch = e;
+                        // zone de contact élargie selon la durée de l'image : sur téléphone (moins d'images par seconde), un vigile lancé
+                        // traversait la zone entre deux images sans jamais toucher personne → on ne perdait presque aucun voleur
+                        if (dx < 0.6f && dz > -0.4f - (speed + Mathf.Abs(e.vz) + 4f) * dt && dz < 0.5f && !e.fled) touch = e;
                     }
                     else if ((dx < 0.9f || e.type == ET.Onde) && Mathf.Abs(dz) < e.depth + 0.2f)
                     {
@@ -2288,6 +2294,7 @@ namespace SamediRouge
         {
             if (swingCd > 0f || pendings.Count > 0) return;
             float reach = Heavy ? 6.3f : gear[GBaton] ? 5.8f : 3.4f;
+            if (Tuning.Arcade) reach = 1.6f;   // arcade : le coup de batte du héros ne touche qu'au contact (il fauchait les groupes avant qu'ils n'atteignent la foule)
             foreach (Ent e in ents)
             {
                 if (e.hit || e.dead) continue;
@@ -2547,7 +2554,8 @@ namespace SamediRouge
                     return;
                 case ET.Casseur:
                     // bouclier : on passe à travers en les bousculant
-                    if (P.swingT >= 0f || gear[GShield]) { HitCasseur(e, false); return; }
+                    // arcade : même en plein coup de batte, le choc coûte des voleurs (avant, le héros qui frappait tout le temps les absorbait gratuitement)
+                    if ((P.swingT >= 0f && !Tuning.Arcade) || gear[GShield]) { HitCasseur(e, false); return; }
                     e.hit = true;
                     RaidMemberGone(e, true);
                     if (Tuning.Arcade)
