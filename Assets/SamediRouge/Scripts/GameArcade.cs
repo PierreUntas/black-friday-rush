@@ -139,6 +139,7 @@ namespace SamediRouge
             nextCrateZ = pz + 80f;
             crates = 0;
             craftBoost = 0;
+            hud.HideWeaponCard();
             ClearMergeIcons();
             foreach (Craft c in crafts) if (c.go != null) Destroy(c.go);
             crafts.Clear();
@@ -566,7 +567,7 @@ namespace SamediRouge
             Snd.Play(Snd.I.perfect, 0.7f, 0f);
             hud.Flash(0.35f);
             fovKick = Mathf.Max(fovKick, 7f);
-            hud.Toast(runTier >= 2 ? L("SMG!", "MITRAILLETTE !") : L("PISTOL!", "PISTOLET !"));
+            hud.Toast(runTier >= 3 ? L("SUPER SMG!", "SUPER MITRAILLETTE !") : runTier >= 2 ? L("SMG!", "MITRAILLETTE !") : L("PISTOL!", "PISTOLET !"));
             // le héros évolue aussi en pleine course (nouvelle tenue) : la progression se voit
             int form = RunForm;
             if (form > HomeForm + runTier - 1 && form <= 3)
@@ -1008,8 +1009,7 @@ namespace SamediRouge
             Snd.Play(Snd.I.perfect, 0.7f, 0f);
             hud.Flash(0.3f);
             fovKick = Mathf.Max(fovKick, 6f);
-            hud.Toast(L("WEAPON LV ", "ARME NIV. ") + RunWeaponLv + " !");
-            hud.FloatKey(new Vector3(px, 3f, pz), L("FIRE RATE +15%", "CADENCE +15 %"), Hud.StarGold, true);
+            hud.Toast(L("FIRE RATE +15%", "CADENCE +15 %"));   // la carte d'arme à droite saute et affiche le nouveau niveau
             foreach (Mate m in squad) { m.rig.Land(0.4f); m.rig.Flash(Hud.StarGold, 0.2f); }
             Haptics.Pulse(30, true);
         }
@@ -1049,16 +1049,8 @@ namespace SamediRouge
                 for (int l = 0; l < 3; l++)
                     hud.Tag(new Vector3((l - 1) * Lane, 1.5f, g.z), GateText(g, l), Color.white, 2.2f);
             }
-            // atelier : titre, coups restants et niveau d'arme à gagner, lisibles de loin
-            foreach (Craft c in crafts)
-            {
-                if (c.done || c.go == null) continue;
-                float d = c.z - pz;
-                if (d < 1f || d > 70f) continue;
-                float cx = (c.lane - 1) * Lane;
-                hud.Tag(new Vector3(cx, 3.15f, c.z), L("WORKSHOP", "ATELIER"), Color.white, 1.5f);
-                hud.Tag(new Vector3(cx, 0.35f, c.z), L("LV ", "NIV. ") + (RunWeaponLv + 1) + "  " + c.hits + "/" + c.need, Hud.Yellow, 1.3f);
-            }
+            // carte d'arme fixe sur le bord droit (pas de texte dans la scène, comme Hell Escape)
+            hud.SetWeaponCard(runTier, RunWeaponLv);
             int myLane = Mathf.Clamp(Mathf.RoundToInt(px / Lane) + 1, 0, 2);
             foreach (LootBox b in loot)
             {
@@ -1079,8 +1071,6 @@ namespace SamediRouge
             if (finaleZ < 0f || pz < lootEndZ + 3f)
             {
                 hud.Tag(new Vector3(px, 2.6f, pz), crowd.ToString(), cc, 1.3f * (1f + 0.6f * crowdPop + 0.3f * crowdHurt));
-                // niveau d'arme toujours visible (la progression de la course se lit d'un coup d'œil)
-                hud.Tag(new Vector3(px, 3.35f, pz), L("WEAPON LV ", "ARME NIV. ") + RunWeaponLv, Color.white, 0.85f);
             }
         }
     }

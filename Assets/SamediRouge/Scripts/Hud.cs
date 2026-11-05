@@ -481,6 +481,50 @@ namespace SamediRouge
             rt.sizeDelta = Vector2.zero;
         }
 
+        // ---------------------------------------------------------------- carte d'arme (comme la carte « EQUIPPED » de Hell Escape)
+
+        Image wCard, wIcon;
+        Text wLv;
+        int wShownLv = -1, wShownTier = -1;
+        float wPop;
+
+        /// <summary>Carte fixe sur le bord droit : icône de l'arme portée et son niveau (gros chiffre). Elle « saute » quand le niveau monte.</summary>
+        public void SetWeaponCard(int tier, int level)
+        {
+            if (wCard == null)
+            {
+                wCard = Img(play.transform, round, new Color(0.16f, 0.55f, 0.95f, 0.97f));
+                Place(wCard.rectTransform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-22f, 170f), new Vector2(150f, 176f), new Vector2(1f, 0.5f));
+                Image inner = Img(wCard.rectTransform, round, new Color(0.05f, 0.2f, 0.45f, 0.95f));
+                Place(inner.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, new Vector2(-16f, -16f));
+                wIcon = Img(wCard.rectTransform, GearIcons.Upgrade(2, true, 1), Color.white);
+                wIcon.preserveAspect = true;
+                Place(wIcon.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-6f, 14f), new Vector2(112f, 112f));
+                wLv = Label(wCard.rectTransform, "", 58, Color.white, TextAnchor.LowerRight, true);
+                Shadowed(wLv);
+                Place(wLv.rectTransform, Vector2.zero, Vector2.one, new Vector2(-12f, 2f), new Vector2(-8f, -8f));
+            }
+            if (!wCard.gameObject.activeSelf) wCard.gameObject.SetActive(true);
+            if (tier != wShownTier) { wShownTier = tier; wIcon.sprite = GearIcons.Upgrade(2, true, Mathf.Clamp(tier + 1, 1, 3)); }
+            if (level != wShownLv)
+            {
+                if (wShownLv >= 0 && level > wShownLv) wPop = 1f;
+                wShownLv = level;
+                wLv.text = level.ToString();
+            }
+            wPop = Mathf.Max(0f, wPop - Time.unscaledDeltaTime * 2.5f);
+            float k = wPop > 0f ? 1f + 0.35f * Mathf.Sin(wPop * Mathf.PI) : 1f;
+            wCard.rectTransform.localScale = Vector3.one * k;
+            wLv.color = Color.Lerp(Color.white, Yellow, wPop);
+        }
+
+        /// <summary>Cache la carte d'arme (hors mode arcade, nouvelle course).</summary>
+        public void HideWeaponCard()
+        {
+            wShownLv = -1;
+            if (wCard != null && wCard.gameObject.activeSelf) wCard.gameObject.SetActive(false);
+        }
+
         static void Place(RectTransform rt, Vector2 aMin, Vector2 aMax, Vector2 pos, Vector2 size, Vector2? pivot = null)
         {
             rt.anchorMin = aMin;
