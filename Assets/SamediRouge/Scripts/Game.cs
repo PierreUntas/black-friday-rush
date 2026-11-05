@@ -1854,7 +1854,7 @@ namespace SamediRouge
                     for (int i = squad.Count - 1; i >= 0; i--)
                     {
                         int ml = Mathf.Clamp(Mathf.RoundToInt(squad[i].x / Lane) + 1, 0, 2);
-                        if (ml == bossTargetLane || ml == bossSecondLane) LoseMate(i, new Vector3(Random.Range(-5f, 5f), 6f, 2f));
+                        if ((ml == bossTargetLane || ml == bossSecondLane) && !Defended()) LoseMate(i, new Vector3(Random.Range(-5f, 5f), 6f, 2f));
                     }
                     if ((lane == bossTargetLane || lane == bossSecondLane) && py < 0.8f) Hurt(1, L("The bat sweep got you", "La batte t'a balayé"));
                     e.timer = Mathf.Max(1f, 1.6f - lvl * 0.1f);
@@ -2221,7 +2221,8 @@ namespace SamediRouge
                     if (touch.type == ET.Casseur && !Tuning.Arcade) HitCasseur(touch, true, 0.8f); // échange un pour un (arcade : voir plus bas)
                     if (st != St.Play) return;
                     if (Tuning.Arcade && touch.type == ET.Casseur && touch.hit) continue;   // arcade : le coup l'a mis K.-O. avant qu'il ne te touche
-                    LoseMate(i, new Vector3(Random.Range(-3f, 3f), 4f, speed * 0.4f));
+                    if (Defended()) { m.rig.Flash(new Color(0.4f, 0.7f, 1f), 0.15f); Fx.Sparkle(new Vector3(m.x, 1.2f, m.z)); }   // défense / armure : il encaisse
+                    else LoseMate(i, new Vector3(Random.Range(-3f, 3f), 4f, speed * 0.4f));
                     if (st != St.Play) return;
                     if (Tuning.Arcade && touch.type == ET.Casseur && !touch.hit && !touch.dead)
                     {
@@ -2439,6 +2440,7 @@ namespace SamediRouge
             {
                 // arcade : la bande encaisse à ta place (un ou deux membres tombent)
                 int lose = Mathf.Min(squad.Count, n + 1);
+                for (int k = lose; k > 0; k--) if (Defended()) lose--;
                 for (int k = 0; k < lose; k++) LoseMate(squad.Count - 1, new Vector3(Random.Range(-3f, 3f), 4f, 2f));
                 inv = 0.45f;
                 hud.Damage(0.12f);

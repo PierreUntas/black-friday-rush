@@ -526,15 +526,51 @@ namespace SamediRouge
         readonly int[] boonShown = { -1, -1 };
         readonly float[] boonPop = new float[2];
 
-        /// <summary>Bonus ramassés pendant la course : une petite carte par type (cadence, dégâts) avec le total, sur le bord gauche.</summary>
+        Image aCard, aIcon;
+        Text aLv;
+        int aShown = -1;
+        float aPop;
+
+        /// <summary>Carte d'armure, sous la carte d'arme : tenue portée (sweat, blouson, gilet) et niveau ; cachée tant qu'on n'en a pas.</summary>
+        public void SetArmorCard(int level)
+        {
+            if (aCard == null)
+            {
+                aCard = Img(play.transform, round, new Color(0.3f, 0.55f, 0.95f, 0.97f));
+                Place(aCard.rectTransform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-22f, -60f), new Vector2(184f, 208f), new Vector2(1f, 0.5f));
+                Image inner = Img(aCard.rectTransform, round, new Color(0.05f, 0.15f, 0.35f, 0.95f));
+                Place(inner.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, new Vector2(-16f, -16f));
+                aIcon = Img(aCard.rectTransform, GearIcons.Upgrade(1, true, 1), Color.white);
+                aIcon.preserveAspect = true;
+                Place(aIcon.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-14f, 24f), new Vector2(118f, 118f));
+                aLv = Label(aCard.rectTransform, "", 52, Color.white, TextAnchor.LowerRight, true);
+                Shadowed(aLv);
+                Place(aLv.rectTransform, Vector2.zero, Vector2.one, new Vector2(-6f, 6f), new Vector2(-28f, -20f));
+                aCard.gameObject.SetActive(false);
+            }
+            if (level != aShown)
+            {
+                if (aShown >= 0 && level > aShown) aPop = 1f;
+                aShown = level;
+                aLv.text = level.ToString();
+                aIcon.sprite = GearIcons.Upgrade(1, true, Mathf.Clamp(level, 1, 3));
+                aCard.gameObject.SetActive(level > 0);
+            }
+            aPop = Mathf.Max(0f, aPop - Time.unscaledDeltaTime * 2.5f);
+            aCard.rectTransform.localScale = Vector3.one * (aPop > 0f ? 1f + 0.35f * Mathf.Sin(aPop * Mathf.PI) : 1f);
+            aLv.color = Color.Lerp(Color.white, Yellow, aPop);
+        }
+
+        /// <summary>Bonus ramassés pendant la course : une petite carte par type (attaque, défense) avec le total, sur le bord gauche.</summary>
         public void SetBoons(int fire, int dmg)
         {
             if (boonCard == null)
             {
                 boonCard = new Image[2];
                 boonTxt = new Text[2];
-                string[] icons = { "rate", "dmg" };
-                Color[] cols = { new Color(0.16f, 0.45f, 0.95f, 0.97f), new Color(0.85f, 0.22f, 0.2f, 0.97f) };
+                string[] icons = { "atk", "def" };
+                string[] titles = { L("ATTACK", "ATTAQUE"), L("DEFENSE", "DÉFENSE") };
+                Color[] cols = { new Color(0.85f, 0.22f, 0.2f, 0.97f), new Color(0.16f, 0.45f, 0.95f, 0.97f) };
                 for (int i = 0; i < 2; i++)
                 {
                     boonCard[i] = Img(play.transform, round, cols[i]);
@@ -543,7 +579,10 @@ namespace SamediRouge
                     Place(inner.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, new Vector2(-14f, -14f));
                     Image ic = Img(boonCard[i].rectTransform, GearIcons.Get(icons[i]), Color.white);
                     ic.preserveAspect = true;
-                    Place(ic.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -18f), new Vector2(112f, 112f), new Vector2(0.5f, 1f));
+                    Place(ic.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -44f), new Vector2(96f, 96f), new Vector2(0.5f, 1f));
+                    Text tt = Label(boonCard[i].rectTransform, titles[i], 24, Color.white, TextAnchor.UpperCenter, true);
+                    Shadowed(tt);
+                    Place(tt.rectTransform, Vector2.zero, Vector2.one, new Vector2(0f, -12f), new Vector2(-12f, -20f));
                     boonTxt[i] = Label(boonCard[i].rectTransform, "", 44, Color.white, TextAnchor.LowerCenter, true);
                     Shadowed(boonTxt[i]);
                     Place(boonTxt[i].rectTransform, Vector2.zero, Vector2.one, new Vector2(0f, 12f), new Vector2(-10f, -20f));
@@ -570,6 +609,8 @@ namespace SamediRouge
         {
             wShownLv = -1;
             if (wCard != null && wCard.gameObject.activeSelf) wCard.gameObject.SetActive(false);
+            aShown = -1;
+            if (aCard != null && aCard.gameObject.activeSelf) aCard.gameObject.SetActive(false);
         }
 
         static void Place(RectTransform rt, Vector2 aMin, Vector2 aMax, Vector2 pos, Vector2 size, Vector2? pivot = null)

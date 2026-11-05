@@ -661,7 +661,7 @@ namespace SamediRouge
         static int ArcMap(int street) => Tuning.Arcade ? Mathf.Max(0, street) % Tuning.Maps : Tuning.MapOf(street);   // nouveau décor à chaque niveau
 
         int HomeForm => Mathf.Clamp((ArcLevel(KCrew) + ArcLevel(KIncome) + ArcWeapon - 1 + 1) / 2, 0, 3);
-        int RunForm => Mathf.Clamp(HomeForm + runTier, 0, 3);
+        int RunForm => Mathf.Clamp(HomeForm + armorLv, 0, 3);   // la tenue suit l'armure gagnée pendant la course
         int formShown = -1;
 
         void ShowHomeScreen()

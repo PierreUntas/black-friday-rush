@@ -313,15 +313,20 @@ namespace SamediRouge
                     o.Add(Line(new P(18, 22).L(46, 22).Pts, SteelLight, 3f));
                     foreach (var c in new[] { new Vector2(16, 14), new Vector2(48, 14), new Vector2(18, 48), new Vector2(46, 48) }) o.Add(Circ(c.x, c.y, 2f, SteelLight, Ink, 1f));
                     break;
-                case "rate":
-                    // bonus de cadence : éclair dans un disque bleu
-                    o.Add(Circ(32, 32, 28f, Blue, Ink, 3f));
-                    o.Add(Poly(new P(37, 7).L(15, 36).L(29, 36).L(24, 58).L(50, 26).L(35, 26).L(43, 7).Pts, Gold, Ink, 3f));
+                case "atk":
+                    // bonus d'attaque : épée dressée sur un disque rouge
+                    o.Add(Circ(32, 32, 29f, Red, Ink, 3f));
+                    o.Add(Poly(new P(32, 6).L(38, 14).L(38, 40).L(26, 40).L(26, 14).Pts, H("#e8ecf2"), Ink, 2.5f));
+                    o.Add(Line(new P(32, 13).L(32, 38).Pts, SteelLight, 2f));
+                    o.Add(Box(18, 40, 28, 6, 2, Gold, Ink, 2.5f));
+                    o.Add(Box(29, 46, 6, 10, 1, H("#7a4a26"), Ink, 2f));
+                    o.Add(Circ(32, 58, 3.5f, Gold, Ink, 1.5f));
                     break;
-                case "dmg":
-                    // bonus de dégâts : explosion rouge et or
-                    o.Add(Poly(Star(32f, 32f, 30f, 17f), Red, Ink, 3f));
-                    o.Add(Poly(Star(32f, 32f, 17f, 9f), Gold, Ink, 2f));
+                case "def":
+                    // bonus de défense : bouclier sur un disque bleu
+                    o.Add(Circ(32, 32, 29f, Blue, Ink, 3f));
+                    o.Add(Poly(new P(32, 8).L(52, 15).C(52, 36, 46, 50, 32, 58).C(18, 50, 12, 36, 12, 15).Pts, H("#e8ecf2"), Ink, 3f));
+                    o.Add(Poly(new P(32, 14).L(46, 19).C(46, 35, 41, 46, 32, 52).Pts, Gold, Ink, 1.5f));
                     break;
                 case "charge":
                     // charge : on fonce à travers tout (double chevron dans un disque)

@@ -28,7 +28,7 @@ namespace SamediRouge
             public GameObject go;
             public int lane, hits, need;
             public float z, punch;
-            public bool done;
+            public bool done, armor;
             public Transform bar, panel;
         }
 
@@ -41,6 +41,7 @@ namespace SamediRouge
             public int lane, hp, max;
             public float z, punch;
             public bool broken, dodged;
+            public int id;     // place dans le champ (rangée × 3 + couloir), pour s'en souvenir d'une course à l'autre
             public int pend;   // dégâts déjà en vol vers ce carton (évite que toute la bande vise le même)
         }
 
@@ -59,9 +60,9 @@ namespace SamediRouge
         /// <summary>Niveau d'arme affiché (comme la carte « EQUIPPED » de Hell Escape) : batte 1, pistolet 2, mitraillette 3, puis +1 par atelier.</summary>
         int RunWeaponLv => runTier + 1 + craftBoost;
         /// <summary>Cadence : chaque niveau d'atelier au-delà de la mitraillette fait tirer 15 % plus vite.</summary>
-        float RateK => 1f / (1f + 0.15f * craftBoost + 0.2f * fireBoon);
+        float RateK => 1f / (1f + 0.15f * craftBoost);
 
-        /// <summary>Bonus à ramasser (comme le « God's Help » de Hell Escape) : 0 cadence +20 %, 1 dégâts +20 %, 2 renforts.</summary>
+        /// <summary>Bonus à ramasser (comme le « God's Help » de Hell Escape) : 0 attaque +20 %, 1 défense +20 %.</summary>
         class Boon
         {
             public GameObject go;
@@ -71,7 +72,15 @@ namespace SamediRouge
         }
 
         readonly List<Boon> boons = new List<Boon>();
-        int fireBoon, dmgBoon, lastBoonKind = -1;
+        int dmgBoon, defBoon, lastBoonKind = -1;
+        /// <summary>Armure de la course (atelier d'armure) : 0 rien, 1 sweat, 2 blouson, 3 gilet volé, puis +1 par atelier.</summary>
+        int armorLv;
+        int craftCount;
+        /// <summary>Chance qu'un voleur touché reste debout (bonus de défense +20 % chacun, armure +15 % par niveau).</summary>
+        float DefChance { get { float d = 0.2f * defBoon + 0.15f * armorLv; return d / (1f + d); } }
+        bool Defended() => Tuning.Arcade && Random.value < DefChance;
+        /// <summary>Cartons de la finale déjà cassés à une tentative précédente (gardés d'une course à l'autre, comme Hell Escape).</summary>
+        string LootKey => "sr_loot_" + streetIdx;
         float nextBoonZ;
         /// <summary>Multiplicateur de dégâts des bonus ramassés.</summary>
         float DmgK => 1f + 0.2f * dmgBoon;
@@ -163,7 +172,9 @@ namespace SamediRouge
             nextCrateZ = pz + 80f;
             crates = 0;
             craftBoost = 0;
-            fireBoon = dmgBoon = 0;
+            dmgBoon = defBoon = 0;
+            armorLv = 0;
+            craftCount = 0;
             lastBoonKind = -1;
             nextBoonZ = pz + 125f;
             foreach (Boon bo in boons) if (bo.go != null) Destroy(bo.go);
@@ -207,7 +218,7 @@ namespace SamediRouge
             {
                 // panneau de fusion dans un couloir au hasard : il faut s'y placer et tirer dessus pour le remplir
                 // l'atelier revient toute la course (plus de plafond à la mitraillette : ensuite il augmente la cadence)
-                SpawnCraft(z + 6f, devCenter ? 1 : Random.Range(0, 3));
+                SpawnCraft(z + 6f, devCenter ? 1 : Random.Range(0, 3), craftCount++ % 2 == 1);   // une fois l'arme, une fois l'armure
                 nextCrateZ = z + Random.Range(80f, 105f);
                 return 14f;
             }
@@ -281,7 +292,7 @@ namespace SamediRouge
         void SetPackHp(float z, int n, float share)
         {
             float prog = Mathf.Clamp01((z - stageStartZ) / Mathf.Max(1f, StageLen));
-            float k = Mathf.Min(2.6f, 1.15f + 0.5f * arcD + 0.8f * prog);
+            float k = Mathf.Min(2.6f, 0.95f + 0.5f * arcD + 0.7f * prog);   // bande plus petite qu'avant (portes moins généreuses) : début plus doux
             // grosse foule : pression un peu moindre (sinon chaque groupe la décimait : 97 → 34 en une rencontre)
             k *= Mathf.Lerp(1f, 0.8f, Mathf.Clamp01((squad.Count - 20) / 79f));
             float t = 26f / Mathf.Max(6f, speed + 6f * Tuning.EnemyRush);   // temps entre l'entrée à portée et le contact
@@ -294,14 +305,15 @@ namespace SamediRouge
         {
             var g = new Gate { z = z };
             int n = squad.Count + 1;
-            bool x2 = n >= 12 && Random.value < 0.2f;
+            bool x2 = n >= 12 && n < 40 && Random.value < 0.15f;
             // trois choix : toujours au moins un bon et un mauvais
             var opts = new List<(int v, bool m)>
             {
                 // peu généreuses : +1..+2 au début, les ×2 n'arrivent qu'avec une bande déjà formée
-                (1 + n / 14, false),
-                (Random.Range(1, 3) + n / 12, false),
-                (x2 ? 2 : Random.Range(2, 4) + n / 12, x2),
+                // (retour : on finissait toujours à 100) — valeurs de départ plus basses
+                (1 + n / 20, false),
+                (Random.Range(1, 3) + n / 16, false),
+                (x2 ? 2 : Random.Range(2, 4) + n / 16, x2),
                 (-Mathf.RoundToInt((Random.Range(2, 5) + n / 3) * (1f + 0.5f * arcD)), false),
             };
             int bad = 3;
@@ -606,13 +618,6 @@ namespace SamediRouge
             hud.Flash(0.35f);
             fovKick = Mathf.Max(fovKick, 7f);
             hud.Toast(runTier >= 3 ? L("SUPER SMG!", "SUPER MITRAILLETTE !") : runTier >= 2 ? L("SMG!", "MITRAILLETTE !") : L("PISTOL!", "PISTOLET !"));
-            // le héros évolue aussi en pleine course (nouvelle tenue) : la progression se voit
-            int form = RunForm;
-            if (form > HomeForm + runTier - 1 && form <= 3)
-            {
-                P.SetLevels(helmetLv, form, weaponLv);
-                hud.FloatKey(new Vector3(px, 3f, pz), L("EVOLUTION!", "ÉVOLUTION !"), Hud.StarGold, true);
-            }
             foreach (Mate m in squad) { m.rig.Land(0.4f); m.rig.Flash(Hud.StarGold, 0.2f); }
             Haptics.Pulse(30, true);
         }
@@ -725,12 +730,14 @@ namespace SamediRouge
             float crossT = (lootEndZ - pz) / Mathf.Max(4f, speed);
             float laneHp = (0.45f + 0.1f * arcD) * lootDps * crossT;
             Perf.Note("cartons : " + lootDps.ToString("0.0") + " dégâts/s, traversée " + crossT.ToString("0.0") + " s, couloir " + laneHp.ToString("0"));
+            int mask = PlayerPrefs.GetInt(LootKey, 0);
             for (int r = 0; r < rows; r++)
                 for (int l = 0; l < 3; l++)
                 {
+                    if ((mask & (1 << (r * 3 + l))) != 0) continue;   // cassé à une tentative précédente : il ne revient pas
                     // premières rangées plus faciles, les dernières plus solides (moyenne = résistance du couloir / 7)
                     int hp = Mathf.Max(3, Mathf.RoundToInt(laneHp / rows * (0.7f + 0.1f * r) * Random.Range(0.9f, 1.1f)));
-                    var b = new LootBox { lane = l, z = z0 + r * gap + Random.Range(-0.6f, 0.6f), hp = hp, max = hp };
+                    var b = new LootBox { lane = l, z = z0 + r * gap + Random.Range(-0.6f, 0.6f), hp = hp, max = hp, id = r * 3 + l };
                     b.tr = Art.Node(world, "loot", new Vector3((l - 1) * Lane, 0f, b.z));
                     float k = 0.8f + 0.06f * Mathf.Min(hp, 8);   // les cartons solides sont plus gros
                     Art.Part(b.tr, Art.Cube, card, new Vector3(0f, 0.6f * k, 0f), new Vector3(1.4f, 1.2f, 1.1f) * k);
@@ -806,23 +813,26 @@ namespace SamediRouge
                 Fx.Confetti(new Vector3(0f, 3f, pz + 2f));
                 Fx.Confetti(new Vector3(-2f, 3f, pz + 1f));
                 Fx.Confetti(new Vector3(2f, 3f, pz + 1f));
+                PlayerPrefs.DeleteKey(LootKey);   // magasin pillé : la prochaine fois, un champ de cartons tout neuf
                 RunWon();
             }
         }
 
-        void SpawnCraft(float z, int lane)
+        void SpawnCraft(float z, int lane, bool armor = false)
         {
-            var c = new Craft { z = z, lane = lane, need = Mathf.RoundToInt((runTier == 0 ? 3 : runTier == 1 ? 5 : runTier == 2 ? 8 : 10 + 3 * craftBoost) * (1f + 0.25f * arcD)) };
+            int step = armor ? armorLv : runTier + craftBoost;
+            var c = new Craft { z = z, lane = lane, armor = armor, need = Mathf.RoundToInt((step == 0 ? 3 : step == 1 ? 5 : step == 2 ? 8 : 10 + 3 * (step - 3)) * (1f + 0.25f * arcD)) };
             Perf.Note("panneau de fusion couloir " + lane + " à " + z.ToString("0") + " (pz " + pz.ToString("0") + ")");
             c.go = new GameObject("craft");
             c.go.transform.SetParent(world, false);
             c.go.transform.localPosition = new Vector3((lane - 1) * Lane, 0f, z);
             Transform t = c.go.transform;
-            Material post = Art.Mat(new Color(0.18f, 0.62f, 0.25f), 0.6f, 0.3f);   // portique vert bien visible, comme le « Craft » de Hell Escape
+            // portique vert pour l'arme, bleu pour l'armure, bien visible comme le « Craft » de Hell Escape
+            Material post = armor ? Art.Mat(new Color(0.18f, 0.38f, 0.75f), 0.6f, 0.3f) : Art.Mat(new Color(0.18f, 0.62f, 0.25f), 0.6f, 0.3f);
             Art.Part(t, Art.Cylinder, post, new Vector3(-1.12f, 1.35f, 0f), new Vector3(0.14f, 1.35f, 0.14f), default, false);
             Art.Part(t, Art.Cylinder, post, new Vector3(1.12f, 1.35f, 0f), new Vector3(0.14f, 1.35f, 0.14f), default, false);
             Art.Part(t, Art.Cube, post, new Vector3(0f, 2.72f, 0f), new Vector3(2.4f, 0.14f, 0.16f), default, false);
-            c.panel = Art.Part(t, Art.Cube, Art.Particle(null, new Color(0.25f, 0.9f, 0.35f, 0.7f)), new Vector3(0f, 1.35f, 0f), new Vector3(2.1f, 2.6f, 0.04f), default, false).transform;
+            c.panel = Art.Part(t, Art.Cube, Art.Particle(null, armor ? new Color(0.3f, 0.55f, 1f, 0.7f) : new Color(0.25f, 0.9f, 0.35f, 0.7f)), new Vector3(0f, 1.35f, 0f), new Vector3(2.1f, 2.6f, 0.04f), default, false).transform;
             // jauge : fond sombre, remplissage vert qui grandit depuis la gauche
             Art.Part(t, Art.Cube, Art.Mat(new Color(0.12f, 0.12f, 0.15f), 0.3f), new Vector3(0f, 2.35f, -0.06f), new Vector3(1.8f, 0.24f, 0.05f), default, false);
             c.bar = Art.Node(t, "bar", new Vector3(-0.88f, 2.35f, -0.1f));
@@ -834,7 +844,15 @@ namespace SamediRouge
             // l'arme à gagner est affichée dans le portique, sous la jauge, face à la caméra
             ic.localPosition = new Vector3(0f, 1.2f, -0.15f);
             ic.localRotation = Quaternion.Euler(20f, 0f, 0f);
-            if (FitModel(ic, TierModel(Mathf.Min(runTier + 1, 3)), 1.6f) == null)
+            if (armor)
+            {
+                // l'armure à gagner : icône du vêtement (sweat, blouson, gilet volé)
+                Texture2D tex = GearIcons.Upgrade(1, true, Mathf.Clamp(armorLv + 1, 1, 3)).texture;
+                tex.name = "armor" + Mathf.Clamp(armorLv + 1, 1, 3);
+                ic.localRotation = Quaternion.identity;
+                Art.Part(ic, Art.Quad, Art.Particle(tex, Color.white), new Vector3(0f, 0.1f, 0f), new Vector3(1.3f, 1.3f, 1f), default, false);
+            }
+            else if (FitModel(ic, TierModel(Mathf.Min(runTier + 1, 3)), 1.6f) == null)
                 Art.Part(ic, Art.Cube, Art.Glow(new Color(1f, 0.8f, 0.3f), new Color(0.6f, 0.4f, 0.05f), 0.85f), Vector3.zero, new Vector3(0.9f, 0.26f, 0.18f));
             crafts.Add(c);
         }
@@ -938,6 +956,7 @@ namespace SamediRouge
             b.punch = 1f;
             if (b.hp > 0) return;
             b.broken = true;
+            PlayerPrefs.SetInt(LootKey, PlayerPrefs.GetInt(LootKey, 0) | (1 << b.id));
             int gain = b.max;
             coins += gain;
             Vector3 p = b.tr.position + Vector3.up * 0.8f;
@@ -993,15 +1012,17 @@ namespace SamediRouge
             Vector3 at = new Vector3((l - 1) * Lane, 2.3f, g.z);
             if (g.mul[l])
             {
-                if (++g.hits[l] % 6 == 0)
+                if (++g.hits[l] >= 8 && g.val[l] < 4)   // multiplicateur : +1 tous les 8 tirs, jusqu'à ×4
                 {
+                    g.hits[l] = 0;
                     g.val[l]++;
                     hud.FloatKey(at, "×" + g.val[l] + "!", Hud.Yellow, true);
                     Snd.PlayPitch(Snd.I.pickup, 0.5f, 1.3f);
                 }
             }
-            else if (++g.hits[l] % 2 == 0)   // +1 tous les 2 tirs (retour : montait trop vite)
+            else if (++g.hits[l] >= 3 + Mathf.Max(0, g.val[l]) / 5)   // +1 tous les 3 tirs, de plus en plus dur (retour : on finissait toujours à 100)
             {
+                g.hits[l] = 0;
                 g.val[l]++;
                 if (g.val[l] == 0) g.val[l] = 1;   // pas de porte « 0 »
                 hud.FloatKey(at, "+1", Hud.Yellow, false);
@@ -1031,6 +1052,7 @@ namespace SamediRouge
             Fx.Confetti(c.go.transform.position + Vector3.up * 1.6f);
             Snd.Play(Snd.I.pickup, 0.9f, 0f);
             Destroy(c.go, 0.05f);
+            if (c.armor) { UpgradeArmor(); return; }
             if (runTier == 0) { UpgradeWeapon(); return; }
             if (runTier >= 3) { BoostWeapon(); return; }
             if (mergeA != null) Destroy(mergeA.gameObject);
@@ -1040,21 +1062,38 @@ namespace SamediRouge
             mergeT = 0f;
         }
 
+        /// <summary>Atelier d'armure rempli : nouvelle tenue (sweat → blouson → gilet volé), puis +1 niveau ; chaque niveau protège la bande.</summary>
+        void UpgradeArmor()
+        {
+            armorLv++;
+            Perf.Note("armure niveau " + armorLv + ", défense " + (DefChance * 100f).ToString("0") + " %");
+            int vest = RunForm;
+            P.SetLevels(helmetLv, vest, weaponLv);
+            Fx.Confetti(IconBase);
+            P.Flash(new Color(0.4f, 0.7f, 1f), 0.3f);
+            Snd.Play(Snd.I.pickup, 1f, 0f);
+            Snd.Play(Snd.I.perfect, 0.7f, 0f);
+            hud.Flash(0.3f);
+            fovKick = Mathf.Max(fovKick, 6f);
+            hud.Toast(armorLv == 1 ? L("HOODIE!", "SWEAT !") : armorLv == 2 ? L("JACKET!", "BLOUSON !") : armorLv == 3 ? L("STOLEN VEST!", "GILET VOLÉ !") : L("ARMOR +15%", "ARMURE +15 %"));
+            foreach (Mate m in squad) { m.rig.Land(0.4f); m.rig.Flash(new Color(0.4f, 0.7f, 1f), 0.2f); }
+            Haptics.Pulse(30, true);
+        }
+
         /// <summary>Un bonus debout dans un couloir : carte dorée avec son icône ; on le prend en passant dedans.</summary>
         void SpawnBoon(float z)
         {
-            int kind = Random.Range(0, 3);
-            if (kind == lastBoonKind) kind = (kind + 1 + Random.Range(0, 2)) % 3;
+            int kind = lastBoonKind < 0 ? Random.Range(0, 2) : 1 - lastBoonKind;   // attaque et défense en alternance
             lastBoonKind = kind;
             var bo = new Boon { z = z, lane = Random.Range(0, 3), kind = kind };
             bo.go = new GameObject("boon");
             bo.go.transform.SetParent(world, false);
             bo.go.transform.localPosition = new Vector3((bo.lane - 1) * Lane, 0f, z);
             Transform t = Art.Node(bo.go.transform, "card", Vector3.zero);
-            Color face = kind == 0 ? new Color(0.16f, 0.45f, 0.95f) : kind == 1 ? new Color(0.85f, 0.2f, 0.2f) : new Color(0.25f, 0.7f, 0.3f);
+            Color face = kind == 0 ? new Color(0.85f, 0.2f, 0.2f) : new Color(0.16f, 0.45f, 0.95f);
             Art.Part(t, Art.Cube, Art.Glow(new Color(1f, 0.82f, 0.25f), new Color(1.2f, 0.9f, 0.2f), 0.5f), new Vector3(0f, 1.55f, 0f), new Vector3(1.5f, 1.9f, 0.12f), default, false);
             Art.Part(t, Art.Cube, Art.Glow(face, face * 0.5f, 0.3f), new Vector3(0f, 1.55f, -0.07f), new Vector3(1.3f, 1.7f, 0.02f), default, false);
-            Sprite sp = GearIcons.Get(kind == 0 ? "rate" : kind == 1 ? "dmg" : "gang");
+            Sprite sp = GearIcons.Get(kind == 0 ? "atk" : "def");
             Texture2D tex = sp.texture;
             tex.name = "boon" + kind;   // la clé du matériau dépend du nom de la texture
             Art.Part(t, Art.Quad, Art.Particle(tex, Color.white), new Vector3(0f, 1.6f, -0.09f), new Vector3(1.15f, 1.15f, 1f), default, false);
@@ -1091,11 +1130,10 @@ namespace SamediRouge
             P.Flash(Hud.StarGold, 0.25f);
             hud.Flash(0.2f);
             Haptics.Pulse(20, true);
-            if (bo.kind == 0) { fireBoon++; hud.Toast(L("FIRE RATE +20%", "CADENCE +20 %")); }
-            else if (bo.kind == 1) { dmgBoon++; hud.Toast(L("DAMAGE +20%", "DÉGÂTS +20 %")); }
-            else { int n = 4 + Mathf.RoundToInt(2f * arcD); AddMates(n); hud.Toast(L("+" + n + " RECRUITS", "+" + n + " RENFORTS")); }
-            hud.SetBoons(fireBoon, dmgBoon);
-            Perf.Note("bonus pris : " + bo.kind + " (cadence " + fireBoon + ", dégâts " + dmgBoon + ")");
+            if (bo.kind == 0) { dmgBoon++; hud.Toast(L("ATTACK +20%", "ATTAQUE +20 %")); }
+            else { defBoon++; hud.Toast(L("DEFENSE +20%", "DÉFENSE +20 %")); }
+            hud.SetBoons(dmgBoon, defBoon);
+            Perf.Note("bonus pris : " + bo.kind + " (attaque " + dmgBoon + ", défense " + defBoon + ")");
         }
 
         /// <summary>Atelier rempli avec la meilleure arme : l'arme monte d'un niveau, toute la bande tire plus vite.</summary>
@@ -1154,7 +1192,8 @@ namespace SamediRouge
             }
             // carte d'arme fixe sur le bord droit (pas de texte dans la scène, comme Hell Escape)
             hud.SetWeaponCard(runTier, RunWeaponLv);
-            hud.SetBoons(fireBoon, dmgBoon);
+            hud.SetArmorCard(armorLv);
+            hud.SetBoons(dmgBoon, defBoon);
             int myLane = Mathf.Clamp(Mathf.RoundToInt(px / Lane) + 1, 0, 2);
             foreach (LootBox b in loot)
             {
