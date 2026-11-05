@@ -483,6 +483,7 @@ namespace SamediRouge
 
         // ---------------------------------------------------------------- carte d'arme (comme la carte « EQUIPPED » de Hell Escape)
 
+        bool stageWide;
         Image wCard, wIcon;
         Text wLv;
         int wShownLv = -1, wShownTier = -1;
@@ -494,15 +495,15 @@ namespace SamediRouge
             if (wCard == null)
             {
                 wCard = Img(play.transform, round, new Color(0.16f, 0.55f, 0.95f, 0.97f));
-                Place(wCard.rectTransform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-22f, 170f), new Vector2(150f, 176f), new Vector2(1f, 0.5f));
+                Place(wCard.rectTransform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-22f, 170f), new Vector2(184f, 208f), new Vector2(1f, 0.5f));
                 Image inner = Img(wCard.rectTransform, round, new Color(0.05f, 0.2f, 0.45f, 0.95f));
                 Place(inner.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, new Vector2(-16f, -16f));
                 wIcon = Img(wCard.rectTransform, GearIcons.Upgrade(2, true, 1), Color.white);
                 wIcon.preserveAspect = true;
-                Place(wIcon.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-6f, 14f), new Vector2(112f, 112f));
-                wLv = Label(wCard.rectTransform, "", 58, Color.white, TextAnchor.LowerRight, true);
+                Place(wIcon.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-14f, 24f), new Vector2(118f, 118f));
+                wLv = Label(wCard.rectTransform, "", 52, Color.white, TextAnchor.LowerRight, true);
                 Shadowed(wLv);
-                Place(wLv.rectTransform, Vector2.zero, Vector2.one, new Vector2(-12f, 2f), new Vector2(-8f, -8f));
+                Place(wLv.rectTransform, Vector2.zero, Vector2.one, new Vector2(-6f, 6f), new Vector2(-28f, -20f));
             }
             if (!wCard.gameObject.activeSelf) wCard.gameObject.SetActive(true);
             if (tier != wShownTier) { wShownTier = tier; wIcon.sprite = GearIcons.Upgrade(2, true, Mathf.Clamp(tier + 1, 1, 3)); }
@@ -931,7 +932,13 @@ namespace SamediRouge
             Slot(4, gear[1], gear[1] ? "" : next == 1 ? L("NEXT", "SUIV.") : "", next == 1 && !gear[1]);
             Slot(5, gear[3], gear[3] && chargeT > 0f ? Mathf.CeilToInt(chargeT) + " s" : next == 3 ? L("NEXT", "SUIV.") : "", next == 3 && !gear[3]);
             Slot(6, squad > 0, squad > 0 ? "x" + squad : "", false);
-            if (Quiet) for (int i = 0; i < slotShow.Length; i++) slotShow[i] = false;   // arcade : la taille de la bande est affichée au-dessus du héros
+            if (Quiet) for (int i = 0; i < slotShow.Length; i++) slotShow[i] = false;
+            if (Quiet && !stageWide)
+            {
+                // arcade (pas de compteur de KO à droite) : la barre d'étape va jusqu'au bord droit, alignée sur la pastille des pièces
+                stageWide = true;
+                Place(stageBg.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, stageBg.rectTransform.anchoredPosition.y), new Vector2(-52f, 50f), new Vector2(0.5f, 1f));
+            }   // arcade : la taille de la bande est affichée au-dessus du héros
             LayoutSlots();
         }
 

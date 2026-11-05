@@ -2134,7 +2134,8 @@ namespace SamediRouge
                 Mate m = squad[i];
                 Vector2 sl = SlotAt(m.slot);
                 float tx = Mathf.Clamp(px + sl.x, -3.5f, 3.5f), tz = pz + sl.y;
-                bool charge = threats.Count > 0;
+                // arcade : la foule garde sa forme au contact (elle ne fonce plus sur les vigiles : plus lisible, plus propre)
+                bool charge = threats.Count > 0 && !Tuning.Arcade;
                 if (charge)
                 {
                     // cibles réparties : les plus proches d'abord, en évitant d'empiler toute l'escouade sur le même
