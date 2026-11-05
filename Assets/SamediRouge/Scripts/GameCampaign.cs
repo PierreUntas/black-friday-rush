@@ -675,7 +675,7 @@ namespace SamediRouge
             metaScreen = MetaScreen.Home;
             menuFreeBottom = 760f;
             menuFill = 0.34f;
-            menuDrop = 0.17f;   // héros un peu plus bas : la carte de progression du quartier est au-dessus
+            menuDrop = 0.29f;   // héros centré entre la carte de progression du quartier et « GLISSE POUR JOUER »
             menuFit = true;   // cadrage sur la taille réelle du personnage (comme la page Équipement)
             campaign = false;
             tutorialMode = false;

@@ -117,7 +117,8 @@ namespace SamediRouge
         void BuildZone()
         {
             zoneRoot = New("zone", homeRoot.transform);
-            Place(zoneRoot, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -172f), new Vector2(940f, 190f), new Vector2(0.5f, 1f));
+            // même largeur que la rangée du haut : du bord gauche de RESET au bord droit de la pastille des dollars
+            Place(zoneRoot, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(-5f, -172f), new Vector2(-60f, 190f), new Vector2(0.5f, 1f));
             Image bg = Img(zoneRoot, round, new Color(0.06f, 0.08f, 0.11f, 0.82f));
             Stretch(bg.rectTransform);
             zoneTitle = Label(zoneRoot, "", 30, Yellow, TextAnchor.MiddleCenter, true);
