@@ -886,7 +886,144 @@ namespace SamediRouge
             return Sprite.Create(t, new Rect(0, 0, n, n), new Vector2(0.5f, 0.5f), 100f);
         }
         Text resEarned, resTotal, resCurName, resMore, resUpgLabel;
-        float resCountT = -1f, resLastShown;
+        float resCountT = -1f, resLastShown, resCountDur = 0.6f;
+
+        // ---------------------------------------------------------------- bilan arcade « qui envoie du lourd »
+        // Les lignes du butin tombent une à une, le multiplicateur de l'escalator s'abat comme un tampon,
+        // puis le total défile pendant qu'une pluie de pièces jaillit.
+        RectTransform brkRoot;
+        Text[] brkL, brkV;
+        Text brkStamp, brkStampSub;
+        float brkT = -1f, brkStampAt, brkCountAt;
+        int brkN, brkMult;
+        bool brkStampHit;
+        const int CoinN = 36;
+        Image[] coinImg;
+        readonly Vector2[] coinV = new Vector2[CoinN];
+        readonly float[] coinLife = new float[CoinN], coinSpin = new float[CoinN], coinAng = new float[CoinN];
+
+        /// <summary>Arcade : détail du gain (lignes libellé / valeur) et multiplicateur de l'escalator (1 = pas de tampon).</summary>
+        public void ShowBreakdown(string[] labels, string[] values, int mult)
+        {
+            Transform card = resTagBg.transform.parent;
+            if (brkRoot == null)
+            {
+                brkRoot = New("breakdown", card);
+                Place(brkRoot, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, -440f), new Vector2(0f, 620f), new Vector2(0.5f, 1f));
+                brkL = new Text[6];
+                brkV = new Text[6];
+                for (int i = 0; i < 6; i++)
+                {
+                    brkL[i] = Label(brkRoot, "", 42, Color.white, TextAnchor.MiddleLeft, true);
+                    Shadowed(brkL[i]);
+                    Place(brkL[i].rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(70f, -40f - i * 78f), new Vector2(560f, 64f), new Vector2(0f, 0.5f));
+                    brkV[i] = Label(brkRoot, "", 46, StarGold, TextAnchor.MiddleRight, true);
+                    Shadowed(brkV[i]);
+                    Place(brkV[i].rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-70f, -40f - i * 78f), new Vector2(330f, 64f), new Vector2(1f, 0.5f));
+                }
+                brkStampSub = Label(brkRoot, "ESCALATOR", 40, Color.white, TextAnchor.MiddleCenter, true);
+                Shadowed(brkStampSub);
+                Place(brkStampSub.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 190f), new Vector2(600f, 56f));
+                brkStamp = Label(brkRoot, "", 190, StarGold, TextAnchor.MiddleCenter, true);
+                var ol = brkStamp.gameObject.AddComponent<Shadow>();
+                ol.effectColor = new Color(0.45f, 0.12f, 0.05f, 1f);
+                ol.effectDistance = new Vector2(6f, -6f);
+                Place(brkStamp.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 70f), new Vector2(700f, 220f));
+                coinImg = new Image[CoinN];
+                Sprite cs = GearIcons.Art("dollar");
+                for (int i = 0; i < CoinN; i++)
+                {
+                    coinImg[i] = cs != null ? Img(resRoot.transform, cs, Color.white) : Img(resRoot.transform, round, StarGold);
+                    Place(coinImg[i].rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), Vector2.zero, new Vector2(84f, 84f));
+                    coinImg[i].gameObject.SetActive(false);
+                }
+            }
+            brkRoot.gameObject.SetActive(true);
+            brkN = Mathf.Min(labels.Length, 6);
+            for (int i = 0; i < 6; i++)
+            {
+                brkL[i].text = i < brkN ? labels[i] : "";
+                brkV[i].text = i < brkN ? values[i] : "";
+                brkL[i].transform.localScale = brkV[i].transform.localScale = Vector3.zero;
+            }
+            brkMult = mult;
+            brkStamp.text = "×" + mult;
+            brkStamp.transform.localScale = Vector3.zero;
+            brkStampSub.gameObject.SetActive(false);
+            brkStampHit = false;
+            brkT = 0f;
+            brkStampAt = 0.35f + brkN * 0.32f + 0.15f;
+            brkCountAt = mult > 1 ? brkStampAt + 0.45f : brkStampAt;
+            // le total attend la fin du détail, puis défile plus longtemps
+            resCountT = -1f;
+            resCountDur = 1.3f;
+            resEarned.text = "+0";
+        }
+
+        void CoinBurst(int n, float power)
+        {
+            for (int i = 0, k = 0; i < CoinN && k < n; i++)
+            {
+                if (coinLife[i] > 0f) continue;
+                k++;
+                coinLife[i] = Random.Range(1.2f, 1.8f);
+                coinV[i] = new Vector2(Random.Range(-900f, 900f), Random.Range(1400f, 2300f)) * power;
+                coinSpin[i] = Random.Range(-720f, 720f);
+                coinImg[i].rectTransform.anchoredPosition = new Vector2(Random.Range(-200f, 200f), 520f);
+                coinImg[i].gameObject.SetActive(true);
+            }
+        }
+
+        void TickBreakdown(float udt)
+        {
+            if (coinImg != null)
+                for (int i = 0; i < CoinN; i++)
+                {
+                    if (coinLife[i] <= 0f) continue;
+                    coinLife[i] -= udt;
+                    coinV[i].y -= 3200f * udt;
+                    RectTransform rt = coinImg[i].rectTransform;
+                    rt.anchoredPosition += coinV[i] * udt;
+                    coinAng[i] += coinSpin[i] * udt;
+                    rt.localRotation = Quaternion.Euler(0f, 0f, coinAng[i]);
+                    rt.localScale = new Vector3(Mathf.Abs(Mathf.Cos(Time.unscaledTime * 8f + i)), 1f, 1f);
+                    if (coinLife[i] <= 0f) coinImg[i].gameObject.SetActive(false);
+                }
+            if (brkT < 0f || brkRoot == null || !resRoot.activeSelf) return;
+            float prev = brkT;
+            brkT += udt;
+            for (int i = 0; i < brkN; i++)
+            {
+                float at = 0.35f + i * 0.32f, k = Mathf.Clamp01((brkT - at) / 0.18f);
+                if (prev < at && brkT >= at) { Snd.PlayPitch(Snd.I != null ? Snd.I.tick : null, 0.5f, 1f + 0.12f * i); Haptics.Pulse(8); }
+                float s = k <= 0f ? 0f : k < 1f ? Mathf.Lerp(1.6f, 1f, k) : 1f;
+                brkL[i].transform.localScale = brkV[i].transform.localScale = Vector3.one * s;
+            }
+            if (brkMult > 1)
+            {
+                // le tampon : arrive énorme, s'écrase, l'écran tremble
+                float k = Mathf.Clamp01((brkT - brkStampAt) / 0.2f);
+                brkStamp.transform.localScale = Vector3.one * (k <= 0f ? 0f : k < 1f ? Mathf.Lerp(3.2f, 1f, k * k) : 1f + 0.05f * Mathf.Sin(Time.unscaledTime * 6f));
+                brkStamp.transform.localRotation = Quaternion.Euler(0f, 0f, -10f);
+                if (!brkStampHit && k >= 1f)
+                {
+                    brkStampHit = true;
+                    brkStampSub.gameObject.SetActive(true);
+                    Snd.Play(Snd.I != null ? Snd.I.crash : null, 0.8f, 0f);
+                    Snd.Play(Snd.I != null ? Snd.I.perfect : null, 0.7f, 0f);
+                    Haptics.Pulse(40, true);
+                    Flash(0.45f);
+                    resRoot.transform.localScale = Vector3.one * 1.06f;
+                    CoinBurst(14, 0.8f);
+                }
+            }
+            if (prev < brkCountAt && brkT >= brkCountAt)
+            {
+                resCountT = 0f;   // le total se met à défiler
+                CoinBurst(CoinN, 1f);
+                Snd.Play(Snd.I != null ? Snd.I.coin : null, 0.7f, 0f);
+            }
+        }
         int resEarnedTarget, resBankTarget, resBankBefore;
         bool resVictory;
 
@@ -943,8 +1080,11 @@ namespace SamediRouge
             resBankTarget = bank;
             resBankBefore = bank - earned;
             resCountT = 0f;
+            resCountDur = 0.6f;
             resLastShown = 0f;
             resEarned.text = "+0";
+            brkT = -1f;
+            if (brkRoot != null) brkRoot.gameObject.SetActive(false);
             SetTracks(tracks, resBankBefore);
             resMore.gameObject.SetActive(tracks != null);
             resCont.SetActive(victory);
@@ -1067,7 +1207,7 @@ namespace SamediRouge
             if (resCountT < 0f) return;
             // compteur rapide (≈ 0,7 s) : les jauges se remplissent en même temps que le gain s'affiche
             resCountT += udt;
-            float u = Mathf.Clamp01((resCountT - 0.12f) / 0.6f);
+            float u = Mathf.Clamp01((resCountT - 0.12f) / resCountDur);
             float shown = Mathf.Round(resEarnedTarget * (1f - (1f - u) * (1f - u)));
             if (shown > resLastShown)
             {
@@ -1397,6 +1537,7 @@ namespace SamediRouge
                     else gBuy[i].transform.localScale = Vector3.MoveTowards(gBuy[i].transform.localScale, Vector3.one, udt * 2f);
             TickHealth(udt);
             TickResultCount(udt);
+            TickBreakdown(udt);
             if (inputDbgT > 0f)
             {
                 inputDbgT -= udt;

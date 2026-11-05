@@ -396,7 +396,7 @@ namespace SamediRouge
             metaScreen = MetaScreen.Result;
             bool already = Progress.Conquered(thief, streetIdx);
             int bonus = already ? Mathf.RoundToInt(Tuning.VictoryBonus[streetIdx] * Tuning.ReplayBonusFactor) : Tuning.VictoryBonus[streetIdx];
-            int crewN = squad.Count + 1;
+            int crewN = Tuning.Arcade && finaleCrew > 0 ? finaleCrew : squad.Count + 1;   // la bande arrivée au pied de l'escalator
             if (Tuning.Arcade) bonus += crewN * 4 + 40;   // arcade : chaque membre de la bande rapporte au pillage, + prime de victoire
             int total = coins + bonus;
             if (Tuning.Arcade) total = Mathf.RoundToInt(total * IncomeMult * stairMult);   // amélioration « Revenus » de l'accueil × hauteur atteinte sur l'escalator
@@ -431,6 +431,15 @@ namespace SamediRouge
                 string title = zoneDone ? L("DISTRICT " + ((streetIdx + 1) / Hud.ZoneLen) + " CLEARED!", "QUARTIER " + ((streetIdx + 1) / Hud.ZoneLen) + " TERMINÉ !")
                                         : L("MEGA STORE RAIDED!", "MEGA STORE PILLÉ !") + (stairMult > 1 ? "  ×" + stairMult : "");
                 hud.ShowResult(true, title, "", "", total, Progress.Coins, null, "", L("CONTINUE", "CONTINUER"));
+                // détail du butin, puis le tampon de l'escalator et le total qui défile
+                var bl = new System.Collections.Generic.List<string>();
+                var bv = new System.Collections.Generic.List<string>();
+                bl.Add(L("Loot grabbed", "Butin ramassé")); bv.Add("+" + coins);
+                bl.Add(L("Crew ×", "Bande ×") + crewN); bv.Add("+" + (crewN * 4));
+                bl.Add(L("Victory bonus", "Prime de victoire")); bv.Add("+" + (bonus - crewN * 4));
+                if (IncomeMult > 1.001f) { bl.Add(L("Income", "Revenus")); bv.Add("×" + IncomeMult.ToString("0.0")); }
+                if (zoneBonus > 0) { bl.Add(L("District cleared", "Quartier terminé")); bv.Add("+" + zoneBonus); }
+                hud.ShowBreakdown(bl.ToArray(), bv.ToArray(), stairMult);
                 return;
             }
             hud.minimalResult = false;

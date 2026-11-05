@@ -57,7 +57,7 @@ namespace SamediRouge
         const int StairSteps = 30;
         const float StairD = 1.1f, StairRise = 0.17f;
         float stairZ0 = -1f;
-        int climbStep, stairMult = 1;
+        int climbStep, stairMult = 1, finaleCrew;   // finaleCrew : taille de la bande au pied de l'escalator (pour le bilan)
         bool climbStopped;
         float climbStopT;
         GameObject stairsGo;
@@ -79,6 +79,7 @@ namespace SamediRouge
             stairZ0 = -1f;
             climbStep = 0;
             stairMult = 1;
+            finaleCrew = 0;
             climbStopped = false;
             climbStopT = 0f;
             if (stairsGo != null) Destroy(stairsGo);
@@ -131,6 +132,7 @@ namespace SamediRouge
                 return;
             }
             int at = Mathf.FloorToInt((pz - stairZ0) / StairD);
+            if (climbStep == 0 && at >= 0 && finaleCrew == 0) finaleCrew = squad.Count + 1;
             while (at >= climbStep && climbStep < StairSteps)
             {
                 int cost = StepCost(climbStep);
@@ -865,12 +867,15 @@ namespace SamediRouge
             float laneHp = (0.62f + 0.08f * arcD) * lootDps * crossT;
             Perf.Note("cartons : " + lootDps.ToString("0.0") + " dégâts/s, traversée " + crossT.ToString("0.0") + " s, couloir " + laneHp.ToString("0"));
             int mask = PlayerPrefs.GetInt(LootKey, 0);
+            // première tentative (rien de cassé) : les rangées du fond sont bien plus solides → on n'y arrive pas du premier coup,
+            // mais ce qu'on a cassé reste cassé, et la tentative suivante passe (comme Hell Escape)
+            bool firstTry = mask == 0;
             for (int r = 0; r < rows; r++)
                 for (int l = 0; l < 3; l++)
                 {
                     if ((mask & (1 << (r * 3 + l))) != 0) continue;   // cassé à une tentative précédente : il ne revient pas
                     // premières rangées plus faciles, les dernières plus solides (moyenne = résistance du couloir / 7)
-                    int hp = Mathf.Max(3, Mathf.RoundToInt(laneHp / rows * (0.7f + 0.1f * r) * Random.Range(0.9f, 1.1f)));
+                    int hp = Mathf.Max(3, Mathf.RoundToInt(laneHp / rows * (0.7f + 0.1f * r) * Random.Range(0.9f, 1.1f) * (firstTry && r >= 3 ? 2.6f : 1f)));
                     var b = new LootBox { lane = l, z = z0 + r * gap + Random.Range(-0.6f, 0.6f), hp = hp, max = hp, id = r * 3 + l };
                     b.tr = Art.Node(world, "loot", new Vector3((l - 1) * Lane, 0f, b.z));
                     float k = 0.8f + 0.06f * Mathf.Min(hp, 8);   // les cartons solides sont plus gros
