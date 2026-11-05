@@ -51,6 +51,134 @@ namespace SamediRouge
         readonly List<LootBox> loot = new List<LootBox>();
         float lootEndZ = -1f;
 
+        // ---------------------------------------------------------------- escalator de fin (à la Hell Escape)
+        // Après les cartons, la bande monte un grand escalator : chaque marche « coûte » des voleurs qui restent dessus.
+        // Plus la bande est grande, plus on monte haut, et plus le butin du MEGA STORE est multiplié (×2, ×3, ×5 au sommet).
+        const int StairSteps = 30;
+        const float StairD = 1.1f, StairRise = 0.17f;
+        float stairZ0 = -1f;
+        int climbStep, stairMult = 1;
+        bool climbStopped;
+        float climbStopT;
+        GameObject stairsGo;
+        readonly List<Rig> parked = new List<Rig>();
+
+        static int StepCost(int i) => i < 10 ? 1 : i < 20 ? 2 : 3;
+        static int StepMult(int stepsClimbed) => stepsClimbed >= StairSteps ? 5 : stepsClimbed >= 20 ? 3 : stepsClimbed >= 10 ? 2 : 1;
+
+        /// <summary>Hauteur du sol à la profondeur z (marches de l'escalator, puis le palier du haut).</summary>
+        float StairY(float z)
+        {
+            if (stairZ0 < 0f || z < stairZ0) return 0f;
+            int i = Mathf.FloorToInt((z - stairZ0) / StairD);
+            return Mathf.Min(i + 1, StairSteps) * StairRise;
+        }
+
+        void ClearStairs()
+        {
+            stairZ0 = -1f;
+            climbStep = 0;
+            stairMult = 1;
+            climbStopped = false;
+            climbStopT = 0f;
+            if (stairsGo != null) Destroy(stairsGo);
+            stairsGo = null;
+            foreach (Rig r in parked) if (r != null) Destroy(r.root.gameObject);
+            parked.Clear();
+        }
+
+        void BuildStairs(float z0)
+        {
+            stairZ0 = z0;
+            stairsGo = new GameObject("escalator");
+            stairsGo.transform.SetParent(world, false);
+            Transform t = stairsGo.transform;
+            float w = Lane * 3f + 1.2f;
+            Material stepA = Art.Mat(new Color(0.62f, 0.64f, 0.7f), 0.6f, 0.4f);
+            Material stepB = Art.Mat(new Color(0.5f, 0.52f, 0.58f), 0.6f, 0.4f);
+            Material rail = Art.Mat(new Color(0.15f, 0.15f, 0.18f), 0.5f, 0.3f);
+            Material[] tier = {
+                Art.Glow(new Color(0.3f, 0.85f, 0.35f), new Color(0.3f, 1.1f, 0.35f), 0.5f),   // ×2
+                Art.Glow(new Color(0.25f, 0.55f, 1f), new Color(0.3f, 0.6f, 1.4f), 0.5f),     // ×3
+                Art.Glow(new Color(1f, 0.8f, 0.2f), new Color(1.4f, 1.0f, 0.25f), 0.5f) };    // ×5
+            for (int i = 0; i < StairSteps; i++)
+            {
+                float h = (i + 1) * StairRise, zc = z0 + (i + 0.5f) * StairD;
+                Material m = (i + 1) % 10 == 0 ? tier[(i + 1) / 10 - 1] : i % 2 == 0 ? stepA : stepB;
+                Art.Part(t, Art.Cube, m, new Vector3(0f, h * 0.5f, zc), new Vector3(w, h, StairD), default, false);
+            }
+            // palier du haut jusqu'au magasin, et rampes noires sur les côtés
+            float topH = StairSteps * StairRise, top = z0 + StairSteps * StairD;
+            Art.Part(t, Art.Cube, stepA, new Vector3(0f, topH * 0.5f, top + 9f), new Vector3(w + 6f, topH, 18f), default, false);
+            for (int sgn = -1; sgn <= 1; sgn += 2)
+            {
+                float len = StairSteps * StairD;
+                float ang = Mathf.Atan2(topH, len) * Mathf.Rad2Deg;
+                Art.Part(t, Art.Cube, rail, new Vector3(sgn * (w * 0.5f + 0.15f), topH * 0.5f + 0.5f, z0 + len * 0.5f), new Vector3(0.3f, 0.5f, Mathf.Sqrt(len * len + topH * topH)), new Vector3(-ang, 0f, 0f), false);
+            }
+        }
+
+        /// <summary>Chaque marche franchie laisse des voleurs dessus ; s'il n'y a plus assez de monde, l'ascension s'arrête là.</summary>
+        void ClimbTick(float dt)
+        {
+            foreach (Rig r in parked) if (r != null) { r.anim = Anim.Cheer; r.Tick(dt); }
+            if (stairZ0 < 0f) return;
+            if (climbStopped)
+            {
+                speed = 0f;
+                climbStopT += dt;
+                if (climbStopT > 1.3f && finaleZ >= 0f) { finaleZ = -1f; FinishRaid(); }
+                return;
+            }
+            int at = Mathf.FloorToInt((pz - stairZ0) / StairD);
+            while (at >= climbStep && climbStep < StairSteps)
+            {
+                int cost = StepCost(climbStep);
+                if (squad.Count < cost)
+                {
+                    climbStopped = true;
+                    stairMult = StepMult(climbStep);
+                    P.anim = Anim.Cheer;
+                    hud.Toast(stairMult > 1 ? L("LOOT ×", "BUTIN ×") + stairMult + " !" : L("OUT OF CREW!", "PLUS ASSEZ DE MONDE !"));
+                    Perf.Note("escalator : arrêt marche " + climbStep + ", butin ×" + stairMult);
+                    return;
+                }
+                float sz = stairZ0 + (climbStep + 0.5f) * StairD, sy = (climbStep + 1) * StairRise;
+                for (int k = 0; k < cost; k++)
+                {
+                    int idx = squad.Count - 1;
+                    Mate m = squad[idx];
+                    squad.RemoveAt(idx);
+                    Rig r = m.rig;
+                    r.root.localPosition = new Vector3(px + (k - (cost - 1) * 0.5f) * 0.9f + Random.Range(-0.2f, 0.2f), sy, sz);
+                    r.root.localRotation = Quaternion.Euler(0f, 180f + Random.Range(-25f, 25f), 0f);   // ils se retournent pour applaudir
+                    parked.Add(r);
+                }
+                for (int k = 0; k < squad.Count; k++) squad[k].slot = k;
+                climbStep++;
+                if (climbStep % 10 == 0)
+                {
+                    Fx.Confetti(new Vector3(px, sy + 2f, sz));
+                    Snd.Play(Snd.I.perfect, 0.7f, 0f);
+                    hud.Toast(L("LOOT ×", "BUTIN ×") + StepMult(climbStep) + " !");
+                    Haptics.Pulse(20, true);
+                }
+                else Snd.PlayPitch(Snd.I.tick, 0.35f, 1f + 0.03f * climbStep);
+            }
+            if (climbStep >= StairSteps) stairMult = 5;
+        }
+
+        /// <summary>Le magasin est pillé (au sommet, ou là où l'ascension s'est arrêtée).</summary>
+        void FinishRaid()
+        {
+            Fx.Confetti(new Vector3(0f, 3f + StairY(pz), pz + 2f));
+            Fx.Confetti(new Vector3(-2f, 3f + StairY(pz), pz + 1f));
+            Fx.Confetti(new Vector3(2f, 3f + StairY(pz), pz + 1f));
+            PlayerPrefs.DeleteKey(LootKey);   // magasin pillé : la prochaine fois, un champ de cartons tout neuf
+            Perf.Note("escalator : " + climbStep + " marches, butin ×" + stairMult);
+            RunWon();
+        }
+
         readonly List<Gate> gates = new List<Gate>();
         float nextGateZ, nextCrateZ, mateVolleyT;
         /// <summary>Niveau d'arme de la course : 0 mains nues, 1 pistolet, 2 mitraillette, 3 mitraillette renforcée.</summary>
@@ -187,6 +315,7 @@ namespace SamediRouge
             foreach (LootBox b in loot) if (b.tr != null) Destroy(b.tr.gameObject);
             loot.Clear();
             lootEndZ = -1f;
+            ClearStairs();
             mateVolleyT = 0.5f;
             runTier = gear[GSmg] ? 2 : gear[GPistol] ? 1 : 0;
             freeX = 0f;
@@ -384,6 +513,7 @@ namespace SamediRouge
         {
             SwooshTick(dt);
             FinaleTick();
+            if (finaleZ >= 0f || climbStopped) ClimbTick(dt);
             if (st != St.Play) return;
             MergeTick(dt);
             PropsTick(dt);
@@ -715,7 +845,9 @@ namespace SamediRouge
             const int rows = 7;
             float z0 = pz + 18f, gap = 6.5f;
             lootEndZ = z0 + (rows - 1) * gap;
-            finaleZ = lootEndZ + 22f;
+            ClearStairs();
+            BuildStairs(lootEndZ + 10f);
+            finaleZ = stairZ0 + StairSteps * StairD + 9f;   // le magasin attend en haut de l'escalator
             nextSpawnZ = 1e9f;
             hud.Toast(L("SMASH THE CRATES!", "CASSE LES CARTONS !"));   // ils barrent la route jusqu'au MEGA STORE
             foreach (LootBox b in loot) if (b.tr != null) Destroy(b.tr.gameObject);
@@ -755,6 +887,7 @@ namespace SamediRouge
                     e.rig.KO(new Vector3(Random.Range(-4f, 4f), 6f, 6f), new Vector3(Random.Range(-5f, 5f), 0f, Random.Range(-5f, 5f)));
                 }
             BuildStore(finaleZ);
+            store.transform.localPosition = new Vector3(0f, StairSteps * StairRise, finaleZ);
             Perf.Note("finale : " + loot.Count + " cartons jusqu'à " + lootEndZ.ToString("0") + ", magasin à " + finaleZ.ToString("0"));
             hud.Toast(L("RAID THE MEGA STORE!", "PILLE LE MEGA STORE !"));
             return true;
@@ -804,7 +937,7 @@ namespace SamediRouge
             {
                 lane = 1;
                 freeX = 0f;
-                speed = Mathf.Max(speed, 15f);
+                speed = stairZ0 >= 0f && pz > stairZ0 - 3f && pz < stairZ0 + StairSteps * StairD ? 9f : Mathf.Max(speed, 15f);   // on monte l'escalator au pas de course
             }
             foreach (Mate m in squad)
                 if (m.rig != null && m.z > finaleZ + 0.5f && m.rig.root.gameObject.activeSelf) m.rig.root.gameObject.SetActive(false);
@@ -812,11 +945,8 @@ namespace SamediRouge
             if (pz >= finaleZ + 4.5f)
             {
                 finaleZ = -1f;
-                Fx.Confetti(new Vector3(0f, 3f, pz + 2f));
-                Fx.Confetti(new Vector3(-2f, 3f, pz + 1f));
-                Fx.Confetti(new Vector3(2f, 3f, pz + 1f));
-                PlayerPrefs.DeleteKey(LootKey);   // magasin pillé : la prochaine fois, un champ de cartons tout neuf
-                RunWon();
+                stairMult = 5;   // sommet atteint
+                FinishRaid();
             }
         }
 

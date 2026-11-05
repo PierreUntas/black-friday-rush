@@ -369,6 +369,7 @@ namespace SamediRouge
             loot.Clear();
             finaleZ = -1f;
             lootEndZ = -1f;
+            ClearStairs();
             ClearMergeIcons();
             pendingEnd = null;
             warn.gameObject.SetActive(false);
@@ -924,12 +925,13 @@ namespace SamediRouge
                 lane = Mathf.Clamp(Mathf.RoundToInt(px / Lane) + 1, 0, 2);
             }
             else px = Mathf.Lerp(px, tx, 1f - Mathf.Exp(-(thief ? Tuning.ThiefLaneSpeed : Tuning.GuardLaneSpeed) * dt));
-            bool air = py > 0.01f;
+            float ground = Tuning.Arcade ? StairY(pz) : 0f;   // escalator de fin : le sol monte marche après marche
+            bool air = py > ground + 0.01f;
             vy -= 38f * dt;
             py += vy * dt;
-            if (py <= 0f)
+            if (py <= ground)
             {
-                py = 0f;
+                py = ground;
                 if (air)
                 {
                     landT = Time.time;
@@ -952,7 +954,7 @@ namespace SamediRouge
             P.speed = speed;
             P.vy = vy;
             P.lean = (tx - px) * 9f;
-            P.anim = py > 0.05f ? Anim.Jump : (slide > 0f ? Anim.Slide : Anim.Run);
+            P.anim = Tuning.Arcade && climbStopped ? Anim.Cheer : py > ground + 0.05f ? Anim.Jump : (slide > 0f ? Anim.Slide : Anim.Run);
             P.root.localPosition = new Vector3(px, py, pz);
             P.root.localRotation = Quaternion.Euler(0f, (tx - px) * 7f, (tx - px) * -6f);
             P.SetVisible(inv <= 0f || Mathf.Repeat(Time.unscaledTime * 14f, 1f) < 0.5f);
@@ -2173,7 +2175,7 @@ namespace SamediRouge
                 r.vy = vy;
                 r.lean = (tx - m.x) * 9f;
                 r.anim = py > 0.05f ? Anim.Jump : slide > 0f ? Anim.Slide : Anim.Run;
-                r.root.localPosition = new Vector3(m.x, py, m.z + lungeZ);
+                r.root.localPosition = new Vector3(m.x, Tuning.Arcade && stairZ0 >= 0f ? Mathf.Max(StairY(m.z), py - StairY(pz) + StairY(m.z)) : py, m.z + lungeZ);
                 r.root.localRotation = Quaternion.Euler(0f, (tx - m.x) * 6f, 0f);
                 r.Tick(dt);
 
@@ -3626,6 +3628,13 @@ namespace SamediRouge
                     want += new Vector3(0f, 2.6f + 2.2f * ck + 0.6f * ck2, -0.4f - 1f * ck - 4f * ck2);   // grosse foule : la caméra RECULE (en montant elle passait au-dessus du plafond de la galerie : écran blanc)
                 }
                 look = Tuning.Arcade ? new Vector3(px * 0.4f, 0.4f, pz + 6.5f) : new Vector3(px * 0.4f, 1.25f, pz + 9f);
+                if (Tuning.Arcade && stairZ0 >= 0f && pz > stairZ0 - 6f)
+                {
+                    // escalator : la caméra monte avec la bande, un peu plus bas (sous le plafond de la galerie)
+                    float gy = StairY(pz);
+                    want = new Vector3(px * 0.5f, 4.6f + gy, pz - 7.2f);
+                    look = new Vector3(0f, gy + 0.8f, pz + 6f);
+                }
                 wantFov = (portrait ? 66f : 54f) + Mathf.InverseLerp(12f, 26f, speed) * 7f;
                 // pendant un ralenti : la caméra se rapproche et resserre le cadre
                 float zk = slowMo > 0f ? zoom : 0f;

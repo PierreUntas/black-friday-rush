@@ -399,7 +399,7 @@ namespace SamediRouge
             int crewN = squad.Count + 1;
             if (Tuning.Arcade) bonus += crewN * 4 + 40;   // arcade : chaque membre de la bande rapporte au pillage, + prime de victoire
             int total = coins + bonus;
-            if (Tuning.Arcade) total = Mathf.RoundToInt(total * IncomeMult);   // amélioration « Revenus » de l'accueil
+            if (Tuning.Arcade) total = Mathf.RoundToInt(total * IncomeMult * stairMult);   // amélioration « Revenus » de l'accueil × hauteur atteinte sur l'escalator
             Progress.Coins += total;
             var openBefore = new bool[Tuning.Maps];
             for (int m = 0; m < Tuning.Maps; m++) openBefore[m] = Progress.MapUnlocked(thief, m);
@@ -424,7 +424,7 @@ namespace SamediRouge
             {
                 // arcade (retours YSO) : écran de fin minimal — le gain, une amélioration (l'arme de départ), CONTINUER
                 hud.minimalResult = true;
-                hud.ShowResult(true, L("MEGA STORE RAIDED!", "MEGA STORE PILLÉ !"), "", "", total, Progress.Coins, null, "", L("CONTINUE", "CONTINUER"));
+                hud.ShowResult(true, L("MEGA STORE RAIDED!", "MEGA STORE PILLÉ !") + (stairMult > 1 ? "  ×" + stairMult : ""), "", "", total, Progress.Coins, null, "", L("CONTINUE", "CONTINUER"));
                 return;
             }
             hud.minimalResult = false;
