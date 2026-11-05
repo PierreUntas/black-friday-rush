@@ -920,8 +920,9 @@ namespace SamediRouge
             if (sale != null)
             {
                 Material sm = Art.Particle(sale, Color.white);
-                Art.Part(t, Art.Cube, sm, new Vector3(-6.4f, 5.4f, -0.05f), new Vector3(2.2f, 2.2f, 0.05f), new Vector3(0f, 180f, -12f), false);
-                Art.Part(t, Art.Cube, sm, new Vector3(6.4f, 5.4f, -0.05f), new Vector3(2.2f, 2.2f, 0.05f), new Vector3(0f, 180f, 12f), false);
+                // une seule face (quad) tournée vers la caméra : sur un cube transparent, la face du fond (en miroir) passait devant → « %07- »
+                Art.Part(t, Art.Quad, sm, new Vector3(-6.4f, 5.4f, -0.1f), new Vector3(2.2f, 2.2f, 1f), new Vector3(0f, 0f, 12f), false);
+                Art.Part(t, Art.Quad, sm, new Vector3(6.4f, 5.4f, -0.1f), new Vector3(2.2f, 2.2f, 1f), new Vector3(0f, 0f, -12f), false);
             }
         }
 
