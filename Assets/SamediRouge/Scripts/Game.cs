@@ -1621,7 +1621,8 @@ namespace SamediRouge
                 }
             }
             float frac = Mathf.Clamp01((pz - stageStartZ) / StageLen);
-            if (boss == null && !demo && !tutorialMode && !runWon && store == null && pz - stageStartZ >= StageLen + 12f) StartBoss();
+            // arcade : le boss arrive dès la fin du parcours (il se faisait attendre sur une longue ligne droite vide)
+            if (boss == null && !demo && !tutorialMode && !runWon && store == null && pz - stageStartZ >= StageLen + (Tuning.Arcade ? -6f : 12f)) StartBoss();
             if (boss != null && (boss.dead || boss.go == null)) boss = null;
             hud.SetStage(stage, frac, boss != null ? BossName : null, boss != null ? boss.hp / (float)bossMaxHp : 0f);
             if (boss == null) { warn.gameObject.SetActive(false); warn2.gameObject.SetActive(false); }
@@ -1639,7 +1640,7 @@ namespace SamediRouge
             bossAttacks = 0;
             bossCharging = false;
             bossStunT = 0f;
-            boss = Spawn(ET.Loup, 1, pz + 30f);
+            boss = Spawn(ET.Loup, 1, pz + (Tuning.Arcade ? 16f : 30f));
             if (bossType == 6)
             {
                 // le chef de bande arrive avec son escorte
@@ -2228,11 +2229,18 @@ namespace SamediRouge
                     if (Defended()) { m.rig.Flash(new Color(0.4f, 0.7f, 1f), 0.15f); Fx.Sparkle(new Vector3(m.x, 1.2f, m.z)); }   // défense / armure : il encaisse
                     else LoseMate(i, new Vector3(Random.Range(-3f, 3f), 4f, speed * 0.4f));
                     if (st != St.Play) return;
+                    // retour : le corps à corps doit faire plus mal → chaque vigile qui atteint la foule emporte un 2e voleur
+                    if (Tuning.Arcade && touch.type == ET.Casseur && !touch.hit && !touch.dead && squad.Count > 0 && !Defended())
+                    {
+                        LoseMate(squad.Count - 1, new Vector3(Random.Range(-3f, 3f), 4f, speed * 0.4f));
+                        if (i > squad.Count) i = squad.Count;   // la boucle descend : on reste dans la liste
+                        if (st != St.Play) return;
+                    }
                     if (Tuning.Arcade && touch.type == ET.Casseur && !touch.hit && !touch.dead)
                     {
                         // la foule l'encercle : chaque voleur emporté lui coûte un gros morceau de vie
                         // (sinon un vigile costaud traversait toute une grosse bande à lui seul)
-                        HitCasseur(touch, true, 0.5f, true, squad.Count >= 20 ? 999 : 2 + touch.hp / 2);   // grosse foule : échange un pour un (le vigile tombe avec lui)   // échange : le voleur emporté entame sérieusement le vigile (2 à 3 voleurs par costaud)
+                        HitCasseur(touch, true, 0.5f, true, squad.Count >= 20 ? 999 : 1 + touch.hp / 3);   // grosse foule : échange un pour un (le vigile tombe avec lui)   // échange : le voleur emporté entame sérieusement le vigile (2 à 3 voleurs par costaud)
                         if (st != St.Play) return;
                     }
                 }
@@ -3609,7 +3617,7 @@ namespace SamediRouge
                 Vector3 body = P.root.position;
                 want = body + new Vector3(3.2f, 3.6f, -3.8f);
                 look = body + new Vector3(0f, 0.6f, 0f);
-                if (Tuning.Arcade && store != null && !blocked)
+                if (Tuning.Arcade && store != null && !blocked && !climbStopped)   // arrêté sur la piste de butin : on reste sur la bande qui fête
                 {
                     // victoire arcade : plan large sur la façade du MEGA STORE pillé
                     Vector3 sp = store.transform.position;

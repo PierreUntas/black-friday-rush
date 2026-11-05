@@ -11,15 +11,15 @@ namespace SamediRouge
     {
         GameObject homeRoot;
         Text homeLevel, homeCoins, homeSwipe;
-        readonly Image[] homeCard = new Image[3], homeIcon = new Image[3], homeBuy = new Image[3];
-        readonly Text[] homeName = new Text[3], homeLv = new Text[3], homeCost = new Text[3];
-        readonly bool[] homeAfford = new bool[3];
+        readonly Image[] homeCard = new Image[4], homeIcon = new Image[4], homeBuy = new Image[4];
+        readonly Text[] homeName = new Text[4], homeLv = new Text[4], homeCost = new Text[4];
+        readonly bool[] homeAfford = new bool[4];
         public System.Action<int> onHomeBuy;
         public System.Action onHomePlay, onHomeReset;
         Text homeResetLabel;
         float homeResetArm = -1f;
 
-        static readonly Color[] HomeColors = { new Color(0.93f, 0.68f, 0.12f), new Color(0.55f, 0.3f, 0.85f), new Color(0.25f, 0.72f, 0.35f) };
+        static readonly Color[] HomeColors = { new Color(0.93f, 0.68f, 0.12f), new Color(0.55f, 0.3f, 0.85f), new Color(0.25f, 0.72f, 0.35f), new Color(0.2f, 0.5f, 0.92f) };
 
         void BuildHome()
         {
@@ -50,28 +50,30 @@ namespace SamediRouge
             Shadowed(homeSwipe);
             Place(homeSwipe.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 640f), new Vector2(1000f, 110f));
 
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 4; i++)
             {
                 int id = i;
-                float x = (i - 1) * 340f;
-                Image card = Box(r, HomeColors[i], new Vector2(0.5f, 0f), new Vector2(x, 330f), new Vector2(316f, 420f));
+                // quatre cartes : Bande, Arme, Armure, Revenus (l'armure, ajoutée après, s'affiche en 3e)
+                int slot = i == 2 ? 3 : i == 3 ? 2 : i;
+                float x = (slot - 1.5f) * 256f;
+                Image card = Box(r, HomeColors[i], new Vector2(0.5f, 0f), new Vector2(x, 330f), new Vector2(242f, 400f));
                 homeCard[i] = card;
                 RectTransform cr = card.rectTransform;
-                Image inner = Box(cr, new Color(0f, 0f, 0f, 0.18f), new Vector2(0.5f, 0.5f), new Vector2(0f, 30f), new Vector2(284f, 250f));
+                Image inner = Box(cr, new Color(0f, 0f, 0f, 0.18f), new Vector2(0.5f, 0.5f), new Vector2(0f, 28f), new Vector2(216f, 236f));
                 inner.raycastTarget = false;
-                homeName[i] = Label(cr, "", 34, Color.white, TextAnchor.MiddleCenter, true);
+                homeName[i] = Label(cr, "", 30, Color.white, TextAnchor.MiddleCenter, true);
                 Shadowed(homeName[i]);
-                Place(homeName[i].rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -36f), new Vector2(300f, 56f));
+                Place(homeName[i].rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -34f), new Vector2(228f, 52f));
                 Fit(homeName[i], 20);
                 homeIcon[i] = Img(cr, white, Color.white);
                 homeIcon[i].preserveAspect = true;
-                Place(homeIcon[i].rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 40f), new Vector2(170f, 170f));
-                homeLv[i] = Label(cr, "", 28, Color.white, TextAnchor.MiddleCenter, true);
+                Place(homeIcon[i].rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 42f), new Vector2(140f, 140f));
+                homeLv[i] = Label(cr, "", 24, Color.white, TextAnchor.MiddleCenter, true);
                 Shadowed(homeLv[i]);
-                Place(homeLv[i].rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -70f), new Vector2(290f, 44f));
+                Place(homeLv[i].rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -62f), new Vector2(222f, 40f));
                 Fit(homeLv[i], 16);
-                homeBuy[i] = Box(cr, new Color(0.08f, 0.1f, 0.13f, 0.9f), new Vector2(0.5f, 0f), new Vector2(0f, 56f), new Vector2(270f, 84f));
-                homeCost[i] = Label(homeBuy[i].rectTransform, "", 40, StarGold, TextAnchor.MiddleCenter, true);
+                homeBuy[i] = Box(cr, new Color(0.08f, 0.1f, 0.13f, 0.9f), new Vector2(0.5f, 0f), new Vector2(0f, 54f), new Vector2(210f, 80f));
+                homeCost[i] = Label(homeBuy[i].rectTransform, "", 36, StarGold, TextAnchor.MiddleCenter, true);
                 Stretch(homeCost[i].rectTransform);
                 AddButton(cr, () => onHomeBuy?.Invoke(id));
             }
@@ -87,7 +89,7 @@ namespace SamediRouge
             LockClicks(0.4f);
             homeLevel.text = L("LEVEL ", "NIVEAU ") + level;
             homeCoins.text = "$ " + coins;
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 4; i++)
             {
                 homeName[i].text = names[i];
                 homeIcon[i].sprite = icons[i] != null ? icons[i] : white;
@@ -196,7 +198,7 @@ namespace SamediRouge
             homeSwipe.color = new Color(1f, 1f, 1f, a);
             homeSwipe.transform.localScale = Vector3.one * (1f + 0.04f * Mathf.Sin(Time.unscaledTime * 4.4f));
             TickZone(udt);
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 4; i++)
                 homeCard[i].transform.localScale = homeAfford[i]
                     ? (Vector3.one * BuyPulse(Time.unscaledTime, i * 0.2f) * 0.97f + Vector3.one * 0.03f) * CardK
                     : Vector3.MoveTowards(homeCard[i].transform.localScale, Vector3.one * CardK, udt * 1.5f);

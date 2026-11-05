@@ -921,7 +921,7 @@ namespace SamediRouge
                     Shadowed(brkV[i]);
                     Place(brkV[i].rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-70f, -40f - i * 78f), new Vector2(330f, 64f), new Vector2(1f, 0.5f));
                 }
-                brkStampSub = Label(brkRoot, "ESCALATOR", 40, Color.white, TextAnchor.MiddleCenter, true);
+                brkStampSub = Label(brkRoot, L("LOOT RUN", "PISTE DE BUTIN"), 40, Color.white, TextAnchor.MiddleCenter, true);
                 Shadowed(brkStampSub);
                 Place(brkStampSub.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 190f), new Vector2(600f, 56f));
                 brkStamp = Label(brkRoot, "", 190, StarGold, TextAnchor.MiddleCenter, true);

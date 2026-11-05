@@ -60,6 +60,7 @@ namespace SamediRouge
                 Progress.ResetAll();
                 PlayerPrefs.SetInt(KCrew, 0);
                 PlayerPrefs.SetInt(KIncome, 0);
+                PlayerPrefs.SetInt(KArmor, 0);
                 PlayerPrefs.SetInt(KFirstRun, 0);
                 PlayerPrefs.Save();
                 selStreet = -1;
@@ -647,7 +648,8 @@ namespace SamediRouge
 
         // ------------------------------------------------------------------ accueil arcade (à la Hell Escape)
 
-        const string KCrew = "sr_arc_crew", KIncome = "sr_arc_income", KFirstRun = "sr_arc_played";
+        const string KCrew = "sr_arc_crew", KIncome = "sr_arc_income", KFirstRun = "sr_arc_played", KArmor = "sr_arc_armor";
+        static int ArcArmor => Mathf.Clamp(PlayerPrefs.GetInt(KArmor, 0), 0, 3);
         const int HomeMax = 10;
         static int ArcLevel(string k) => Mathf.Clamp(PlayerPrefs.GetInt(k, 0), 0, HomeMax);
         static int ArcCost(int lv, int b, int step) => lv >= HomeMax ? -1 : b + step * lv + 10 * lv * lv;
@@ -665,7 +667,8 @@ namespace SamediRouge
         // économie arcade : une première partie rapporte de quoi acheter UNE amélioration (la batte, ~250 $)
         // l'arme : on lance déjà la batte au départ, la carte vend donc le pistolet puis la mitraillette « au départ »
         int ArcWeapon => Mathf.Clamp(Progress.GearLevel(thief, Tuning.Weapon), 1, 3);
-        int HomeCost(int i) => i == 0 ? ArcCost(ArcLevel(KCrew), 180, 70) : i == 1 ? (ArcWeapon == 1 ? 150 : ArcWeapon == 2 ? 900 : -1) : ArcCost(ArcLevel(KIncome), 220, 90);
+        int HomeCost(int i) => i == 0 ? ArcCost(ArcLevel(KCrew), 180, 70) : i == 1 ? (ArcWeapon == 1 ? 150 : ArcWeapon == 2 ? 900 : -1)
+                             : i == 3 ? (ArcArmor == 0 ? 200 : ArcArmor == 1 ? 650 : ArcArmor == 2 ? 1400 : -1) : ArcCost(ArcLevel(KIncome), 220, 90);
 
         /// <summary>
         /// Arcade : « forme » du héros (0 à 3), à la Hell Escape — il évolue visiblement (nouvelle tenue) avec les achats de l'accueil,
@@ -675,8 +678,8 @@ namespace SamediRouge
         /// (galerie marchande, rue commerçante, gare, docks, quartier chic de nuit).</summary>
         static int ArcMap(int street) => Tuning.Arcade ? Mathf.Max(0, street) % Tuning.Maps : Tuning.MapOf(street);   // nouveau décor à chaque niveau
 
-        int HomeForm => Mathf.Clamp((ArcLevel(KCrew) + ArcLevel(KIncome) + ArcWeapon - 1 + 1) / 2, 0, 3);
-        int RunForm => Mathf.Clamp(HomeForm + armorLv, 0, 3);   // la tenue suit l'armure gagnée pendant la course
+        int HomeForm => ArcArmor;   // la tenue du héros = l'armure achetée (sweat, blouson, gilet volé)
+        int RunForm => Mathf.Clamp(armorLv, 0, 3);   // en course : l'armure de départ + celle gagnée aux ateliers
         int formShown = -1;
 
         void ShowHomeScreen()
@@ -706,16 +709,19 @@ namespace SamediRouge
         void RefreshHome()
         {
             int crew = ArcLevel(KCrew), wl = ArcWeapon, inc = ArcLevel(KIncome);
-            string[] names = { L("CREW", "BANDE"), L("WEAPON", "ARME"), L("INCOME", "REVENUS") };
-            Sprite[] icons = { GearIcons.Get("gang"), GearIcons.Upgrade(Tuning.Weapon, thief, Mathf.Clamp(wl + 1, 2, 3)), GearIcons.Art("dollar") };
+            int ar = ArcArmor;
+            string[] names = { L("CREW", "BANDE"), L("WEAPON", "ARME"), L("INCOME", "REVENUS"), L("ARMOR", "ARMURE") };
+            Sprite[] icons = { GearIcons.Get("gang"), GearIcons.Upgrade(Tuning.Weapon, thief, Mathf.Clamp(wl + 1, 2, 3)), GearIcons.Art("dollar"), GearIcons.Upgrade(1, true, Mathf.Clamp(ar + 1, 1, 3)) };
+            string[] aNames = { L("Hoodie at start", "Sweat au départ"), L("Jacket at start", "Blouson au départ"), L("Vest at start", "Gilet au départ"), L("Stolen vest", "Gilet volé") };
             string[] wNames = { "", L("Pistol at start", "Pistolet au départ"), L("SMG at start", "Mitraillette au départ"), L("Submachine gun", "Mitraillette") };
             string[] lv =
             {
                 "+" + crew + L(" at start", " au départ"),
                 wNames[Mathf.Clamp(wl, 0, 3)],
-                "×" + IncomeMult.ToString("0.0").Replace('.', ',')
+                "×" + IncomeMult.ToString("0.0").Replace('.', ','),
+                aNames[ar]
             };
-            int[] costs = { HomeCost(0), HomeCost(1), HomeCost(2) };
+            int[] costs = { HomeCost(0), HomeCost(1), HomeCost(2), HomeCost(3) };
             hud.ShowHome(HomeStreet() + 1, Progress.Coins, names, icons, lv, costs);
             // carte de progression : quartier en cours (5 niveaux), animation quand on vient de gagner un niveau
             int level = HomeStreet() + 1, zone = (level - 1) / Hud.ZoneLen;
@@ -736,6 +742,7 @@ namespace SamediRouge
                 return;
             }
             if (i == 1) { Progress.Coins -= cost; Progress.SetGearLevel(thief, Tuning.Weapon, ArcWeapon + 1); }
+            else if (i == 3) { Progress.Coins -= cost; PlayerPrefs.SetInt(KArmor, ArcArmor + 1); PlayerPrefs.Save(); }
             else
             {
                 Progress.Coins -= cost;

@@ -55,7 +55,8 @@ namespace SamediRouge
         // Après les cartons, la bande monte un grand escalator : chaque marche « coûte » des voleurs qui restent dessus.
         // Plus la bande est grande, plus on monte haut, et plus le butin du MEGA STORE est multiplié (×2, ×3, ×5 au sommet).
         const int StairSteps = 30;
-        const float StairD = 1.1f, StairRise = 0.17f;
+        // retour : la montée faisait bizarre → piste de butin à plat (dalles colorées), la bande s'y égrène
+        const float StairD = 1.3f, StairRise = 0f;
         float stairZ0 = -1f;
         int climbStep, stairMult = 1, finaleCrew;   // finaleCrew : taille de la bande au pied de l'escalator (pour le bilan)
         bool climbStopped;
@@ -95,27 +96,17 @@ namespace SamediRouge
             stairsGo.transform.SetParent(world, false);
             Transform t = stairsGo.transform;
             float w = Lane * 3f + 1.2f;
-            Material stepA = Art.Mat(new Color(0.62f, 0.64f, 0.7f), 0.6f, 0.4f);
-            Material stepB = Art.Mat(new Color(0.5f, 0.52f, 0.58f), 0.6f, 0.4f);
-            Material rail = Art.Mat(new Color(0.15f, 0.15f, 0.18f), 0.5f, 0.3f);
-            Material[] tier = {
-                Art.Glow(new Color(0.3f, 0.85f, 0.35f), new Color(0.3f, 1.1f, 0.35f), 0.5f),   // ×2
-                Art.Glow(new Color(0.25f, 0.55f, 1f), new Color(0.3f, 0.6f, 1.4f), 0.5f),     // ×3
-                Art.Glow(new Color(1f, 0.8f, 0.2f), new Color(1.4f, 1.0f, 0.25f), 0.5f) };    // ×5
+            // dalles de couleur : 10 vertes (×1 → ×2), 10 bleues (→ ×3), 10 violettes (→ ×5), lignes dorées aux paliers
+            Color[] band = { new Color(0.3f, 0.75f, 0.35f), new Color(0.25f, 0.5f, 0.95f), new Color(0.6f, 0.3f, 0.9f) };
+            Material line = Art.Glow(new Color(1f, 0.85f, 0.25f), new Color(1.4f, 1.0f, 0.25f), 0.5f);
             for (int i = 0; i < StairSteps; i++)
             {
-                float h = (i + 1) * StairRise, zc = z0 + (i + 0.5f) * StairD;
-                Material m = (i + 1) % 10 == 0 ? tier[(i + 1) / 10 - 1] : i % 2 == 0 ? stepA : stepB;
-                Art.Part(t, Art.Cube, m, new Vector3(0f, h * 0.5f, zc), new Vector3(w, h, StairD), default, false);
-            }
-            // palier du haut jusqu'au magasin, et rampes noires sur les côtés
-            float topH = StairSteps * StairRise, top = z0 + StairSteps * StairD;
-            Art.Part(t, Art.Cube, stepA, new Vector3(0f, topH * 0.5f, top + 9f), new Vector3(w + 6f, topH, 18f), default, false);
-            for (int sgn = -1; sgn <= 1; sgn += 2)
-            {
-                float len = StairSteps * StairD;
-                float ang = Mathf.Atan2(topH, len) * Mathf.Rad2Deg;
-                Art.Part(t, Art.Cube, rail, new Vector3(sgn * (w * 0.5f + 0.15f), topH * 0.5f + 0.5f, z0 + len * 0.5f), new Vector3(0.3f, 0.5f, Mathf.Sqrt(len * len + topH * topH)), new Vector3(-ang, 0f, 0f), false);
+                float zc = z0 + (i + 0.5f) * StairD;
+                Color c = band[i / 10] * (i % 2 == 0 ? 1f : 0.82f);
+                c.a = 1f;
+                Art.Part(t, Art.Cube, Art.Mat(c, 0.5f, 0.1f), new Vector3(0f, 0.03f, zc), new Vector3(w, 0.06f, StairD * 0.96f), default, false);
+                if ((i + 1) % 10 == 0)
+                    Art.Part(t, Art.Cube, line, new Vector3(0f, 0.07f, z0 + (i + 1) * StairD), new Vector3(w, 0.05f, 0.25f), default, false);
             }
         }
 
@@ -142,6 +133,7 @@ namespace SamediRouge
                     stairMult = StepMult(climbStep);
                     P.anim = Anim.Cheer;
                     hud.Toast(stairMult > 1 ? L("LOOT ×", "BUTIN ×") + stairMult + " !" : L("OUT OF CREW!", "PLUS ASSEZ DE MONDE !"));
+                    speed = 0f;
                     Perf.Note("escalator : arrêt marche " + climbStep + ", butin ×" + stairMult);
                     return;
                 }
@@ -153,7 +145,7 @@ namespace SamediRouge
                     squad.RemoveAt(idx);
                     Rig r = m.rig;
                     r.root.localPosition = new Vector3(px + (k - (cost - 1) * 0.5f) * 0.9f + Random.Range(-0.2f, 0.2f), sy, sz);
-                    r.root.localRotation = Quaternion.Euler(0f, 180f + Random.Range(-25f, 25f), 0f);   // ils se retournent pour applaudir
+                    r.root.localRotation = Quaternion.Euler(0f, Random.Range(-30f, 30f), 0f);   // ils restent sur leur dalle et applaudissent
                     parked.Add(r);
                 }
                 for (int k = 0; k < squad.Count; k++) squad[k].slot = k;
@@ -303,7 +295,7 @@ namespace SamediRouge
             crates = 0;
             craftBoost = 0;
             dmgBoon = defBoon = 0;
-            armorLv = 0;
+            armorLv = Mathf.Clamp(PlayerPrefs.GetInt("sr_arc_armor", 0), 0, 3);   // tenue achetée à l'accueil
             craftCount = 0;
             lastBoonKind = -1;
             nextBoonZ = pz + 125f;
@@ -875,7 +867,7 @@ namespace SamediRouge
                 {
                     if ((mask & (1 << (r * 3 + l))) != 0) continue;   // cassé à une tentative précédente : il ne revient pas
                     // premières rangées plus faciles, les dernières plus solides (moyenne = résistance du couloir / 7)
-                    int hp = Mathf.Max(3, Mathf.RoundToInt(laneHp / rows * (0.7f + 0.1f * r) * Random.Range(0.9f, 1.1f) * (firstTry && r >= 3 ? 2.6f : 1f)));
+                    int hp = Mathf.Max(3, Mathf.RoundToInt(laneHp / rows * (0.7f + 0.1f * r) * Random.Range(0.9f, 1.1f) * (firstTry ? (r >= 3 ? 2.6f : 1f) : 0.5f)));   // tentatives suivantes : ce qui reste cède (on doit passer)
                     var b = new LootBox { lane = l, z = z0 + r * gap + Random.Range(-0.6f, 0.6f), hp = hp, max = hp, id = r * 3 + l };
                     b.tr = Art.Node(world, "loot", new Vector3((l - 1) * Lane, 0f, b.z));
                     float k = 0.8f + 0.06f * Mathf.Min(hp, 8);   // les cartons solides sont plus gros
@@ -892,7 +884,7 @@ namespace SamediRouge
                     e.rig.KO(new Vector3(Random.Range(-4f, 4f), 6f, 6f), new Vector3(Random.Range(-5f, 5f), 0f, Random.Range(-5f, 5f)));
                 }
             BuildStore(finaleZ);
-            store.transform.localPosition = new Vector3(0f, StairSteps * StairRise, finaleZ);
+            store.transform.localPosition = new Vector3(0f, 0f, finaleZ);
             Perf.Note("finale : " + loot.Count + " cartons jusqu'à " + lootEndZ.ToString("0") + ", magasin à " + finaleZ.ToString("0"));
             hud.Toast(L("RAID THE MEGA STORE!", "PILLE LE MEGA STORE !"));
             return true;
@@ -908,7 +900,7 @@ namespace SamediRouge
             float w = Street.ShopX * 2f + 1f;
             Material wall = Art.Mat(new Color(0.16f, 0.15f, 0.2f), 0.4f);
             Material gold = Art.Glow(new Color(1f, 0.8f, 0.2f), new Color(1.4f, 1.0f, 0.25f), 0.5f);
-            Material glass = Art.Glow(new Color(1f, 0.93f, 0.7f), new Color(1.6f, 1.4f, 0.9f), 0.8f);
+            Material glass = Art.Glow(new Color(1f, 0.85f, 0.55f), new Color(0.75f, 0.55f, 0.25f), 0.8f);   // intérieur chaud, plus un écran blanc
             // façade : murs de part et d'autre de la grande entrée, linteau, enseigne lumineuse
             Art.Part(t, Art.Cube, wall, new Vector3(-(w * 0.5f + 4.2f) * 0.5f - 0.1f, 4.5f, 0.6f), new Vector3(w * 0.5f - 4.2f, 9f, 1.2f));
             Art.Part(t, Art.Cube, wall, new Vector3((w * 0.5f + 4.2f) * 0.5f + 0.1f, 4.5f, 0.6f), new Vector3(w * 0.5f - 4.2f, 9f, 1.2f));
@@ -942,7 +934,7 @@ namespace SamediRouge
             {
                 lane = 1;
                 freeX = 0f;
-                speed = stairZ0 >= 0f && pz > stairZ0 - 3f && pz < stairZ0 + StairSteps * StairD ? 9f : Mathf.Max(speed, 15f);   // on monte l'escalator au pas de course
+                speed = stairZ0 >= 0f && pz > stairZ0 - 3f && pz < stairZ0 + StairSteps * StairD ? 11f : Mathf.Max(speed, 15f);   // piste de butin au pas de course
             }
             foreach (Mate m in squad)
                 if (m.rig != null && m.z > finaleZ + 0.5f && m.rig.root.gameObject.activeSelf) m.rig.root.gameObject.SetActive(false);
@@ -1331,6 +1323,12 @@ namespace SamediRouge
             hud.SetWeaponCard(runTier, RunWeaponLv);
             hud.SetArmorCard(armorLv);
             hud.SetBoons(dmgBoon, defBoon);
+            if (stairZ0 >= 0f)
+                for (int k = 1; k <= 3; k++)
+                {
+                    float zl = stairZ0 + k * 10 * StairD - 0.6f;
+                    if (zl - pz > 1f && zl - pz < 45f) hud.Tag(new Vector3(0f, 0.4f, zl), "×" + StepMult(k * 10), Hud.Yellow, 2.2f);
+                }
             int myLane = Mathf.Clamp(Mathf.RoundToInt(px / Lane) + 1, 0, 2);
             foreach (LootBox b in loot)
             {
