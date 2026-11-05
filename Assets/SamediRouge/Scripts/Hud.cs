@@ -519,6 +519,52 @@ namespace SamediRouge
             wLv.color = Color.Lerp(Color.white, Yellow, wPop);
         }
 
+        // ---------------------------------------------------------------- cartes de bonus (bord gauche, comme Hell Escape)
+
+        Image[] boonCard;
+        Text[] boonTxt;
+        readonly int[] boonShown = { -1, -1 };
+        readonly float[] boonPop = new float[2];
+
+        /// <summary>Bonus ramassés pendant la course : une petite carte par type (cadence, dégâts) avec le total, sur le bord gauche.</summary>
+        public void SetBoons(int fire, int dmg)
+        {
+            if (boonCard == null)
+            {
+                boonCard = new Image[2];
+                boonTxt = new Text[2];
+                string[] icons = { "rate", "dmg" };
+                Color[] cols = { new Color(0.16f, 0.45f, 0.95f, 0.97f), new Color(0.85f, 0.22f, 0.2f, 0.97f) };
+                for (int i = 0; i < 2; i++)
+                {
+                    boonCard[i] = Img(play.transform, round, cols[i]);
+                    Place(boonCard[i].rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(22f, 170f - i * 230f), new Vector2(184f, 208f), new Vector2(0f, 0.5f));
+                    Image inner = Img(boonCard[i].rectTransform, round, new Color(0.05f, 0.08f, 0.15f, 0.9f));
+                    Place(inner.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, new Vector2(-14f, -14f));
+                    Image ic = Img(boonCard[i].rectTransform, GearIcons.Get(icons[i]), Color.white);
+                    ic.preserveAspect = true;
+                    Place(ic.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -18f), new Vector2(112f, 112f), new Vector2(0.5f, 1f));
+                    boonTxt[i] = Label(boonCard[i].rectTransform, "", 44, Color.white, TextAnchor.LowerCenter, true);
+                    Shadowed(boonTxt[i]);
+                    Place(boonTxt[i].rectTransform, Vector2.zero, Vector2.one, new Vector2(0f, 12f), new Vector2(-10f, -20f));
+                    boonCard[i].gameObject.SetActive(false);
+                }
+            }
+            int[] n = { fire, dmg };
+            for (int i = 0; i < 2; i++)
+            {
+                if (n[i] != boonShown[i])
+                {
+                    if (boonShown[i] >= 0 && n[i] > boonShown[i]) boonPop[i] = 1f;
+                    boonShown[i] = n[i];
+                    boonTxt[i].text = "+" + (20 * n[i]) + "%";
+                    boonCard[i].gameObject.SetActive(n[i] > 0);
+                }
+                boonPop[i] = Mathf.Max(0f, boonPop[i] - Time.unscaledDeltaTime * 2.5f);
+                boonCard[i].rectTransform.localScale = Vector3.one * (boonPop[i] > 0f ? 1f + 0.35f * Mathf.Sin(boonPop[i] * Mathf.PI) : 1f);
+            }
+        }
+
         /// <summary>Cache la carte d'arme (hors mode arcade, nouvelle course).</summary>
         public void HideWeaponCard()
         {

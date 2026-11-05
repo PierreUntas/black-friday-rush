@@ -59,7 +59,31 @@ namespace SamediRouge
         /// <summary>Niveau d'arme affiché (comme la carte « EQUIPPED » de Hell Escape) : batte 1, pistolet 2, mitraillette 3, puis +1 par atelier.</summary>
         int RunWeaponLv => runTier + 1 + craftBoost;
         /// <summary>Cadence : chaque niveau d'atelier au-delà de la mitraillette fait tirer 15 % plus vite.</summary>
-        float RateK => 1f / (1f + 0.15f * craftBoost);
+        float RateK => 1f / (1f + 0.15f * craftBoost + 0.2f * fireBoon);
+
+        /// <summary>Bonus à ramasser (comme le « God's Help » de Hell Escape) : 0 cadence +20 %, 1 dégâts +20 %, 2 renforts.</summary>
+        class Boon
+        {
+            public GameObject go;
+            public int lane, kind;
+            public float z;
+            public bool done;
+        }
+
+        readonly List<Boon> boons = new List<Boon>();
+        int fireBoon, dmgBoon, lastBoonKind = -1;
+        float nextBoonZ;
+        /// <summary>Multiplicateur de dégâts des bonus ramassés.</summary>
+        float DmgK => 1f + 0.2f * dmgBoon;
+
+        /// <summary>Dégâts d'un tir avec le bonus de dégâts (partie fractionnaire tirée au sort : +20 % en moyenne).</summary>
+        int BoostDmg(int d)
+        {
+            if (!Tuning.Arcade || dmgBoon == 0) return d;
+            float f = d * DmgK;
+            int i = Mathf.FloorToInt(f);
+            return i + (Random.value < f - i ? 1 : 0);
+        }
         static bool devCenter;   // dev (éditeur) : caisses dans le couloir du milieu, pour tester la fusion sans diriger
         /// <summary>Caisses d'armes ramassées vers la prochaine fusion.</summary>
         int crates;
@@ -139,7 +163,13 @@ namespace SamediRouge
             nextCrateZ = pz + 80f;
             crates = 0;
             craftBoost = 0;
+            fireBoon = dmgBoon = 0;
+            lastBoonKind = -1;
+            nextBoonZ = pz + 125f;
+            foreach (Boon bo in boons) if (bo.go != null) Destroy(bo.go);
+            boons.Clear();
             hud.HideWeaponCard();
+            hud.SetBoons(0, 0);
             ClearMergeIcons();
             foreach (Craft c in crafts) if (c.go != null) Destroy(c.go);
             crafts.Clear();
@@ -166,6 +196,12 @@ namespace SamediRouge
                 SpawnGate(z + 4f);
                 nextGateZ = z + Random.Range(55f, 72f);
                 return 16f;
+            }
+            if (z >= nextBoonZ)
+            {
+                SpawnBoon(z + 5f);
+                nextBoonZ = z + Random.Range(95f, 125f);
+                return 10f;
             }
             if (z >= nextCrateZ)
             {
@@ -202,6 +238,7 @@ namespace SamediRouge
                 return (best - 1) * Lane;
             }
             foreach (Craft c in crafts) if (!c.done && c.z > pz && c.z < pz + 32f) return (c.lane - 1) * Lane;
+            foreach (Boon bo in boons) if (!bo.done && bo.z > pz && bo.z < pz + 30f) return (bo.lane - 1) * Lane;
             return 0f;
         }
 #endif
@@ -338,6 +375,7 @@ namespace SamediRouge
             if (st != St.Play) return;
             MergeTick(dt);
             PropsTick(dt);
+            BoonTick();
             for (int i = gates.Count - 1; i >= 0; i--)
             {
                 Gate g = gates[i];
@@ -680,11 +718,18 @@ namespace SamediRouge
             Material card = Art.Mat(new Color(0.78f, 0.56f, 0.32f), 0.25f);
             Material tape = Art.Mat(new Color(0.55f, 0.36f, 0.18f), 0.3f);
             Material gold = Art.Glow(new Color(1f, 0.8f, 0.25f), new Color(1.3f, 0.9f, 0.2f), 0.6f);
+            // résistance calée sur la puissance de feu réelle (arme, ateliers, taille de la bande) et le temps de traversée :
+            // en restant dans un couloir, la bande peut abattre ~2 fois la résistance de ce couloir (petite ou grosse bande)
+            float heroRate = (gear[GSmg] ? 0.11f : gear[GPistol] ? Tuning.AutoPistolRate : Tuning.AutoBareRate) * RateK;
+            float lootDps = LootDmg * DmgK * (1f / heroRate + squad.Count / (MateRate * RateK));
+            float crossT = (lootEndZ - pz) / Mathf.Max(4f, speed);
+            float laneHp = (0.45f + 0.1f * arcD) * lootDps * crossT;
+            Perf.Note("cartons : " + lootDps.ToString("0.0") + " dégâts/s, traversée " + crossT.ToString("0.0") + " s, couloir " + laneHp.ToString("0"));
             for (int r = 0; r < rows; r++)
                 for (int l = 0; l < 3; l++)
                 {
-                    // cartons solides : avec la batte de départ on ne passe pas, avec le pistolet acheté (dégâts ×2) on passe
-                    int hp = 13 + Mathf.RoundToInt(r * 3f + 3f * arcD + squad.Count * 0.2f) + Random.Range(0, 3);   // grosse foule : cartons un peu plus solides
+                    // premières rangées plus faciles, les dernières plus solides (moyenne = résistance du couloir / 7)
+                    int hp = Mathf.Max(3, Mathf.RoundToInt(laneHp / rows * (0.7f + 0.1f * r) * Random.Range(0.9f, 1.1f)));
                     var b = new LootBox { lane = l, z = z0 + r * gap + Random.Range(-0.6f, 0.6f), hp = hp, max = hp };
                     b.tr = Art.Node(world, "loot", new Vector3((l - 1) * Lane, 0f, b.z));
                     float k = 0.8f + 0.06f * Mathf.Min(hp, 8);   // les cartons solides sont plus gros
@@ -888,7 +933,7 @@ namespace SamediRouge
         void LootHit(LootBox b, int mult = 1)
         {
             if (b.broken) return;
-            b.hp -= LootDmg * mult;
+            b.hp -= BoostDmg(LootDmg * mult);
             b.pend = Mathf.Max(0, b.pend - LootDmg * mult);
             b.punch = 1f;
             if (b.hp > 0) return;
@@ -995,6 +1040,64 @@ namespace SamediRouge
             mergeT = 0f;
         }
 
+        /// <summary>Un bonus debout dans un couloir : carte dorée avec son icône ; on le prend en passant dedans.</summary>
+        void SpawnBoon(float z)
+        {
+            int kind = Random.Range(0, 3);
+            if (kind == lastBoonKind) kind = (kind + 1 + Random.Range(0, 2)) % 3;
+            lastBoonKind = kind;
+            var bo = new Boon { z = z, lane = Random.Range(0, 3), kind = kind };
+            bo.go = new GameObject("boon");
+            bo.go.transform.SetParent(world, false);
+            bo.go.transform.localPosition = new Vector3((bo.lane - 1) * Lane, 0f, z);
+            Transform t = Art.Node(bo.go.transform, "card", Vector3.zero);
+            Color face = kind == 0 ? new Color(0.16f, 0.45f, 0.95f) : kind == 1 ? new Color(0.85f, 0.2f, 0.2f) : new Color(0.25f, 0.7f, 0.3f);
+            Art.Part(t, Art.Cube, Art.Glow(new Color(1f, 0.82f, 0.25f), new Color(1.2f, 0.9f, 0.2f), 0.5f), new Vector3(0f, 1.55f, 0f), new Vector3(1.5f, 1.9f, 0.12f), default, false);
+            Art.Part(t, Art.Cube, Art.Glow(face, face * 0.5f, 0.3f), new Vector3(0f, 1.55f, -0.07f), new Vector3(1.3f, 1.7f, 0.02f), default, false);
+            Sprite sp = GearIcons.Get(kind == 0 ? "rate" : kind == 1 ? "dmg" : "gang");
+            Texture2D tex = sp.texture;
+            tex.name = "boon" + kind;   // la clé du matériau dépend du nom de la texture
+            Art.Part(t, Art.Quad, Art.Particle(tex, Color.white), new Vector3(0f, 1.6f, -0.09f), new Vector3(1.15f, 1.15f, 1f), default, false);
+            boons.Add(bo);
+            Perf.Note("bonus " + kind + " couloir " + bo.lane + " à " + z.ToString("0"));
+        }
+
+        /// <summary>Bonus : léger flottement, ramassé quand le héros passe dans son couloir.</summary>
+        void BoonTick()
+        {
+            int l = Mathf.Clamp(Mathf.RoundToInt(px / Lane) + 1, 0, 2);
+            for (int i = boons.Count - 1; i >= 0; i--)
+            {
+                Boon bo = boons[i];
+                if (bo.go == null || bo.z < pz - 6f) { if (bo.go != null) Destroy(bo.go); boons.RemoveAt(i); continue; }
+                if (bo.done) continue;
+                Transform card = bo.go.transform.GetChild(0);
+                card.localPosition = new Vector3(0f, 0.12f * Mathf.Sin(Time.time * 3f + bo.z), 0f);
+                card.localRotation = Quaternion.Euler(0f, 10f * Mathf.Sin(Time.time * 2f + bo.z), 0f);
+                if (pz < bo.z - 0.3f) continue;
+                bo.done = true;
+                if (bo.lane != l) continue;   // passé à côté
+                TakeBoon(bo);
+                Destroy(bo.go);
+            }
+        }
+
+        void TakeBoon(Boon bo)
+        {
+            Vector3 p = new Vector3((bo.lane - 1) * Lane, 1.6f, bo.z);
+            Fx.Confetti(p);
+            Snd.Play(Snd.I.pickup, 1f, 0f);
+            Snd.Play(Snd.I.perfect, 0.6f, 0f);
+            P.Flash(Hud.StarGold, 0.25f);
+            hud.Flash(0.2f);
+            Haptics.Pulse(20, true);
+            if (bo.kind == 0) { fireBoon++; hud.Toast(L("FIRE RATE +20%", "CADENCE +20 %")); }
+            else if (bo.kind == 1) { dmgBoon++; hud.Toast(L("DAMAGE +20%", "DÉGÂTS +20 %")); }
+            else { int n = 4 + Mathf.RoundToInt(2f * arcD); AddMates(n); hud.Toast(L("+" + n + " RECRUITS", "+" + n + " RENFORTS")); }
+            hud.SetBoons(fireBoon, dmgBoon);
+            Perf.Note("bonus pris : " + bo.kind + " (cadence " + fireBoon + ", dégâts " + dmgBoon + ")");
+        }
+
         /// <summary>Atelier rempli avec la meilleure arme : l'arme monte d'un niveau, toute la bande tire plus vite.</summary>
         void BoostWeapon()
         {
@@ -1051,6 +1154,7 @@ namespace SamediRouge
             }
             // carte d'arme fixe sur le bord droit (pas de texte dans la scène, comme Hell Escape)
             hud.SetWeaponCard(runTier, RunWeaponLv);
+            hud.SetBoons(fireBoon, dmgBoon);
             int myLane = Mathf.Clamp(Mathf.RoundToInt(px / Lane) + 1, 0, 2);
             foreach (LootBox b in loot)
             {

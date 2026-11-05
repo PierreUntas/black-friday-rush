@@ -313,6 +313,16 @@ namespace SamediRouge
                     o.Add(Line(new P(18, 22).L(46, 22).Pts, SteelLight, 3f));
                     foreach (var c in new[] { new Vector2(16, 14), new Vector2(48, 14), new Vector2(18, 48), new Vector2(46, 48) }) o.Add(Circ(c.x, c.y, 2f, SteelLight, Ink, 1f));
                     break;
+                case "rate":
+                    // bonus de cadence : éclair dans un disque bleu
+                    o.Add(Circ(32, 32, 28f, Blue, Ink, 3f));
+                    o.Add(Poly(new P(37, 7).L(15, 36).L(29, 36).L(24, 58).L(50, 26).L(35, 26).L(43, 7).Pts, Gold, Ink, 3f));
+                    break;
+                case "dmg":
+                    // bonus de dégâts : explosion rouge et or
+                    o.Add(Poly(Star(32f, 32f, 30f, 17f), Red, Ink, 3f));
+                    o.Add(Poly(Star(32f, 32f, 17f, 9f), Gold, Ink, 2f));
+                    break;
                 case "charge":
                     // charge : on fonce à travers tout (double chevron dans un disque)
                     o.Add(Circ(32, 32, 27f, Red, Ink, 3f));
