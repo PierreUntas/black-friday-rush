@@ -2073,6 +2073,7 @@ namespace SamediRouge
                 // Grosse foule qui passe une porte négative : quelques nuages seulement par image (sinon l'écran devenait tout blanc)
                 Vector3 at = m.rig.root.position;
                 if (loseFxFrame != Time.frameCount) { loseFxFrame = Time.frameCount; loseFxN = 0; }
+                if (loseFxN == 0) { hud.Damage(0.18f); Haptics.Pulse(12); }   // chaque perte se sent : bord rouge + petite vibration
                 if (loseFxN++ < 5)
                 {
                     Fx.Hit(at + Vector3.up * 0.5f);

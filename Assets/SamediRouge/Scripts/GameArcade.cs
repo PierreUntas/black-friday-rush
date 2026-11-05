@@ -415,9 +415,9 @@ namespace SamediRouge
         void SetPackHp(float z, int n, float share)
         {
             float prog = Mathf.Clamp01((z - stageStartZ) / Mathf.Max(1f, StageLen));
-            float k = Mathf.Min(2.6f, 1.05f + 0.5f * arcD + 0.75f * prog);   // retour : on ne perdait presque plus personne → une partie du groupe doit atteindre la foule
+            float k = Mathf.Min(2.6f, 1.25f + 0.5f * arcD + 0.8f * prog);   // retour : on ne perdait presque plus personne → une partie du groupe doit atteindre la foule
             // grosse foule : pression un peu moindre (sinon chaque groupe la décimait : 97 → 34 en une rencontre)
-            k *= Mathf.Lerp(1f, 0.8f, Mathf.Clamp01((squad.Count - 20) / 79f));
+            k *= Mathf.Lerp(1f, 0.9f, Mathf.Clamp01((squad.Count - 20) / 79f));
             float t = 26f / Mathf.Max(6f, speed + 6f * Tuning.EnemyRush);   // temps entre l'entrée à portée et le contact
             // les ateliers et les bonus d'attaque comptent à moitié : on sent le gain, mais les groupes arrivent encore au contact
             float budget = k * t * ArcadePower() * Mathf.Sqrt(DmgK / RateK) * share;
