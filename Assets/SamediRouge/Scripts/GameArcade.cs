@@ -728,7 +728,9 @@ namespace SamediRouge
             float heroRate = (gear[GSmg] ? 0.11f : gear[GPistol] ? Tuning.AutoPistolRate : Tuning.AutoBareRate) * RateK;
             float lootDps = LootDmg * DmgK * (1f / heroRate + squad.Count / (MateRate * RateK));
             float crossT = (lootEndZ - pz) / Mathf.Max(4f, speed);
-            float laneHp = (0.45f + 0.1f * arcD) * lootDps * crossT;
+            // retour : il faut s'y reprendre à deux fois (comme Hell Escape) → à la première tentative on en casse environ la moitié,
+            // les cartons cassés restent cassés, la deuxième passe
+            float laneHp = (0.62f + 0.08f * arcD) * lootDps * crossT;
             Perf.Note("cartons : " + lootDps.ToString("0.0") + " dégâts/s, traversée " + crossT.ToString("0.0") + " s, couloir " + laneHp.ToString("0"));
             int mask = PlayerPrefs.GetInt(LootKey, 0);
             for (int r = 0; r < rows; r++)

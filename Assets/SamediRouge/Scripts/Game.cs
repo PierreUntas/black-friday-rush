@@ -1696,7 +1696,9 @@ namespace SamediRouge
                 e.rig.Flash(NinjaGold, 0.06f);
                 e.timer = Mathf.Max(e.timer, 0.5f);
             }
-            float gap = 3.2f + e.escape;
+            // arcade : chaque tir de la bande le faisait reculer (des dizaines par seconde) → il partait très loin ; recul plafonné
+            float gap = Tuning.Arcade ? 4.5f + Mathf.Min(e.escape, 1.5f) : 3.2f + e.escape;
+            if (Tuning.Arcade) e.escape = Mathf.Min(e.escape, 1.5f);
             float want = pz + gap;
             e.rig.speed = speed;
             bool riding = bossType == 4 && thief; // gyropode : pas de foulées
