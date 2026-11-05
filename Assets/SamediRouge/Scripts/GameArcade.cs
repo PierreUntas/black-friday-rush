@@ -54,6 +54,12 @@ namespace SamediRouge
         float nextGateZ, nextCrateZ, mateVolleyT;
         /// <summary>Niveau d'arme de la course : 0 mains nues, 1 pistolet, 2 mitraillette, 3 mitraillette renforcée.</summary>
         int runTier;
+        /// <summary>Niveaux d'atelier gagnés au-delà de la mitraillette : chaque niveau accélère les tirs de toute la bande.</summary>
+        int craftBoost;
+        /// <summary>Niveau d'arme affiché (comme la carte « EQUIPPED » de Hell Escape) : batte 1, pistolet 2, mitraillette 3, puis +1 par atelier.</summary>
+        int RunWeaponLv => runTier + 1 + craftBoost;
+        /// <summary>Cadence : chaque niveau d'atelier au-delà de la mitraillette fait tirer 15 % plus vite.</summary>
+        float RateK => 1f / (1f + 0.15f * craftBoost);
         static bool devCenter;   // dev (éditeur) : caisses dans le couloir du milieu, pour tester la fusion sans diriger
         /// <summary>Caisses d'armes ramassées vers la prochaine fusion.</summary>
         int crates;
@@ -132,6 +138,7 @@ namespace SamediRouge
             nextGateZ = pz + 48f;
             nextCrateZ = pz + 80f;
             crates = 0;
+            craftBoost = 0;
             ClearMergeIcons();
             foreach (Craft c in crafts) if (c.go != null) Destroy(c.go);
             crafts.Clear();
@@ -162,8 +169,10 @@ namespace SamediRouge
             if (z >= nextCrateZ)
             {
                 // panneau de fusion dans un couloir au hasard : il faut s'y placer et tirer dessus pour le remplir
-                if (runTier < 3) { SpawnCraft(z + 6f, devCenter ? 1 : Random.Range(0, 3)); nextCrateZ = z + Random.Range(80f, 105f); return 14f; }
+                // l'atelier revient toute la course (plus de plafond à la mitraillette : ensuite il augmente la cadence)
+                SpawnCraft(z + 6f, devCenter ? 1 : Random.Range(0, 3));
                 nextCrateZ = z + Random.Range(80f, 105f);
+                return 14f;
             }
             return 0f;
         }
@@ -363,7 +372,7 @@ namespace SamediRouge
                     int nb = bolts.Count;
                     Shoot(best, true, new Vector3(m.x, 1.3f, m.z + 0.4f));
                     if (bolts.Count > nb) bolts[bolts.Count - 1].mult = salvo;
-                    m.shotT = MateRate * salvo * Random.Range(0.85f, 1.15f);
+                    m.shotT = MateRate * salvo * RateK * Random.Range(0.85f, 1.15f);
                 }
                 else if (loot.Count > 0)
                 {
@@ -375,7 +384,7 @@ namespace SamediRouge
                         bolts[bolts.Count - 1].loot = lb;
                         bolts[bolts.Count - 1].mult = salvo;
                         lb.pend += LootDmg * salvo;
-                        m.shotT = MateRate * salvo * Random.Range(0.85f, 1.15f);
+                        m.shotT = MateRate * salvo * RateK * Random.Range(0.85f, 1.15f);
                     }
                     else m.shotT = 0.15f;
                 }
@@ -757,17 +766,17 @@ namespace SamediRouge
 
         void SpawnCraft(float z, int lane)
         {
-            var c = new Craft { z = z, lane = lane, need = Mathf.RoundToInt((runTier == 0 ? 3 : runTier == 1 ? 5 : 8) * (1f + 0.25f * arcD)) };
+            var c = new Craft { z = z, lane = lane, need = Mathf.RoundToInt((runTier == 0 ? 3 : runTier == 1 ? 5 : runTier == 2 ? 8 : 10 + 3 * craftBoost) * (1f + 0.25f * arcD)) };
             Perf.Note("panneau de fusion couloir " + lane + " à " + z.ToString("0") + " (pz " + pz.ToString("0") + ")");
             c.go = new GameObject("craft");
             c.go.transform.SetParent(world, false);
             c.go.transform.localPosition = new Vector3((lane - 1) * Lane, 0f, z);
             Transform t = c.go.transform;
-            Material post = Art.Mat(new Color(0.92f, 0.92f, 0.95f), 0.6f, 0.3f);
+            Material post = Art.Mat(new Color(0.18f, 0.62f, 0.25f), 0.6f, 0.3f);   // portique vert bien visible, comme le « Craft » de Hell Escape
             Art.Part(t, Art.Cylinder, post, new Vector3(-1.12f, 1.35f, 0f), new Vector3(0.14f, 1.35f, 0.14f), default, false);
             Art.Part(t, Art.Cylinder, post, new Vector3(1.12f, 1.35f, 0f), new Vector3(0.14f, 1.35f, 0.14f), default, false);
             Art.Part(t, Art.Cube, post, new Vector3(0f, 2.72f, 0f), new Vector3(2.4f, 0.14f, 0.16f), default, false);
-            c.panel = Art.Part(t, Art.Cube, Art.Particle(null, new Color(1f, 0.78f, 0.2f, 0.45f)), new Vector3(0f, 1.35f, 0f), new Vector3(2.1f, 2.6f, 0.04f), default, false).transform;
+            c.panel = Art.Part(t, Art.Cube, Art.Particle(null, new Color(0.25f, 0.9f, 0.35f, 0.7f)), new Vector3(0f, 1.35f, 0f), new Vector3(2.1f, 2.6f, 0.04f), default, false).transform;
             // jauge : fond sombre, remplissage vert qui grandit depuis la gauche
             Art.Part(t, Art.Cube, Art.Mat(new Color(0.12f, 0.12f, 0.15f), 0.3f), new Vector3(0f, 2.35f, -0.06f), new Vector3(1.8f, 0.24f, 0.05f), default, false);
             c.bar = Art.Node(t, "bar", new Vector3(-0.88f, 2.35f, -0.1f));
@@ -779,7 +788,7 @@ namespace SamediRouge
             // l'arme à gagner est affichée dans le portique, sous la jauge, face à la caméra
             ic.localPosition = new Vector3(0f, 1.2f, -0.15f);
             ic.localRotation = Quaternion.Euler(20f, 0f, 0f);
-            if (FitModel(ic, TierModel(runTier + 1), 1.6f) == null)
+            if (FitModel(ic, TierModel(Mathf.Min(runTier + 1, 3)), 1.6f) == null)
                 Art.Part(ic, Art.Cube, Art.Glow(new Color(1f, 0.8f, 0.3f), new Color(0.6f, 0.4f, 0.05f), 0.85f), Vector3.zero, new Vector3(0.9f, 0.26f, 0.18f));
             crafts.Add(c);
         }
@@ -977,11 +986,32 @@ namespace SamediRouge
             Snd.Play(Snd.I.pickup, 0.9f, 0f);
             Destroy(c.go, 0.05f);
             if (runTier == 0) { UpgradeWeapon(); return; }
+            if (runTier >= 3) { BoostWeapon(); return; }
             if (mergeA != null) Destroy(mergeA.gameObject);
             if (mergeB != null) Destroy(mergeB.gameObject);
             mergeA = WeaponIcon(runTier, IconBase + new Vector3(-0.85f, 0f, 0f));
             mergeB = WeaponIcon(runTier, IconBase + new Vector3(0.85f, 0f, 0f));
             mergeT = 0f;
+        }
+
+        /// <summary>Atelier rempli avec la meilleure arme : l'arme monte d'un niveau, toute la bande tire plus vite.</summary>
+        void BoostWeapon()
+        {
+            craftBoost++;
+            Perf.Note("atelier : arme niveau " + RunWeaponLv + ", cadence x" + (1f / RateK).ToString("0.00"));
+            if (newIcon != null) Destroy(newIcon.gameObject);
+            newIcon = WeaponIcon(runTier, IconBase);
+            popT = 0f;
+            Fx.Confetti(IconBase);
+            P.Flash(Hud.StarGold, 0.3f);
+            Snd.Play(Snd.I.pickup, 1f, 0f);
+            Snd.Play(Snd.I.perfect, 0.7f, 0f);
+            hud.Flash(0.3f);
+            fovKick = Mathf.Max(fovKick, 6f);
+            hud.Toast(L("WEAPON LV ", "ARME NIV. ") + RunWeaponLv + " !");
+            hud.FloatKey(new Vector3(px, 3f, pz), L("FIRE RATE +15%", "CADENCE +15 %"), Hud.StarGold, true);
+            foreach (Mate m in squad) { m.rig.Land(0.4f); m.rig.Flash(Hud.StarGold, 0.2f); }
+            Haptics.Pulse(30, true);
         }
 
         /// <summary>Petits coups de « boing » sur les panneaux touchés, et nettoyage des panneaux dépassés.</summary>
@@ -1019,6 +1049,16 @@ namespace SamediRouge
                 for (int l = 0; l < 3; l++)
                     hud.Tag(new Vector3((l - 1) * Lane, 1.5f, g.z), GateText(g, l), Color.white, 2.2f);
             }
+            // atelier : titre, coups restants et niveau d'arme à gagner, lisibles de loin
+            foreach (Craft c in crafts)
+            {
+                if (c.done || c.go == null) continue;
+                float d = c.z - pz;
+                if (d < 1f || d > 70f) continue;
+                float cx = (c.lane - 1) * Lane;
+                hud.Tag(new Vector3(cx, 3.15f, c.z), L("WORKSHOP", "ATELIER"), Color.white, 1.5f);
+                hud.Tag(new Vector3(cx, 0.35f, c.z), L("LV ", "NIV. ") + (RunWeaponLv + 1) + "  " + c.hits + "/" + c.need, Hud.Yellow, 1.3f);
+            }
             int myLane = Mathf.Clamp(Mathf.RoundToInt(px / Lane) + 1, 0, 2);
             foreach (LootBox b in loot)
             {
@@ -1036,7 +1076,12 @@ namespace SamediRouge
             crowdPop = Mathf.MoveTowards(crowdPop, 0f, Time.deltaTime * 3f);
             crowdHurt = Mathf.MoveTowards(crowdHurt, 0f, Time.deltaTime * 2.5f);
             Color cc = Color.Lerp(Hud.Yellow, Hud.Bad, crowdHurt);
-            if (finaleZ < 0f || pz < lootEndZ + 3f) hud.Tag(new Vector3(px, 2.6f, pz), crowd.ToString(), cc, 1.3f * (1f + 0.6f * crowdPop + 0.3f * crowdHurt));
+            if (finaleZ < 0f || pz < lootEndZ + 3f)
+            {
+                hud.Tag(new Vector3(px, 2.6f, pz), crowd.ToString(), cc, 1.3f * (1f + 0.6f * crowdPop + 0.3f * crowdHurt));
+                // niveau d'arme toujours visible (la progression de la course se lit d'un coup d'œil)
+                hud.Tag(new Vector3(px, 3.35f, pz), L("WEAPON LV ", "ARME NIV. ") + RunWeaponLv, Color.white, 0.85f);
+            }
         }
     }
 }

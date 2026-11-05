@@ -2255,6 +2255,7 @@ namespace SamediRouge
             }
             // cadence : mitraillette en rafale, pistolet régulier, à mains nues un lancer plus lent
             float rate = gear[GSmg] ? 0.11f : gear[GPistol] ? Tuning.AutoPistolRate : Tuning.AutoBareRate;
+            if (Tuning.Arcade) rate *= RateK;   // ateliers au-delà de la mitraillette
             if (best == null)
             {
                 // arcade : sans ennemi en vue, il tire sur le panneau de fusion ou la porte de son couloir
