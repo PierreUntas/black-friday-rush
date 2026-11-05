@@ -41,6 +41,7 @@ namespace SamediRouge
             public int lane, hp, max;
             public float z, punch;
             public bool broken, dodged;
+            public int pend;   // dégâts déjà en vol vers ce carton (évite que toute la bande vise le même)
         }
 
         /// <summary>Champ de cartons de la finale en cours : la bande se resserre derrière le héros pour passer par la même brèche.</summary>
@@ -373,6 +374,7 @@ namespace SamediRouge
                         Shoot(null, true, new Vector3(m.x, 1.3f, m.z + 0.4f));
                         bolts[bolts.Count - 1].loot = lb;
                         bolts[bolts.Count - 1].mult = salvo;
+                        lb.pend += LootDmg * salvo;
                         m.shotT = MateRate * salvo * Random.Range(0.85f, 1.15f);
                     }
                     else m.shotT = 0.15f;
@@ -672,7 +674,7 @@ namespace SamediRouge
                 for (int l = 0; l < 3; l++)
                 {
                     // cartons solides : avec la batte de départ on ne passe pas, avec le pistolet acheté (dégâts ×2) on passe
-                    int hp = 13 + Mathf.RoundToInt(r * 3f + 3f * arcD + squad.Count * 0.35f) + Random.Range(0, 3);   // grosse foule : cartons plus solides
+                    int hp = 13 + Mathf.RoundToInt(r * 3f + 3f * arcD + squad.Count * 0.2f) + Random.Range(0, 3);   // grosse foule : cartons un peu plus solides
                     var b = new LootBox { lane = l, z = z0 + r * gap + Random.Range(-0.6f, 0.6f), hp = hp, max = hp };
                     b.tr = Art.Node(world, "loot", new Vector3((l - 1) * Lane, 0f, b.z));
                     float k = 0.8f + 0.06f * Mathf.Min(hp, 8);   // les cartons solides sont plus gros
@@ -791,6 +793,7 @@ namespace SamediRouge
             {
                 Shoot(null, gear[GSmg]);
                 bolts[bolts.Count - 1].loot = lb;
+                lb.pend += LootDmg;
                 return true;
             }
             foreach (Craft c in crafts)
@@ -819,7 +822,7 @@ namespace SamediRouge
             LootBox best = null;
             foreach (LootBox b in loot)
             {
-                if (b.broken || (lane >= 0 && b.lane != lane)) continue;
+                if (b.broken || b.pend >= b.hp || (lane >= 0 && b.lane != lane)) continue;   // déjà condamné par les tirs en vol : on vise le suivant
                 float d = b.z - fromZ;
                 if (d < 1f || d > range) continue;
                 if (best == null || b.z < best.z) best = b;
@@ -876,6 +879,7 @@ namespace SamediRouge
         {
             if (b.broken) return;
             b.hp -= LootDmg * mult;
+            b.pend = Mathf.Max(0, b.pend - LootDmg * mult);
             b.punch = 1f;
             if (b.hp > 0) return;
             b.broken = true;
