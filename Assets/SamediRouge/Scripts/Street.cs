@@ -10,6 +10,10 @@ namespace SamediRouge
     public partial class Street : MonoBehaviour
     {
         public const float Chunk = 36f, Lane = 2.4f, ShopX = 7.6f, UpperX = 10.4f, Level2 = 5f, Ceiling = 11.5f;
+        /// <summary>Resserrement de la rue (Look.Width) : le décor de chaque tronçon est comprimé en largeur.</summary>
+        public static float Narrow => Look.Width;
+        /// <summary>Position réelle (monde) du pied des vitrines, rue resserrée comprise.</summary>
+        public static float ShopXw => ShopX * Narrow;
 
         class ChunkData { public GameObject go; public float z; public List<Walker> people = new List<Walker>(); }
         class Walker { public Rig rig; public float dir, v; }
@@ -159,6 +163,25 @@ namespace SamediRouge
 
         void BuildChunk(float z0)
         {
+            BuildChunkRaw(z0);
+            // rue resserrée : le tronçon est comprimé en largeur, mais les passants gardent leurs proportions
+            ChunkData cd = chunks[chunks.Count - 1];
+            float k = Narrow;
+            cd.go.transform.localScale = new Vector3(k, 1f, 1f);
+            if (k == 1f) return;
+            foreach (Walker w in cd.people)
+            {
+                if (w.rig == null) continue;
+                Transform r = w.rig.root;
+                bool side = Mathf.Abs(Mathf.Sin(r.localEulerAngles.y * Mathf.Deg2Rad)) > 0.5f;
+                Vector3 s = r.localScale;
+                if (side) s.z /= k; else s.x /= k;
+                r.localScale = s;
+            }
+        }
+
+        void BuildChunkRaw(float z0)
+        {
             counter++;
             var go = new GameObject("Chunk" + counter);
             go.transform.SetParent(transform, false);
@@ -306,6 +329,20 @@ namespace SamediRouge
 
         void Store(Transform t, int s, float zc, float x, float y, int v)
         {
+            if (Tuning.Arcade && Look.SoftShops && y < 0.1f && ShopArt(v) != null)
+            {
+                // retour de Guillaume (conseil YSO) : des boutiques plutôt que des murs vides, mais en lumière douce qui
+                // n'attire pas l'oeil — devanture peu lumineuse, voilée d'un pastel, petit bandeau chaud au-dessus
+                Texture2D shopTex = ShopArt(v);
+                Color pastel = PlainWall[((v % PlainWall.Length) + PlainWall.Length) % PlainWall.Length];
+                float yawS = s < 0 ? -90f : 90f;
+                Art.Part(t, Art.Quad, Art.Tex(shopTex, Vector2.one, 0.4f, shopTex, new Color(0.16f, 0.15f, 0.14f)), new Vector3(s * (x - 0.01f), y + 2.4f, zc), new Vector3(9f, 4.6f, 1f), new Vector3(0f, yawS, 0f), false);
+                Art.Part(t, Art.Quad, Art.Particle(null, new Color(pastel.r, pastel.g, pastel.b, 0.58f)), new Vector3(s * (x - 0.03f), y + 2.4f, zc), new Vector3(9f, 4.6f, 1f), new Vector3(0f, yawS, 0f), false);
+                Art.Part(t, Art.Cube, wall, new Vector3(s * (x + 0.3f), y + 2.4f, zc), new Vector3(0.6f, 4.8f, 9f));
+                Art.Part(t, Art.Cube, Art.Glow(new Color(1f, 0.92f, 0.78f), new Color(0.55f, 0.48f, 0.36f), 0.3f), new Vector3(s * (x - 0.06f), y + 4.75f, zc), new Vector3(0.06f, 0.12f, 8.6f), default, false);
+                Art.Part(t, Art.Cube, frameMat, new Vector3(s * (x - 0.05f), y + 2.4f, zc - 4.45f), new Vector3(0.12f, 4.8f, 0.12f), default, false);
+                return;
+            }
             if (Tuning.Arcade)
             {
                 // arcade : pas de vitrines (retour YSO : seulement l'essentiel à l'écran) — panneaux pastel unis

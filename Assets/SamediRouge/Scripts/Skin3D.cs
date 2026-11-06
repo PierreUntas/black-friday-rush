@@ -203,6 +203,17 @@ namespace SamediRouge
             restL = Pitch(footL, toeL);
             restR = Pitch(footR, toeR);
 
+            // style « jouet » (retour de Guillaume, conseil YSO) : grosse tête, mains et pieds plus forts, comme une figurine
+            if (Look.Toy && name != "passant_1" && name != "passant_2")
+            {
+                Transform hd = Find(m, "Head");
+                if (hd != null) hd.localScale = Vector3.Scale(hd.localScale, Vector3.one * 1.38f);
+                foreach (string b in new[] { "LeftHand", "RightHand" }) { Transform t = Find(m, b); if (t != null) t.localScale *= 1.22f; }
+                foreach (string b in new[] { "LeftFoot", "RightFoot" }) { Transform t = Find(m, b); if (t != null) t.localScale *= 1.18f; }
+                Transform sp = Find(m, "Spine");
+                if (sp != null) sp.localScale = Vector3.Scale(sp.localScale, new Vector3(1.1f, 1f, 1.1f));   // buste un peu plus rond
+            }
+
             // articulations du jeu → os du modèle (direction de repos des membres : vers le bas, un peu écartés)
             pairs.Clear();
             Rig r = rig;

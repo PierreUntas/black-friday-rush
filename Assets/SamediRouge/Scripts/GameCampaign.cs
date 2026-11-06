@@ -54,6 +54,26 @@ namespace SamediRouge
             hud.onMapTab = OnMapTab;
             hud.onHomePlay = () => { if (st == St.Menu && metaScreen == MetaScreen.Home) StartStreet(HomeStreet()); };
             hud.onHomeBuy = HomeBuy;
+            hud.onHomeLook = () =>
+            {
+                // proportions suivantes : la rue se reconstruit, le héros change de taille
+                Look.Next();
+                street.Clear(pz);
+                PreviewGear();
+                Snd.Play(Snd.I.whoosh, 0.5f);
+                hud.InputDebug("LOOK " + Look.Names[Look.Preset] + "  ·  " + (Look.Preset == 0 ? "prototype" : Look.Preset == 1 ? "street -30%" : Look.Preset == 2 ? "characters +25%" : "street -30%, characters +25%, closer camera"));
+            };
+            hud.onHomeShops = () =>
+            {
+                Look.ToggleShops();
+                street.Clear(pz);
+                hud.InputDebug(Look.SoftShops ? "SHOPS ON · soft-lit shop fronts" : "SHOPS OFF · plain pastel walls");
+            };
+            hud.onHomeToy = () =>
+            {
+                Look.ToggleToy();
+                hud.InputDebug(Look.Toy ? "TOY ON · toy proportions for new characters (restart Play to update the hero)" : "TOY OFF · original proportions (restart Play to update the hero)");
+            };
             hud.onHomeReset = () =>
             {
                 // remise à zéro complète : progression, améliorations, solde
@@ -160,6 +180,9 @@ namespace SamediRouge
             Perf.On = devCmd.Contains("perf");
             devCenter = devCmd.Contains("center");
             devAuto = devCmd.Contains("auto");
+            var lk = System.Text.RegularExpressions.Regex.Match(devCmd, @"look\s+(\d)");
+            if (lk.Success) { Look.Set(int.Parse(lk.Groups[1].Value)); street.Clear(pz); }
+            devNoChaser = devCmd.Contains("nochaser");
             if (devCmd.Contains("rec")) StartCoroutine(DevRecord());
             if (devCmd.Contains("bossrush")) debugBossRush = true;
 #endif
@@ -333,6 +356,7 @@ namespace SamediRouge
         /// <summary>Boss vaincu en campagne ou en tutoriel : petite célébration puis écran de résultat.</summary>
         void RunWon()
         {
+            if (Tuning.Arcade) Rhythm.End(true, squad.Count + 1, runTier, hearts);
             runWon = true;
             ClearBolts();
             ents.RemoveAll(x => x.dead);
@@ -479,6 +503,7 @@ namespace SamediRouge
 
         void ShowDefeat()
         {
+            if (Tuning.Arcade) Rhythm.End(false, squad.Count + 1, runTier, hearts);
             if (Tuning.Arcade) { PlayerPrefs.SetInt(KFirstRun, 1); PlayerPrefs.Save(); }   // l'accueil s'affichera désormais
             LogRun(false);
             metaScreen = MetaScreen.Result;

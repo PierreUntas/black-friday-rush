@@ -15,8 +15,8 @@ namespace SamediRouge
         readonly Text[] homeName = new Text[4], homeLv = new Text[4], homeCost = new Text[4];
         readonly bool[] homeAfford = new bool[4];
         public System.Action<int> onHomeBuy;
-        public System.Action onHomePlay, onHomeReset;
-        Text homeResetLabel;
+        public System.Action onHomePlay, onHomeReset, onHomeLook, onHomeToy, onHomeShops;
+        Text homeResetLabel, homeLookLabel, homeToyLabel, homeShopsLabel;
         float homeResetArm = -1f;
 
         static readonly Color[] HomeColors = { new Color(0.93f, 0.68f, 0.12f), new Color(0.55f, 0.3f, 0.85f), new Color(0.25f, 0.72f, 0.35f), new Color(0.2f, 0.5f, 0.92f) };
@@ -45,6 +45,22 @@ namespace SamediRouge
                 if (homeResetArm > 0f) { homeResetArm = -1f; homeResetLabel.text = "RESET"; onHomeReset?.Invoke(); }
                 else { homeResetArm = 3f; homeResetLabel.text = L("SURE?", "SÛR ?"); }
             }, out homeResetLabel);
+            // test des proportions (retour de Guillaume) : PROTO → A → B → C
+            Button(r, "LOOK " + Look.Names[Look.Preset], new Color(0.2f, 0.22f, 0.27f, 0.85f), new Vector2(0f, 1f), new Vector2(110f, -200f), new Vector2(170f, 76f), 28, () =>
+            {
+                onHomeLook?.Invoke();
+                homeLookLabel.text = "LOOK " + Look.Names[Look.Preset];
+            }, out homeLookLabel);
+            Button(r, "TOY " + (Look.Toy ? "ON" : "OFF"), new Color(0.2f, 0.22f, 0.27f, 0.85f), new Vector2(0f, 1f), new Vector2(110f, -290f), new Vector2(170f, 76f), 28, () =>
+            {
+                onHomeToy?.Invoke();
+                homeToyLabel.text = "TOY " + (Look.Toy ? "ON" : "OFF");
+            }, out homeToyLabel);
+            Button(r, "SHOPS " + (Look.SoftShops ? "ON" : "OFF"), new Color(0.2f, 0.22f, 0.27f, 0.85f), new Vector2(0f, 1f), new Vector2(110f, -380f), new Vector2(170f, 76f), 26, () =>
+            {
+                onHomeShops?.Invoke();
+                homeShopsLabel.text = "SHOPS " + (Look.SoftShops ? "ON" : "OFF");
+            }, out homeShopsLabel);
 
             homeSwipe = Label(r, L("SWIPE TO PLAY", "GLISSE POUR JOUER"), 68, Color.white, TextAnchor.MiddleCenter, true);
             Shadowed(homeSwipe);

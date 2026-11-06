@@ -29,7 +29,7 @@ namespace SamediRouge
     {
         enum St { Menu, Play, Pause, End }
 
-        const float Lane = Street.Lane;
+        static float Lane => Street.Lane * Street.Narrow;   // rue resserrée (Look) : couloirs plus proches
         int MaxHearts = 3;
 
         St st = St.Menu;
@@ -553,9 +553,20 @@ namespace SamediRouge
             gearGap = campaign && !tutorialMode ? BalanceConfig.I.gearGap[Diff] : 110f;
             nextSpawnZ = pz + 60f;
             nextGearZ = pz + 55f;
+            if (Tuning.Arcade && campaign && !tutorialMode)
+            {
+                // mesure du rythme : 12 s sans aucun choix au départ → première rangée de portes dès ~4-5 s de course
+                nextSpawnZ = pz + 20f;
+                nextGateZ = pz + 18f;
+            }
             if (tutorialMode) { StartTutorialRun(); return; }
-            Spawn(ET.Casseur, 1, pz + 30f, Mode.Casse);
-            for (int i = 0; i < 4; i++) Spawn(ET.Piece, 1, pz + 40f + i * 2f);
+            // arcade : pas d'ennemi isolé au départ (la 1re rangée de portes arrive à ~4 s, puis les groupes enchaînent ;
+            // l'ennemi isolé tombait juste après la porte et frappait le héros pendant que la bande tirait sur la porte)
+            if (!(Tuning.Arcade && campaign))
+            {
+                Spawn(ET.Casseur, 1, pz + 30f, Mode.Casse);
+                for (int i = 0; i < 4; i++) Spawn(ET.Piece, 1, pz + 40f + i * 2f);
+            }
             hud.ShowPlay();
             hud.Toast(Tuning.StreetNames[streetIdx]);
             rankToastT = 1.6f;
@@ -1146,7 +1157,7 @@ namespace SamediRouge
 
             TickVisual(e, dt);
 
-            if (!e.hit && !e.dead && Mathf.Abs(e.z - pz) < e.depth + 0.35f && Mathf.Abs(e.x - px) < 1.05f) Collide(e, h);
+            if (!e.hit && !e.dead && Mathf.Abs(e.z - pz) < e.depth + 0.35f && Mathf.Abs(e.x - px) < 1.05f * Street.Narrow) Collide(e, h);   // rue resserrée : un groupe du couloir voisin ne te touche pas
             if (st != St.Play) return;
 
             if (e.type == ET.Casseur && !e.hit && e.z < pz - 2f)
@@ -1632,8 +1643,12 @@ namespace SamediRouge
             if (boss == null) { warn.gameObject.SetActive(false); warn2.gameObject.SetActive(false); }
         }
 
+        /// <summary>Cause notée pour les pertes de la bande (mesure du rythme).</summary>
+        string lossCause = "enemy";
+
         void StartBoss()
         {
+            if (Tuning.Arcade) Rhythm.Boss();
             bossType = tutorialMode ? 0 : campaign ? Tuning.StreetBoss[streetIdx] : bossOrder[(stage - 1) % 6];
             int baseHp = tutorialMode ? Tuning.TutorialBossHp : campaign ? Mathf.RoundToInt(Tuning.BossHp[Mathf.Clamp(streetIdx + debugDiff, 0, Tuning.Streets - 1)] * Tuning.BossHpMult) : 6 + (stage - 1) * 3;
             bossMaxHp = gear[GSmg] ? baseHp * 3 : baseHp;
@@ -2073,6 +2088,7 @@ namespace SamediRouge
             squad.RemoveAt(i);
             if (Tuning.Arcade)
             {
+                Rhythm.Loss(lossCause);
                 // arcade : petit nuage, pas de corps en physique (plusieurs d'un coup faisaient ramer).
                 // Grosse foule qui passe une porte négative : quelques nuages seulement par image (sinon l'écran devenait tout blanc)
                 Vector3 at = m.rig.root.position;
@@ -2145,7 +2161,7 @@ namespace SamediRouge
             {
                 Mate m = squad[i];
                 Vector2 sl = SlotAt(m.slot);
-                float tx = Mathf.Clamp(px + sl.x, -3.5f, 3.5f), tz = pz + sl.y;
+                float tx = Mathf.Clamp(px + sl.x, -3.5f * Street.Narrow, 3.5f * Street.Narrow), tz = pz + sl.y;
                 // arcade : la foule garde sa forme au contact (elle ne fonce plus sur les vigiles : plus lisible, plus propre)
                 bool charge = threats.Count > 0 && !Tuning.Arcade;
                 if (charge)
@@ -2155,12 +2171,12 @@ namespace SamediRouge
                     if (Tuning.Arcade)
                     {
                         // arcade : la foule fonce en gardant sa forme de grappe (pas une file indienne)
-                        tx = Mathf.Clamp(target.x * 0.6f + px * 0.4f + sl.x * 0.8f, -3.5f, 3.5f);
+                        tx = Mathf.Clamp(target.x * 0.6f + px * 0.4f + sl.x * 0.8f, -3.5f * Street.Narrow, 3.5f * Street.Narrow);
                         tz = Mathf.Min(target.z - 1.2f, pz + 2.2f) + sl.y * 0.7f;
                     }
                     else
                     {
-                        tx = Mathf.Clamp(target.x + (m.slot % 2 == 0 ? -0.35f : 0.35f), -3.5f, 3.5f);
+                        tx = Mathf.Clamp(target.x + (m.slot % 2 == 0 ? -0.35f : 0.35f), -3.5f * Street.Narrow, 3.5f * Street.Narrow);
                         tz = Mathf.Min(target.z - 1.1f, pz + 2.2f - (m.slot / 3) * 0.6f);
                     }
                 }
@@ -2825,11 +2841,11 @@ namespace SamediRouge
                 int side = i % 2 == 0 ? -1 : 1;
                 int ln = side < 0 ? Random.Range(0, 2) : Random.Range(1, 3);
                 Ent e = Spawn(ET.Casseur, ln, z + i * 2.2f, Mode.Sortie);
-                e.x = side * (Street.ShopX - 0.8f);
+                e.x = side * (Street.ShopXw - 0.8f);
                 e.go.transform.localPosition = new Vector3(e.x, 0f, e.z);
                 e.rig.anim = Anim.Stand;
             }
-            Fx.Debris(new Vector3(-(Street.ShopX - 0.6f), 1f, z));
+            Fx.Debris(new Vector3(-(Street.ShopXw - 0.6f), 1f, z));
             for (int i = 0; i < 3; i++) Spawn(ET.Piece, lanes[0], z + 6f + i * 1.8f);
             return 16f;
         }
@@ -2853,7 +2869,7 @@ namespace SamediRouge
             int ln = side < 0 ? 0 : 2;
             var raid = new StoreRaid { z = z, side = side };
             // côté émeutiers : un barrage de police à percer (gyrophare bleu) au lieu d'un magasin à défendre
-            raid.beacon = Street.Beacon(world, new Vector3(side * (Street.ShopX - 0.15f), 3.4f, z), thief ? new Color(0.2f, 0.45f, 1f) : new Color(1f, 0.12f, 0.1f));
+            raid.beacon = Street.Beacon(world, new Vector3(side * (Street.ShopXw - 0.15f), 3.4f, z), thief ? new Color(0.2f, 0.45f, 1f) : new Color(1f, 0.12f, 0.1f));
             raid.beacon.localRotation = Quaternion.Euler(0f, 0f, side * 90f);
             if (n < 0) n = Random.Range(3, 5);
             int id = raids.Count;
@@ -3092,6 +3108,10 @@ namespace SamediRouge
             bool hard = campaign && !tutorialMode;
             Mode m = Tuning.Arcade || Random.value < (hard ? 0.85f : 0.7f) ? Mode.Fonce : Mode.Casse;
             float vz = Random.Range(4.5f, 7f) * (hard ? Tuning.EnemyRush : 1f) * (Tuning.Arcade ? 1f + 0.15f * Mathf.Min(arcD, 2.5f) : 1f);
+            // retour de Guillaume (« trop facile de tuer les gars, il faudrait qu'un arrive parfois à me choper ») :
+            // de temps en temps un sprinteur, plus rapide et plus résistant, qui fonce au contact et emporte un voleur
+            bool lateEnough = streetIdx > 0 || (z - stageStartZ) > 0.5f * StageLen;   // niveau 1 : seulement dans la 2e moitié
+            int chaser = Tuning.Arcade && campaign && !demo && !devNoChaser && lateEnough && Random.value < ChaserChance ? Random.Range(0, n) : -1;
             for (int i = 0; i < n; i++)
             {
                 int row = i / 3, col = i % 3;
@@ -3102,7 +3122,9 @@ namespace SamediRouge
                 {
                     // arcade : construction étalée sur plusieurs images (un groupe de 8 d'un coup = un à-coup)
                     int hp = EnemyHp();
-                    packQueue.Enqueue(() => { hpQueue.Enqueue(hp); PackMember(ln, ez, m, off, vz); });
+                    bool ch = i == chaser;
+                    float o = off * Street.Narrow;   // rue resserrée : le groupe reste dans son couloir
+                    packQueue.Enqueue(() => { hpQueue.Enqueue(hp); PackMember(ln, ez, m, o, vz, ch); });
                 }
                 else PackMember(ln, ez, m, off, vz);
             }
@@ -3131,14 +3153,29 @@ namespace SamediRouge
             return Random.Range(1, unlocked + 1);
         }
 
-        void PackMember(int ln, float z, Mode m, float off, float vz)
+        /// <summary>Probabilité d'un sprinteur par groupe : déjà au niveau 1 (rare), puis de plus en plus fréquent.</summary>
+        float ChaserChance => streetIdx == 0 ? 0.18f : Mathf.Min(0.7f, 0.4f + 0.06f * streetIdx);
+        bool chaserSeen;
+        /// <summary>Outil de dev (commande « nochaser ») : pas de sprinteurs, pour comparer avec l'avant.</summary>
+        static bool devNoChaser;
+
+        void PackMember(int ln, float z, Mode m, float off, float vz, bool chaser = false)
         {
-            int kind = Tuning.Arcade && thief ? PickEnemyKind() : 0;
+            int kind = Tuning.Arcade && thief && !chaser ? PickEnemyKind() : 0;
             if (kind > 0) Rig.EnemySkin = EnemyKinds[kind].skin;
             Ent e = Spawn(ET.Casseur, ln, z, m);
             Rig.EnemySkin = null;
-            e.x = Mathf.Clamp(e.x + off, -3.4f, 3.4f);
+            e.x = Mathf.Clamp(e.x + off, -3.4f * Street.Narrow, 3.4f * Street.Narrow);
             e.vz = vz;
+            if (chaser)
+            {
+                // sprinteur : 1,7× plus rapide, 3× plus résistant (il survit au tir de barrage), un peu plus grand
+                e.vz *= 1.7f;
+                e.hp = Mathf.Clamp(e.hp * (streetIdx == 0 ? 2 : 3), 2, 30);   // niveau 1 : il passe parfois, sans punir
+                e.go.transform.localScale *= 1.15f;
+                if (e.rig != null) e.rig.Flash(new Color(1f, 0.2f, 0.15f), 0.6f);
+                if (!chaserSeen) { chaserSeen = true; hud.Toast(L("SPRINTER!", "SPRINTEUR !")); }
+            }
             if (kind > 0)
             {
                 EnemyKind k = EnemyKinds[kind];
@@ -3645,6 +3682,12 @@ namespace SamediRouge
                     want += new Vector3(0f, 2.6f + 2.2f * ck + 0.6f * ck2, -0.4f - 1f * ck - 4f * ck2);   // grosse foule : la caméra RECULE (en montant elle passait au-dessus du plafond de la galerie : écran blanc)
                 }
                 look = Tuning.Arcade ? new Vector3(px * 0.4f, 0.4f, pz + 6.5f) : new Vector3(px * 0.4f, 1.25f, pz + 9f);
+                if (Tuning.Arcade && Look.Close)
+                {
+                    // réglage C : caméra plus proche et un peu plus basse, la bande occupe plus l'écran
+                    Vector3 off = want - new Vector3(px * 0.55f, 0f, pz);
+                    want = new Vector3(want.x, off.y * 0.8f, pz + off.z * 0.78f);
+                }
                 if (Tuning.Arcade && stairZ0 >= 0f && pz > stairZ0 - 6f)
                 {
                     // escalator : la caméra monte avec la bande, un peu plus bas (sous le plafond de la galerie)

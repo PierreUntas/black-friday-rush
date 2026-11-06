@@ -1,0 +1,14 @@
+{
+  "decisionMin": 2.0,
+  "decisionMax": 3.0,
+  "rewardMin": 4.0,
+  "rewardMax": 6.0,
+  "spectacleMin": 8.0,
+  "spectacleMax": 12.0,
+  "maxGap": 5.0,
+  "minGap": 0.8,
+  "overload": 6,
+  "minReaction": 1.2,
+  "seenDistance": 40.0,
+  "bigLoss": 5
+}

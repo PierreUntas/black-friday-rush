@@ -20,7 +20,24 @@ namespace SamediRouge
             public readonly Transform[] panel = new Transform[3];
             public readonly int[] hits = new int[3];
             public readonly float[] punch = new float[3];
+            /// <summary>Juice (retour de Guillaume) : pop du chiffre quand la valeur monte, jauge vers le +1 suivant, cadre coloré.</summary>
+            public readonly float[] grow = new float[3];
+            public readonly Transform[] fill = new Transform[3];
+            public readonly MeshRenderer[][] frame = new MeshRenderer[3][];
         }
+
+        static readonly Material[] gateFrameMat = new Material[2];
+        static Material GateFrame(bool good)
+        {
+            int i = good ? 1 : 0;
+            if (gateFrameMat[i] == null)
+                gateFrameMat[i] = good ? Art.Glow(new Color(0.35f, 0.7f, 1f), new Color(0.35f, 0.75f, 1.6f), 0.6f)
+                                       : Art.Glow(new Color(1f, 0.35f, 0.3f), new Color(1.5f, 0.25f, 0.2f), 0.6f);
+            return gateFrameMat[i];
+        }
+
+        /// <summary>Tirs nécessaires pour le prochain cran d'une porte (mêmes règles que GateHit).</summary>
+        static int GateNeed(Gate g, int l) => g.mul[l] ? 8 : 3 + Mathf.Max(0, g.val[l]) / 5;
 
         /// <summary>Panneau de fusion (à la Hell Escape) : on le remplit en tirant dessus, l'arme suivante sort quand la jauge est pleine.</summary>
         class Craft
@@ -220,7 +237,12 @@ namespace SamediRouge
         int crates;
         const int ArcadeMaxSquad = 99;   // une vraie foule : 99 voleurs + le héros = 100 (retour : 18 c'était trop peu)
         /// <summary>Arcade : vitesse de course réduite, taille des personnages de ta bande (alignée sur les adversaires).</summary>
-        const float ArcadeSpeed = 0.38f, CrewScale = 0.65f, MateScale = 0.48f, EnemyScale = 1f, FreeMax = 3.3f;
+        const float ArcadeSpeed = 0.38f;
+        /// <summary>Tailles multipliées par Look.Size, déplacement libre borné par la largeur de la rue (Look.Width).</summary>
+        static float CrewScale => 0.65f * Look.Size;
+        static float MateScale => 0.48f * Look.Size;
+        static float EnemyScale => 1f * Look.Size;
+        static float FreeMax => 3.3f * Street.Narrow;
         float freeX;
 
         /// <summary>
@@ -250,6 +272,7 @@ namespace SamediRouge
 
         /// <summary>Place d'un membre de la bande derrière le héros (au-delà des 10 places fixes : rangées de 5).</summary>
         static Vector2[] blob;
+        static int blobLook = -1;
         static Vector2 SlotAt(int i)
         {
             if (!Tuning.Arcade)
@@ -259,18 +282,20 @@ namespace SamediRouge
                 return new Vector2(((k % 5) - 2) * 0.85f, -3.3f - (k / 5) * 0.65f);
             }
             // arcade : une foule compacte en tournesol autour et juste derrière le héros (lisible, ne cache pas l'écran)
-            if (blob == null)
+            if (blob == null || blobLook != Look.Preset)
             {
+                blobLook = Look.Preset;
                 // foule compacte et régulière (maillage en quinconce) : les places les plus proches du héros d'abord,
                 // la foule s'élargit jusqu'aux bords de la piste puis s'allonge vers l'arrière (jusqu'à 100 voleurs)
                 var l = new List<Vector2>();
-                const float sx = 0.46f, sy = 0.4f;
-                for (int iy = -40; iy <= 4; iy++)
+                float sx = 0.46f * Mathf.Min(Look.Size, Street.Narrow * 1.1f), sy = 0.4f * Look.Size,   // largeur de foule proportionnelle aux couloirs (sinon une petite bande déborde sur les couloirs voisins)
+                      maxX = 2.95f * Street.Narrow, gap = 0.45f * Mathf.Max(0.8f, Mathf.Min(Look.Size, Street.Narrow * 1.1f));
+                for (int iy = -60; iy <= 4; iy++)
                     for (int ix = -7; ix <= 7; ix++)
                     {
                         float x = ix * sx + ((iy & 1) != 0 ? sx * 0.5f : 0f), y = iy * sy - 0.3f;
-                        if (Mathf.Abs(x) > 2.95f) continue;
-                        if (Mathf.Abs(x) < 0.45f && y > -0.5f) continue;   // pas sur le héros ni juste devant lui
+                        if (Mathf.Abs(x) > maxX) continue;
+                        if (Mathf.Abs(x) < gap && y > -0.5f) continue;   // pas sur le héros ni juste devant lui
                         if (y > 0.9f) continue;
                         l.Add(new Vector2(x, y));
                     }
@@ -318,6 +343,7 @@ namespace SamediRouge
             if (campaign && !demo && StartCrew > 0) AddMates(StartCrew);   // amélioration « Bande » de l'accueil
             ArmCrew();
             if (campaign && !demo && streetIdx == 0) hud.Toast(L("← SWIPE →", "← GLISSE →"));
+            if (campaign && !demo) Rhythm.Begin(streetIdx + 1, squad.Count + 1, arcD, Look.Names[Look.Preset]);   // mesure du rythme de la course
         }
 
         /// <summary>Génération : une rangée de portes ou une caisse d'armes quand c'est leur tour. Renvoie l'espace pris (0 : rien de spécial).</summary>
@@ -361,7 +387,7 @@ namespace SamediRouge
             int crowd = squad.Count + 1;
             foreach (Gate g in gates)
             {
-                if (g.used || g.z < pz + 2f || g.z > pz + 30f) continue;
+                if (g.used || g.z < pz - 0.5f || g.z > pz + 30f) continue;   // reste dans le couloir choisi jusqu'au passage de la porte
                 int best = 1;
                 float bv = -1e9f;
                 for (int l = 0; l < 3; l++)
@@ -450,19 +476,33 @@ namespace SamediRouge
             g.go = new GameObject("gate");
             g.go.transform.SetParent(world, false);
             g.go.transform.localPosition = new Vector3(0f, 0f, z);
+            g.go.transform.localScale = new Vector3(Street.Narrow, 1f, 1f);   // rue resserrée : portes moins larges
             Material post = Art.Mat(new Color(0.92f, 0.92f, 0.95f), 0.6f, 0.3f);
             for (int l = 0; l < 3; l++)
             {
                 float x = (l - 1) * Lane;
                 bool good = g.mul[l] || g.val[l] > 0;
-                Art.Part(g.go.transform, Art.Cylinder, post, new Vector3(x - 1.12f, 1.35f, 0f), new Vector3(0.14f, 1.35f, 0.14f), default, false);
-                Art.Part(g.go.transform, Art.Cylinder, post, new Vector3(x + 1.12f, 1.35f, 0f), new Vector3(0.14f, 1.35f, 0.14f), default, false);
-                Art.Part(g.go.transform, Art.Cube, post, new Vector3(x, 2.72f, 0f), new Vector3(2.4f, 0.14f, 0.16f), default, false);
+                // cadre lumineux (bleu = gain, rouge = perte) : on lit la porte de loin, sans lire le chiffre
+                Material fm = GateFrame(good);
+                g.frame[l] = new[]
+                {
+                    Art.Part(g.go.transform, Art.Cylinder, fm, new Vector3(x - 1.12f, 1.35f, 0f), new Vector3(0.16f, 1.35f, 0.16f), default, false),
+                    Art.Part(g.go.transform, Art.Cylinder, fm, new Vector3(x + 1.12f, 1.35f, 0f), new Vector3(0.16f, 1.35f, 0.16f), default, false),
+                    Art.Part(g.go.transform, Art.Cube, fm, new Vector3(x, 2.74f, 0f), new Vector3(2.44f, 0.2f, 0.2f), default, false),
+                };
                 MeshRenderer pr = Art.Part(g.go.transform, Art.Cube, Art.Particle(null, good ? GateGood : GateBad), new Vector3(x, 1.35f, 0f), new Vector3(2.1f, 2.6f, 0.04f), default, false);
                 g.panel[l] = pr.transform;
+                // jauge en bas du panneau : elle se remplit à chaque tir, le chiffre monte quand elle est pleine
+                Art.Part(g.go.transform, Art.Cube, Art.Mat(new Color(0.08f, 0.09f, 0.12f), 0.3f), new Vector3(x, 0.32f, -0.05f), new Vector3(1.84f, 0.2f, 0.04f), default, false);
+                g.fill[l] = Art.Node(g.go.transform, "fill", new Vector3(x - 0.9f, 0.32f, -0.08f));
+                Art.Part(g.fill[l], Art.Cube, Art.Glow(new Color(1f, 0.85f, 0.25f), new Color(1.4f, 1.0f, 0.2f), 0.5f), new Vector3(0.9f, 0f, 0f), new Vector3(1.8f, 0.14f, 0.03f), default, false);
+                g.fill[l].localScale = new Vector3(0.001f, 1f, 1f);
             }
             gates.Add(g);
+            Rhythm.Place(z, "gates " + GateText(g, 0) + " / " + GateText(g, 1) + " / " + GateText(g, 2), Rhythm.Kind.Decision);
         }
+
+        static readonly int[] CrewMilestones = { 5, 10, 20, 30, 50, 75, 99 };
 
         static string GateText(Gate g, int l) => g.mul[l] ? "×" + g.val[l] : (g.val[l] > 0 ? "+" + g.val[l] : g.val[l].ToString());
 
@@ -510,6 +550,7 @@ namespace SamediRouge
             FinaleTick();
             if (finaleZ >= 0f || climbStopped) ClimbTick(dt);
             if (st != St.Play) return;
+            Rhythm.Tick(dt, pz);
             MergeTick(dt);
             PropsTick(dt);
             BoonTick();
@@ -571,6 +612,8 @@ namespace SamediRouge
         void ApplyGate(Gate g, int l)
         {
             int before = squad.Count;
+            string[] gopts = { GateText(g, 0), GateText(g, 1), GateText(g, 2) };
+            lossCause = "bad gate";
             if (g.mul[l]) AddMates((squad.Count + 1) * (g.val[l] - 1));
             else if (g.val[l] > 0) AddMates(g.val[l]);
             else for (int k = 0; k < -g.val[l] && squad.Count > 0; k++) LoseMate(squad.Count - 1, new Vector3(Random.Range(-3f, 3f), 4f, 2f));
@@ -587,13 +630,33 @@ namespace SamediRouge
                 fovKick = Mathf.Max(fovKick, 5f);   // un seul coup de zoom au passage, pas à chaque tir
                 foreach (Mate m in squad) m.rig.Land(0.35f);
                 Haptics.Pulse(12);
+                // juice : micro-arrêt sur image, éclats dorés en couronne, flash d'autant plus fort que le gain est gros
+                int gain = squad.Count + pendingMates - before;   // les recrues arrivent sur quelques images (pendingMates)
+                hitStop = Mathf.Max(hitStop, gain >= 10 ? 0.07f : 0.035f);
+                for (int s = 0; s < 3; s++) Fx.Sparkle(p + new Vector3((s - 1) * 0.7f, 0.4f * s, 0f));
+                hud.Flash(Mathf.Clamp(0.08f + 0.01f * gain, 0.08f, 0.3f));
             }
             else
             {
                 Snd.Play(Snd.I.hurt, 0.6f);
-                shake = Mathf.Max(shake, 0.25f);
+                shake = Mathf.Max(shake, 0.35f);
+                hud.Damage(0.3f);
+                Haptics.Pulse(25, true);
             }
             if (squad.Count >= ArcadeMaxSquad && g.mul[l] && before < ArcadeMaxSquad) score += 200f;
+            lossCause = "enemy";
+            int nowCrew = squad.Count + pendingMates + 1;
+            Rhythm.Gate(gopts, l, before + 1, nowCrew, good);
+            // mesure du rythme : trop peu de moments forts (un toutes les ~27 s au niveau 1) → paliers de bande fêtés
+            foreach (int ms in CrewMilestones)
+                if (before + 1 < ms && nowCrew >= ms)
+                {
+                    hud.Toast(L("CREW ", "BANDE ") + ms + " !");
+                    Fx.Confetti(new Vector3(px, 2.5f, pz + 2f));
+                    Snd.Play(Snd.I.perfect, 0.6f, 0f);
+                    Rhythm.Event(Rhythm.Kind.Spectacle, "crew milestone " + ms);
+                    break;
+                }
         }
 
         /// <summary>Une caisse d'armes : deux caisses fusionnent en une arme du niveau au-dessus.</summary>
@@ -742,6 +805,8 @@ namespace SamediRouge
             Snd.Play(Snd.I.perfect, 0.7f, 0f);
             hud.Flash(0.35f);
             fovKick = Mathf.Max(fovKick, 7f);
+            Rhythm.Event(Rhythm.Kind.Reward, "weapon tier " + runTier);
+            Rhythm.Event(Rhythm.Kind.Spectacle, "weapon upgrade");
             hud.Toast(runTier >= 3 ? L("SUPER SMG!", "SUPER MITRAILLETTE !") : runTier >= 2 ? L("SMG!", "MITRAILLETTE !") : L("PISTOL!", "PISTOLET !"));
             foreach (Mate m in squad) { m.rig.Land(0.4f); m.rig.Flash(Hud.StarGold, 0.2f); }
             Haptics.Pulse(30, true);
@@ -812,6 +877,8 @@ namespace SamediRouge
                 int n = Mathf.Clamp(3 + Mathf.Min(crowd, 30) / 3 + Mathf.Max(0, crowd - 30) / 8 + Mathf.RoundToInt(prog * (3f + 2f * arcD) + arcD * 2f), 3, 22);
                 SetPackHp(z, n, 1f);
                 SpawnPack(lanes[0], z, n);
+                Rhythm.Place(z, "pack of " + n, Rhythm.Kind.Decision);
+                Rhythm.Place(z + 2f, "coins", Rhythm.Kind.Passive);
                 arcPackHp = 0f;
                 for (int i = 0; i < 3; i++) Spawn(ET.Piece, lanes[2], z + 2f + i * 2.4f);
                 return 20f;
@@ -823,12 +890,15 @@ namespace SamediRouge
                 SetPackHp(z, n, 0.65f);   // deux groupes : on n'en affronte qu'un si on choisit bien son couloir
                 SpawnPack(lanes[0], z, n);
                 SpawnPack(lanes[1], z + 1.5f, n);
+                Rhythm.Place(z, "barrage 2 × " + n, Rhythm.Kind.Decision);
+                Rhythm.Place(z + 2f, "coins", Rhythm.Kind.Passive);
                 arcPackHp = 0f;
                 for (int i = 0; i < 3; i++) Spawn(ET.Piece, lanes[2], z + 2f + i * 2.4f);
                 return 22f;
             }
             // respiration : une ligne de pièces
             for (int i = 0; i < 4; i++) Spawn(ET.Piece, lanes[1], z + i * 2.2f);
+            Rhythm.Place(z, "coins", Rhythm.Kind.Passive);
             return 14f;
         }
 
@@ -844,7 +914,8 @@ namespace SamediRouge
             BuildStairs(lootEndZ + 10f);
             finaleZ = stairZ0 + StairSteps * StairD + 9f;   // le magasin attend en haut de l'escalator
             nextSpawnZ = 1e9f;
-            hud.Toast(L("SMASH THE CRATES!", "CASSE LES CARTONS !"));   // ils barrent la route jusqu'au MEGA STORE
+            hud.Toast(L("SMASH THE CRATES!", "CASSE LES CARTONS !"));
+            Rhythm.Event(Rhythm.Kind.Spectacle, "finale: crate field");   // ils barrent la route jusqu'au MEGA STORE
             foreach (LootBox b in loot) if (b.tr != null) Destroy(b.tr.gameObject);
             loot.Clear();
             Material card = Art.Mat(new Color(0.78f, 0.56f, 0.32f), 0.25f);
@@ -871,6 +942,7 @@ namespace SamediRouge
                     int hp = Mathf.Max(3, Mathf.RoundToInt(laneHp / rows * (0.7f + 0.1f * r) * Random.Range(0.9f, 1.1f) * (firstTry ? (r >= 3 ? 2.6f : 1f) : 0.5f)));   // tentatives suivantes : ce qui reste cède (on doit passer)
                     var b = new LootBox { lane = l, z = z0 + r * gap + Random.Range(-0.6f, 0.6f), hp = hp, max = hp, id = r * 3 + l };
                     b.tr = Art.Node(world, "loot", new Vector3((l - 1) * Lane, 0f, b.z));
+                    b.tr.localScale = new Vector3(Street.Narrow, 1f, 1f);
                     float k = 0.8f + 0.06f * Mathf.Min(hp, 8);   // les cartons solides sont plus gros
                     Art.Part(b.tr, Art.Cube, card, new Vector3(0f, 0.6f * k, 0f), new Vector3(1.4f, 1.2f, 1.1f) * k);
                     Art.Part(b.tr, Art.Cube, tape, new Vector3(0f, 1.2f * k + 0.01f, 0f), new Vector3(0.3f, 0.02f, 1.12f) * k, default, false);
@@ -898,7 +970,7 @@ namespace SamediRouge
             store.transform.SetParent(world, false);
             store.transform.localPosition = new Vector3(0f, 0f, z);
             Transform t = store.transform;
-            float w = Street.ShopX * 2f + 1f;
+            float w = Street.ShopXw * 2f + 1f;
             Material wall = Art.Mat(new Color(0.16f, 0.15f, 0.2f), 0.4f);
             Material gold = Art.Glow(new Color(1f, 0.8f, 0.2f), new Color(1.4f, 1.0f, 0.25f), 0.5f);
             Material glass = Art.Glow(new Color(1f, 0.85f, 0.55f), new Color(0.75f, 0.55f, 0.25f), 0.8f);   // intérieur chaud, plus un écran blanc
@@ -957,6 +1029,7 @@ namespace SamediRouge
             c.go = new GameObject("craft");
             c.go.transform.SetParent(world, false);
             c.go.transform.localPosition = new Vector3((lane - 1) * Lane, 0f, z);
+            c.go.transform.localScale = new Vector3(Street.Narrow, 1f, 1f);
             Transform t = c.go.transform;
             // portique vert pour l'arme, bleu pour l'armure, bien visible comme le « Craft » de Hell Escape
             Material post = armor ? Art.Mat(new Color(0.18f, 0.38f, 0.75f), 0.6f, 0.3f) : Art.Mat(new Color(0.18f, 0.62f, 0.25f), 0.6f, 0.3f);
@@ -986,6 +1059,7 @@ namespace SamediRouge
             else if (FitModel(ic, TierModel(Mathf.Min(runTier + 1, 3)), 1.6f) == null)
                 Art.Part(ic, Art.Cube, Art.Glow(new Color(1f, 0.8f, 0.3f), new Color(0.6f, 0.4f, 0.05f), 0.85f), Vector3.zero, new Vector3(0.9f, 0.26f, 0.18f));
             crafts.Add(c);
+            Rhythm.Place(z, armor ? "armor panel" : "weapon panel", Rhythm.Kind.Decision);
         }
 
         /// <summary>Tir automatique sans ennemi en vue : il vise le panneau de fusion, sinon la porte de son couloir (plus on tire, meilleure elle devient).</summary>
@@ -1113,7 +1187,7 @@ namespace SamediRouge
                 if (b.punch > 0f)
                 {
                     b.punch = Mathf.Max(0f, b.punch - Time.deltaTime * 6f);
-                    b.tr.localScale = Vector3.one * (1f + 0.15f * b.punch);
+                    b.tr.localScale = new Vector3(Street.Narrow, 1f, 1f) * (1f + 0.15f * b.punch);
                 }
                 if (b.lane == l && !b.dodged && pz >= b.z - 0.9f && st == St.Play)
                 {
@@ -1147,6 +1221,7 @@ namespace SamediRouge
                 {
                     g.hits[l] = 0;
                     g.val[l]++;
+                    g.grow[l] = 1f;
                     hud.FloatKey(at, "×" + g.val[l] + "!", Hud.Yellow, true);
                     Snd.PlayPitch(Snd.I.pickup, 0.5f, 1.3f);
                 }
@@ -1156,6 +1231,8 @@ namespace SamediRouge
                 g.hits[l] = 0;
                 g.val[l]++;
                 if (g.val[l] == 0) g.val[l] = 1;   // pas de porte « 0 »
+                g.grow[l] = 1f;
+                if (g.val[l] == 1) { Fx.Confetti(at); Haptics.Pulse(15); }   // la porte rouge vient de passer au bleu : moment à marquer
                 hud.FloatKey(at, "+1", Hud.Yellow, false);
                 Snd.PlayPitch(Snd.I.tick, 0.35f, 1f + 0.05f * Mathf.Clamp(g.val[l], -5, 12));
             }
@@ -1165,6 +1242,8 @@ namespace SamediRouge
                 MeshRenderer mr = g.panel[l].GetComponent<MeshRenderer>();
                 if (mr != null) mr.sharedMaterial = Art.Particle(null, good ? GateGood : GateBad);
             }
+            if (g.frame[l] != null) foreach (MeshRenderer fr in g.frame[l]) if (fr != null) fr.sharedMaterial = GateFrame(good);
+            if (g.fill[l] != null) g.fill[l].localScale = new Vector3(Mathf.Max(0.001f, Mathf.Clamp01(g.hits[l] / (float)GateNeed(g, l))), 1f, 1f);
             g.punch[l] = 1f;
             Fx.Sparkle(new Vector3((l - 1) * Lane, 1.6f, g.z));
         }
@@ -1196,6 +1275,7 @@ namespace SamediRouge
         /// <summary>Atelier d'armure rempli : nouvelle tenue (sweat → blouson → gilet volé), puis +1 niveau ; chaque niveau protège la bande.</summary>
         void UpgradeArmor()
         {
+            Rhythm.Event(Rhythm.Kind.Reward, "armor");
             armorLv++;
             Perf.Note("armure niveau " + armorLv + ", défense " + (DefChance * 100f).ToString("0") + " %");
             int vest = RunForm;
@@ -1229,6 +1309,7 @@ namespace SamediRouge
             tex.name = "boon" + kind;   // la clé du matériau dépend du nom de la texture
             Art.Part(t, Art.Quad, Art.Particle(tex, Color.white), new Vector3(0f, 1.6f, -0.09f), new Vector3(1.15f, 1.15f, 1f), default, false);
             boons.Add(bo);
+            Rhythm.Place(z, kind == 0 ? "attack boon" : "defense boon", Rhythm.Kind.Decision);
             Perf.Note("bonus " + kind + " couloir " + bo.lane + " à " + z.ToString("0"));
         }
 
@@ -1261,6 +1342,7 @@ namespace SamediRouge
             P.Flash(Hud.StarGold, 0.25f);
             hud.Flash(0.2f);
             Haptics.Pulse(20, true);
+            Rhythm.Event(Rhythm.Kind.Reward, bo.kind == 0 ? "attack boon" : "defense boon");
             if (bo.kind == 0) { dmgBoon++; hud.Toast(L("ATTACK +20%", "ATTAQUE +20 %")); }
             else { defBoon++; hud.Toast(L("DEFENSE +20%", "DÉFENSE +20 %")); }
             hud.SetBoons(dmgBoon, defBoon);
@@ -1270,6 +1352,7 @@ namespace SamediRouge
         /// <summary>Atelier rempli avec la meilleure arme : l'arme monte d'un niveau, toute la bande tire plus vite.</summary>
         void BoostWeapon()
         {
+            Rhythm.Event(Rhythm.Kind.Reward, "weapon boost");
             craftBoost++;
             Perf.Note("atelier : arme niveau " + RunWeaponLv + ", cadence x" + (1f / RateK).ToString("0.00"));
             if (newIcon != null) Destroy(newIcon.gameObject);
@@ -1292,9 +1375,10 @@ namespace SamediRouge
             foreach (Gate g in gates)
                 for (int l = 0; l < 3; l++)
                 {
+                    g.grow[l] = Mathf.Max(0f, g.grow[l] - dt * 3.5f);
                     if (g.punch[l] <= 0f || g.panel[l] == null) continue;
                     g.punch[l] = Mathf.Max(0f, g.punch[l] - dt * 6f);
-                    float k = 1f + 0.12f * g.punch[l];
+                    float k = 1f + 0.18f * g.punch[l] + 0.15f * g.grow[l];
                     g.panel[l].localScale = new Vector3(2.1f * k, 2.6f * k, 0.04f);
                 }
             for (int i = crafts.Count - 1; i >= 0; i--)
@@ -1319,7 +1403,11 @@ namespace SamediRouge
                 float d = g.z - pz;
                 if (d < 1f || d > 70f) continue;
                 for (int l = 0; l < 3; l++)
-                    hud.Tag(new Vector3((l - 1) * Lane, 1.5f, g.z), GateText(g, l), Color.white, 2.2f);
+                {
+                    // le chiffre gonfle et passe au jaune quand il monte
+                    float gr = g.grow[l];
+                    hud.Tag(new Vector3((l - 1) * Lane, 1.5f, g.z), GateText(g, l), Color.Lerp(Color.white, Hud.Yellow, gr), 2.2f * (1f + 0.55f * gr * gr));
+                }
             }
             // carte d'arme fixe sur le bord droit (pas de texte dans la scène, comme Hell Escape)
             hud.SetWeaponCard(runTier, RunWeaponLv);
