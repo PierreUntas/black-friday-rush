@@ -15,19 +15,20 @@ namespace SamediRouge
 
         public static int Preset
         {
-            get { if (preset < 0) preset = Mathf.Clamp(PlayerPrefs.GetInt(Key, 3), 0, 3); return preset; }
+            // réglage retenu : C (boutons de test retirés de l'accueil). Seule la commande de dev « look N » peut en imposer un autre.
+            get { return preset < 0 ? 3 : preset; }
         }
         /// <summary>Largeur de la rue (couloirs et décor), 1 = d'origine.</summary>
         public static float Width => Preset == 1 || Preset == 3 ? 0.7f : 1f;
         /// <summary>Taille des personnages (bande, héros, adversaires), 1 = d'origine.</summary>
-        public static float Size => Preset == 2 || Preset == 3 ? 1.25f : 1f;
+        public static float Size => Preset == 2 ? 1.25f : Preset == 3 ? 1.12f : 1f;   // C : +12 % (retour : +25 % c'était un peu grand avec la rue resserrée)
         /// <summary>Caméra plus proche et plus basse.</summary>
         public static bool Close => Preset == 3;
 
         /// <summary>Proportions « jouet » des personnages 3D (grosse tête, mains et pieds forts). Bouton TOY de l'accueil.</summary>
         public static bool Toy
         {
-            get { if (toy < 0) toy = PlayerPrefs.GetInt("sr_toy", 1); return toy == 1; }
+            get { return toy != 0; }   // retenu : toujours actif (bouton retiré)
         }
         static int toy = -1;
         public static void ToggleToy()
@@ -40,7 +41,7 @@ namespace SamediRouge
         /// <summary>Boutiques en lumière douce sur les côtés (au lieu de murs pastel unis). Bouton SHOPS de l'accueil.</summary>
         public static bool SoftShops
         {
-            get { if (shops < 0) shops = PlayerPrefs.GetInt("sr_shops", 1); return shops == 1; }
+            get { return shops != 0; }   // retenu : toujours actif (bouton retiré ; sur le téléphone il était resté sur OFF)
         }
         static int shops = -1;
         public static void ToggleShops()
@@ -54,7 +55,6 @@ namespace SamediRouge
         public static void Set(int p)
         {
             preset = Mathf.Clamp(p, 0, Names.Length - 1);
-            PlayerPrefs.SetInt(Key, preset);
         }
 
         public static void Next()

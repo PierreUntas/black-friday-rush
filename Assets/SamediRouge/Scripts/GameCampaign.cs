@@ -183,6 +183,8 @@ namespace SamediRouge
             var lk = System.Text.RegularExpressions.Regex.Match(devCmd, @"look\s+(\d)");
             if (lk.Success) { Look.Set(int.Parse(lk.Groups[1].Value)); street.Clear(pz); }
             devNoChaser = devCmd.Contains("nochaser");
+            var gs = System.Text.RegularExpressions.Regex.Match(devCmd, @"gate\s+(\d)");
+            if (gs.Success) GateStyle = int.Parse(gs.Groups[1].Value);
             if (devCmd.Contains("rec")) StartCoroutine(DevRecord());
             if (devCmd.Contains("bossrush")) debugBossRush = true;
 #endif
@@ -356,7 +358,7 @@ namespace SamediRouge
         /// <summary>Boss vaincu en campagne ou en tutoriel : petite célébration puis écran de résultat.</summary>
         void RunWon()
         {
-            if (Tuning.Arcade) Rhythm.End(true, squad.Count + 1, runTier, hearts);
+            if (Tuning.Arcade) Rhythm.End(true, Crew + 1, runTier, hearts);
             runWon = true;
             ClearBolts();
             ents.RemoveAll(x => x.dead);
@@ -421,8 +423,8 @@ namespace SamediRouge
             metaScreen = MetaScreen.Result;
             bool already = Progress.Conquered(thief, streetIdx);
             int bonus = already ? Mathf.RoundToInt(Tuning.VictoryBonus[streetIdx] * Tuning.ReplayBonusFactor) : Tuning.VictoryBonus[streetIdx];
-            int crewN = Tuning.Arcade && finaleCrew > 0 ? finaleCrew : squad.Count + 1;   // la bande arrivée au pied de l'escalator
-            if (Tuning.Arcade) bonus += crewN * 4 + 40;   // arcade : chaque membre de la bande rapporte au pillage, + prime de victoire
+            int crewN = Tuning.Arcade && finaleCrew > 0 ? finaleCrew : Crew + 1;   // la bande arrivée au pied de l'escalator
+            if (Tuning.Arcade) bonus += crewN * 2 + 20;   // arcade : chaque membre de la bande rapporte au pillage, + prime de victoire (retour : « beaucoup trop d'or » → divisé par 2)
             int total = coins + bonus;
             if (Tuning.Arcade) total = Mathf.RoundToInt(total * IncomeMult * stairMult);   // amélioration « Revenus » de l'accueil × hauteur atteinte sur l'escalator
             // dernier niveau d'un quartier (première fois) : coffre de fin de quartier, et le quartier suivant s'ouvre
@@ -430,6 +432,7 @@ namespace SamediRouge
             int zoneBonus = zoneDone ? 400 * ((streetIdx + 1) / Hud.ZoneLen) : 0;
             total += zoneBonus;
             Progress.Coins += total;
+            Perf.Note("gain de victoire : pièces " + coins + ", bonus " + bonus + ", ×" + stairMult + " → " + total + " (solde " + Progress.Coins + ")");
             var openBefore = new bool[Tuning.Maps];
             for (int m = 0; m < Tuning.Maps; m++) openBefore[m] = Progress.MapUnlocked(thief, m);
             if (!already) Progress.SetConquered(thief, streetIdx, true);
@@ -460,8 +463,8 @@ namespace SamediRouge
                 var bl = new System.Collections.Generic.List<string>();
                 var bv = new System.Collections.Generic.List<string>();
                 bl.Add(L("Loot grabbed", "Butin ramassé")); bv.Add("+" + coins);
-                bl.Add(L("Crew ×", "Bande ×") + crewN); bv.Add("+" + (crewN * 4));
-                bl.Add(L("Victory bonus", "Prime de victoire")); bv.Add("+" + (bonus - crewN * 4));
+                bl.Add(L("Crew ×", "Bande ×") + crewN); bv.Add("+" + (crewN * 2));
+                bl.Add(L("Victory bonus", "Prime de victoire")); bv.Add("+" + (bonus - crewN * 2));
                 if (IncomeMult > 1.001f) { bl.Add(L("Income", "Revenus")); bv.Add("×" + IncomeMult.ToString("0.0")); }
                 if (zoneBonus > 0) { bl.Add(L("District cleared", "Quartier terminé")); bv.Add("+" + zoneBonus); }
                 hud.ShowBreakdown(bl.ToArray(), bv.ToArray(), stairMult);
@@ -501,15 +504,37 @@ namespace SamediRouge
             catch (System.Exception) { }
         }
 
+        /// <summary>Prix de l'amélioration la moins chère de l'accueil (-1 si tout est au maximum).</summary>
+        int CheapestHomeCost()
+        {
+            int best = -1;
+            for (int i = 0; i < 4; i++)
+            {
+                int c = HomeCost(i);
+                if (c > 0 && (best < 0 || c < best)) best = c;
+            }
+            return best;
+        }
+
         void ShowDefeat()
         {
-            if (Tuning.Arcade) Rhythm.End(false, squad.Count + 1, runTier, hearts);
+            if (Tuning.Arcade) Rhythm.End(false, Crew + 1, runTier, hearts);
             if (Tuning.Arcade) { PlayerPrefs.SetInt(KFirstRun, 1); PlayerPrefs.Save(); }   // l'accueil s'affichera désormais
             LogRun(false);
             metaScreen = MetaScreen.Result;
             int keep = Mathf.RoundToInt(coins * Tuning.DefeatKeep);
             // arcade, bloqué par les cartons : on garde tout le butin et un bonus « presque ! » (de quoi viser le pistolet)
-            if (Tuning.Arcade && blocked) keep = Mathf.Max(coins + 60, 160);
+            if (Tuning.Arcade && blocked) keep = Mathf.Max(coins + 30, 80);   // bloqué par les cartons (prévu au 1er essai) : prime « presque ! » réduite
+            // boucle hypercasual (retour de Pierre) : on perd la 1re fois, mais on repart TOUJOURS avec de quoi acheter
+            // au moins une amélioration — sinon la 2e course est identique à la 1re. Si la course est allée loin
+            // (bloqué aux cartons, ou plus de la moitié du parcours) et que le solde ne suffit pour rien, on complète.
+            if (Tuning.Arcade)
+            {
+                float prog = Mathf.Clamp01((pz - stageStartZ) / StageLen);
+                int cheapest = CheapestHomeCost();
+                if (cheapest > 0 && (blocked || boss != null || prog >= 0.5f) && Progress.Coins + keep < cheapest)
+                    keep = cheapest - Progress.Coins + Random.Range(5, 21);
+            }
             Progress.Coins += keep;
             float progress = Mathf.Clamp01((pz - stageStartZ) / StageLen);
             string where = boss != null ? L("the boss", "le boss") : Mathf.RoundToInt(progress * 100f) + L("% of the street", " % de la rue");

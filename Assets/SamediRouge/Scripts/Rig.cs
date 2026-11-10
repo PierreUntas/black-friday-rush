@@ -705,6 +705,59 @@ namespace SamediRouge
             return m;
         }
 
+        /// <summary>
+        /// Arme du boss, variée d'un niveau à l'autre (retour de Pierre : « les boss ont toujours les mêmes armes ») :
+        /// 0 matraque, 1 matraque lourde, 2 taser, 3 mitraillette, 4 bouclier anti-émeute + matraque, 5 deux matraques.
+        /// Visuel seulement : les attaques du boss restent celles de son type.
+        /// </summary>
+        readonly System.Collections.Generic.List<Transform> bossArms = new System.Collections.Generic.List<Transform>();
+
+        /// <summary>Le boss lâche son arme (changement d'arme en cours de combat).</summary>
+        public void ClearBossArm()
+        {
+            foreach (Transform t in bossArms) if (t != null) Object.Destroy(t.gameObject);
+            bossArms.Clear();
+        }
+
+        public void BossArm(int kind, bool thiefSide)
+        {
+            string f = thiefSide ? "police" : "voleur";
+            // modèle 3D : l'arme suit la vraie main du modèle (relais), pas le squelette en blocs caché
+            Transform hR = skin3d != null ? skin3d.RelayOf(handR) ?? handR : handR;
+            Transform hL = skin3d != null ? skin3d.RelayOf(handL) ?? handL : handL;
+            Transform r = Art.Node(hR, "bossArm", Vector3.zero);
+            bossArms.Add(r);
+            switch (((kind % 6) + 6) % 6)
+            {
+                case 0: Arm(r, "arme_" + f + "_niv1", 0.85f); break;
+                case 1: Arm(r, "arme_heavy_" + f, 1.25f); break;
+                case 2: Arm(r, "arme_" + f + "_niv2", 0.55f); break;
+                case 3: Arm(r, "arme_" + f + "_niv3", 0.8f); break;
+                case 4:
+                {
+                    Arm(r, "arme_" + f + "_niv1", 0.85f);
+                    Transform sh = Art.Node(hL, "bossShield", new Vector3(-0.05f, 0.05f, 0.15f));
+                    bossArms.Add(sh);
+                    if (GlbModel.Exists("bouclier_" + f + "_niv3")) Fit(GlbModel.Spawn("bouclier_" + f + "_niv3", sh), 1.0f, 1, Vector3.zero, 0f, -90f);
+                    break;
+                }
+                default:
+                {
+                    Arm(r, "arme_" + f + "_niv1", 0.85f);
+                    Transform l2 = Art.Node(hL, "bossArmL", Vector3.zero);
+                    bossArms.Add(l2);
+                    Arm(l2, "arme_" + f + "_niv1", 0.85f);
+                    break;
+                }
+            }
+        }
+
+        static void Arm(Transform slot, string model, float len)
+        {
+            if (!GlbModel.Exists(model)) return;
+            Fit(GlbModel.Spawn(model, slot), len, 1, new Vector3(0f, 0f, len * 0.5f - 0.08f), 90f, 0f);
+        }
+
         /// <summary>Armes 3D : 1 matraque / batte en main droite, 2 pistolet en main gauche, 3 mitraillette à deux mains.</summary>
         static void WeaponModels(Rig r, bool thief)
         {

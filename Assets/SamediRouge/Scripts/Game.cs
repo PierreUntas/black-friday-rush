@@ -556,8 +556,7 @@ namespace SamediRouge
             if (Tuning.Arcade && campaign && !tutorialMode)
             {
                 // mesure du rythme : 12 s sans aucun choix au départ → première rangée de portes dès ~4-5 s de course
-                nextSpawnZ = pz + 20f;
-                nextGateZ = pz + 18f;
+                ArcadeOpening();
             }
             if (tutorialMode) { StartTutorialRun(); return; }
             // arcade : pas d'ennemi isolé au départ (la 1re rangée de portes arrive à ~4 s, puis les groupes enchaînent ;
@@ -698,7 +697,7 @@ namespace SamediRouge
             hud.Tick(udt);
             if (st == St.Play)
             {
-                hud.SetPlay(Mathf.FloorToInt(dist), Mathf.FloorToInt(score), hearts, koCount, ComboMult(), rec, gear, squad.Count, shieldHits, shieldT);
+                hud.SetPlay(Mathf.FloorToInt(dist), Mathf.FloorToInt(score), hearts, koCount, ComboMult(), rec, gear, Tuning.Arcade ? Crew : squad.Count, shieldHits, shieldT);
                 hud.SetStars(coins);
             }
             Perf.Mark("hud");
@@ -1063,14 +1062,14 @@ namespace SamediRouge
                         if (e.mode == Mode.Fonce && e.z - pz < 45f)
                         {
                             e.z -= e.vz * dt;
-                            if (Tuning.Arcade && FreeMove && e.z - pz < 24f && e.z > pz)
+                            if (Tuning.Arcade && FreeMove && e.z - pz < 32f && e.z > pz)   // se rabattent plus tôt (retour : on les esquivait encore par le côté)
                             {
                                 // arcade : les vigiles se rabattent sur ta bande (chacun vise un point de la foule, pas seulement le héros) :
                                 // on ne peut plus simplement les esquiver d'un glissé
-                                float spread = Mathf.Min(2.6f, 0.35f + 0.22f * Mathf.Sqrt(squad.Count));
+                                float spread = Mathf.Min(2.6f * Street.Narrow, (0.35f + 0.22f * Mathf.Sqrt(squad.Count)) * CrowdK);   // la foule est plus étroite dans la rue resserrée : ils visent dedans, pas à côté
                                 float aim = px + ((e.GetHashCode() & 7) / 7f - 0.5f) * 2f * spread;
                                 float dx = aim - e.x;
-                                if (Mathf.Abs(dx) > 0.15f) e.x += Mathf.Sign(dx) * Mathf.Min(Mathf.Abs(dx) - 0.15f, (4f + 1f * arcD) * dt);
+                                if (Mathf.Abs(dx) > 0.15f) e.x += Mathf.Sign(dx) * Mathf.Min(Mathf.Abs(dx) - 0.15f, (5.5f + 1.2f * arcD) * dt);
                             }
                             e.rig.anim = e.z - pz < 16f ? Anim.Charge : Anim.Run;
                             e.rig.speed = e.vz;
@@ -1659,6 +1658,7 @@ namespace SamediRouge
             bossAttacks = 0;
             bossCharging = false;
             bossStunT = 0f;
+            if (Tuning.Arcade) BossArmsStart();
             boss = Spawn(ET.Loup, 1, pz + (Tuning.Arcade ? 16f : 30f));
             if (bossType == 6)
             {
@@ -1682,6 +1682,7 @@ namespace SamediRouge
                 default: ShowTip(TBoss, 4, L("JUMP OR DODGE", "SAUTE OU ESQUIVE"), L("Shockwaves and boxes, one after the other", "Ondes de choc et cartons, l'un après l'autre"), null, false); how = L("Shockwaves, then boxes!", "Ondes de choc, puis cartons !"); break;
             }
             hud.Ticker(L("BOSS FIGHT: " + BossName.ToLower() + ". " + how, "COMBAT DE BOSS : " + BossName + ". " + how), true);
+            if (Tuning.Arcade) BossArmsAnnounce(boss);   // arcade : l'arme annonce l'attaque à esquiver
             Snd.Play(Snd.I.siren, 0.7f, 0f);
             shake = Mathf.Max(shake, 0.3f);
         }
@@ -1718,6 +1719,7 @@ namespace SamediRouge
                 e.rig.Flash(NinjaGold, 0.06f);
                 e.timer = Mathf.Max(e.timer, 0.5f);
             }
+            if (Tuning.Arcade) { BossArmsTick(e, dt); if (st != St.Play) return; }
             // arcade : chaque tir de la bande le faisait reculer (des dizaines par seconde) → il partait très loin ; recul plafonné
             float gap = Tuning.Arcade ? 4.5f + Mathf.Min(e.escape, 1.5f) : 3.2f + e.escape;
             if (Tuning.Arcade) e.escape = Mathf.Min(e.escape, 1.5f);
@@ -1761,9 +1763,10 @@ namespace SamediRouge
                     // armé de l'attaque : on voit venir le coup
                     bossWind = 0f;
                     bossMove = BossMove();
-                    if (Tuning.Arcade) bossMove = 0;   // arcade (retours YSO) : une seule attaque lisible, un carton lancé sur ton couloir
+                    if (Tuning.Arcade) bossMove = ArcadeBossMove();   // arcade : l'attaque dépend de l'arme du boss
                     bossTargetLane = lane;
                     bossThrow = bossMove == 0 || bossMove == 3;
+                    if (!(Tuning.Arcade && ArcadeBossWind(e)))
                     switch (bossMove)
                     {
                         case 1:
@@ -1816,6 +1819,7 @@ namespace SamediRouge
                           : bossMove == 4 ? Mathf.Max(0.6f, 0.85f - lvl * 0.04f)
                           : bossMove == 5 ? Mathf.Max(0.62f, 0.9f - lvl * 0.03f)
                           : 0.7f;
+            if (Tuning.Arcade) { float aw = ArcadeWindDur(lvl); if (aw > 0f) windDur = aw; }
             if (bossMove == 2) e.rig.anim = Anim.Cheer;
             if (bossMove == 4)
             {
@@ -1841,6 +1845,7 @@ namespace SamediRouge
             warn.gameObject.SetActive(false);
             warn2.gameObject.SetActive(false);
             e.y = 0f;
+            if (Tuning.Arcade && ArcadeBossFire(e, lvl)) return;
             switch (bossMove)
             {
                 case 0:
@@ -1875,6 +1880,14 @@ namespace SamediRouge
                     shake = Mathf.Max(shake, 0.3f);
                     Fx.Skid(new Vector3((bossTargetLane - 1) * Lane, 0.1f, pz + 1f));
                     Fx.Skid(new Vector3((bossSecondLane - 1) * Lane, 0.1f, pz + 1f));
+                    if (Tuning.Arcade)
+                    {
+                        // deux matraques : double balayage (le 2e suit tout de suite, sur ton nouveau couloir)
+                        LaneStrike(bossTargetLane, bossSecondLane, L("The batons swept you", "Les matraques t'ont balayé"));
+                        if (bossWeapon == 5 && bossRepeat == 0) { bossRepeat = 1; e.timer = 0.35f; }
+                        else { bossRepeat = 0; e.timer = Mathf.Max(1f, 1.6f - lvl * 0.1f); }
+                        break;
+                    }
                     for (int i = squad.Count - 1; i >= 0; i--)
                     {
                         int ml = Mathf.Clamp(Mathf.RoundToInt(squad[i].x / Lane) + 1, 0, 2);
@@ -1898,6 +1911,7 @@ namespace SamediRouge
                     break;
                 case 4:
                     bossCharging = true;
+                    chargeKills = 0;
                     Snd.PlayPitch(Snd.I.whoosh, 0.9f, 0.6f);
                     Fx.Skid(new Vector3(e.x, 0.1f, e.z));
                     e.timer = Mathf.Max(1.1f, 2f - lvl * 0.12f);
@@ -2047,12 +2061,23 @@ namespace SamediRouge
 
         int pendingMates;
 
+        /// <summary>
+        /// Arcade : bande sans limite (retour de Pierre). Au-delà de 99 voleurs affichés, les suivants sont « en réserve » :
+        /// ils comptent partout (compteur, puissance de feu, escalator, butin) et remplacent un voleur visible qui tombe.
+        /// </summary>
+        int reserve;
+        /// <summary>Taille réelle de la bande, héros non compris (visibles + en construction + réserve).</summary>
+        int Crew => squad.Count + pendingMates + reserve;
+
         void AddMates(int n)
         {
             if (Tuning.Arcade && st == St.Play)
             {
                 // arcade : les recrues d'une porte arrivent sur quelques images (en construire 8 d'un coup = un à-coup)
-                pendingMates = Mathf.Min(pendingMates + n, MaxSquad - squad.Count);
+                int room = Mathf.Max(0, MaxSquad - squad.Count - pendingMates);
+                int vis = Mathf.Min(n, room);
+                pendingMates += vis;
+                reserve += n - vis;
                 return;
             }
             BuildMates(n);
@@ -2075,6 +2100,7 @@ namespace SamediRouge
         void ClearSquad()
         {
             pendingMates = 0;
+            reserve = 0;
             foreach (Mate m in squad) if (m.rig != null && m.rig.root != null) Destroy(m.rig.root.gameObject);
             squad.Clear();
         }
@@ -2086,6 +2112,7 @@ namespace SamediRouge
         {
             Mate m = squad[i];
             squad.RemoveAt(i);
+            if (Tuning.Arcade && reserve > 0) { reserve--; pendingMates++; }   // un voleur de la réserve prend sa place
             if (Tuning.Arcade)
             {
                 Rhythm.Loss(lossCause);
@@ -2210,11 +2237,11 @@ namespace SamediRouge
                     float dz = e.z - m.z, dx = Mathf.Abs(e.x - m.x);
                     if (e.type == ET.Casseur || e.type == ET.Loup)
                     {
-                        if (dx < 1.2f && dz > -0.2f && dz < 3.2f && hitE == null) hitE = e;
-                        if (e.type == ET.Casseur && dx < 1.1f && dz > 0.2f && dz < 2.2f && strike == null) strike = e;
+                        if (dx < 1.2f * BodyK && dz > -0.2f && dz < 3.2f && hitE == null) hitE = e;
+                        if (e.type == ET.Casseur && dx < 1.1f * BodyK && dz > 0.2f && dz < 2.2f && strike == null) strike = e;
                         // zone de contact élargie selon la durée de l'image : sur téléphone (moins d'images par seconde), un vigile lancé
                         // traversait la zone entre deux images sans jamais toucher personne → on ne perdait presque aucun voleur
-                        if (dx < 0.6f && dz > -0.4f - (speed + Mathf.Abs(e.vz) + 4f) * dt && dz < 0.5f && !e.fled) touch = e;
+                        if (dx < 0.75f * BodyK && dz > -0.4f - (speed + Mathf.Abs(e.vz) + 4f) * dt && dz < 0.5f && !e.fled) touch = e;
                     }
                     else if ((dx < 0.9f || e.type == ET.Onde) && Mathf.Abs(dz) < e.depth + 0.2f)
                     {
@@ -2252,8 +2279,9 @@ namespace SamediRouge
                     if (Defended()) { m.rig.Flash(new Color(0.4f, 0.7f, 1f), 0.15f); Fx.Sparkle(new Vector3(m.x, 1.2f, m.z)); }   // défense / armure : il encaisse
                     else LoseMate(i, new Vector3(Random.Range(-3f, 3f), 4f, speed * 0.4f));
                     if (st != St.Play) return;
-                    // retour : le corps à corps doit faire plus mal → chaque vigile qui atteint la foule emporte un 2e voleur
-                    if (Tuning.Arcade && touch.type == ET.Casseur && !touch.hit && !touch.dead && squad.Count > 0 && !Defended())
+                    // (retiré : chaque vigile emportait un 2e voleur, puis revenait à la charge s'il tenait debout →
+                    // pertes disproportionnées, « ça fait bizarre ». Désormais : un vigile au contact = un voleur, et il tombe avec lui)
+                    if (false && Tuning.Arcade && touch.type == ET.Casseur && !touch.hit && !touch.dead && squad.Count > 0 && !Defended())
                     {
                         LoseMate(squad.Count - 1, new Vector3(Random.Range(-3f, 3f), 4f, speed * 0.4f));
                         if (i > squad.Count) i = squad.Count;   // la boucle descend : on reste dans la liste
@@ -2263,7 +2291,7 @@ namespace SamediRouge
                     {
                         // la foule l'encercle : chaque voleur emporté lui coûte un gros morceau de vie
                         // (sinon un vigile costaud traversait toute une grosse bande à lui seul)
-                        HitCasseur(touch, true, 0.5f, true, squad.Count >= 20 ? 999 : 1 + touch.hp / 3);   // grosse foule : échange un pour un (le vigile tombe avec lui)   // échange : le voleur emporté entame sérieusement le vigile (2 à 3 voleurs par costaud)
+                        HitCasseur(touch, true, 0.5f, true, 999);   // échange un pour un : le vigile tombe avec le voleur qu'il emporte   // grosse foule : échange un pour un (le vigile tombe avec lui)   // échange : le voleur emporté entame sérieusement le vigile (2 à 3 voleurs par costaud)
                         if (st != St.Play) return;
                     }
                 }
@@ -2318,6 +2346,10 @@ namespace SamediRouge
                 if (Mathf.Abs(e.x - px) > 1.4f) continue;
                 float d = e.z - pz;
                 if (d < -0.8f || d > reach * 0.8f) continue;
+                // retour de Pierre : seul, sans coéquipier, le corps à corps doit pouvoir te tuer.
+                // Chaque échange au contact coûte un coup (la jauge de vie descend ; protégé un court instant entre deux coups)
+                if (Tuning.Arcade && campaign && !demo && squad.Count == 0 && e.type == ET.Casseur)
+                    Hurt(1, M(L("Beaten in a brawl", "Battu au corps à corps"), L("Beaten in a brawl", "Battu au corps à corps")));
                 Swing();
                 return;
             }
@@ -2373,7 +2405,9 @@ namespace SamediRouge
                     dmg = 1;
                     if (!light && Random.value < 0.5f) hud.Float(chest + Vector3.up * 1.6f, L("TRY A PERFECT HIT!", "TENTE UN COUP PARFAIT !"), NinjaGold, false);
                 }
+                if (Tuning.Arcade) { dmg = BossArmsDamage(e, dmg, chest); if (dmg <= 0) return; }
                 e.hp -= dmg;
+                if (Tuning.Arcade) BossArmsAfterHit(e);
                 e.rig.Flash(Color.white, 0.08f);
                 if (!light) hud.Float(chest + Vector3.up, Random.value < 0.5f ? "BONK!" : "POW!", Hud.Yellow, true);
                 if (e.hp > 0)
@@ -2588,14 +2622,16 @@ namespace SamediRouge
                     return;
                 case ET.Loup:
                     if (e.fled) return;
-                    if (P.swingT >= 0f || gear[GShield])
+                    // arcade : le héros frappe tout seul au contact, donc il « contrait » toujours la charge et le boss ne faisait
+                    // jamais mal (retour de Pierre sur le 2e boss) → en arcade, pas de contre automatique, la charge porte
+                    if ((P.swingT >= 0f && !Tuning.Arcade) || gear[GShield])
                     {
                         // contre parfait pendant sa charge : il est renvoyé devant
                         if (bossCharging) { bossCharging = false; e.fled = true; e.z = pz + 1.2f; hud.Float(new Vector3(px, 2.4f, pz + 1f), L("COUNTER!", "CONTRE !"), Hud.Yellow, true); }
                         HitCasseur(e, false, 1.4f);
                         return;
                     }
-                    if (bossCharging) { bossCharging = false; e.fled = true; e.z = pz - 1.5f; Hurt(1, L(BossName.ToLower() + " ran you over", BossName + " t'a renversé")); return; }
+                    if (bossCharging) { bossCharging = false; e.fled = true; e.z = pz - 1.5f; if (Tuning.Arcade) { ChargeHit(e); return; } Hurt(1, L(BossName.ToLower() + " ran you over", BossName + " t'a renversé")); return; }
                     e.escape += 3f;
                     Hurt(1, L(BossName.ToLower() + " shoved you", BossName + " t'a bousculé"));
                     return;
@@ -3246,6 +3282,8 @@ namespace SamediRouge
                     e.rig = Rig.Build(Kind.Boss, t, Vector3.zero, 180f, Rig.BossLook + (bossType == 6 ? 12 + (thief ? 1 : 0) : bossType + (thief ? 6 : 0)));
                     Rig.OutlineOverride = null;
                     e.rig.root.localScale = Vector3.one * sizes[bossType] * Rig.Scale;
+                    // arcade : une arme différente d'un niveau à l'autre (sauf Big Bat / Riot Titan qui ont la leur)
+                    if (Tuning.Arcade && bossType != 6) e.rig.BossArm(bossWeapon, thief);
                     e.rig.anim = Anim.Run;
                     Color[] auras =
                     {

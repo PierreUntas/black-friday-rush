@@ -24,6 +24,8 @@ namespace SamediRouge
             public readonly float[] grow = new float[3];
             public readonly Transform[] fill = new Transform[3];
             public readonly MeshRenderer[][] frame = new MeshRenderer[3][];
+            public readonly Vector3[] panelBase = new Vector3[3];
+            public readonly MeshRenderer[] floorMark = new MeshRenderer[3];
         }
 
         static readonly Material[] gateFrameMat = new Material[2];
@@ -60,10 +62,57 @@ namespace SamediRouge
             public bool broken, dodged;
             public int id;     // place dans le champ (rangée × 3 + couloir), pour s'en souvenir d'une course à l'autre
             public int pend;   // dégâts déjà en vol vers ce carton (évite que toute la bande vise le même)
+            /// <summary>Coffre à billets pendant la course (à la Hell Escape) : on tire dessus pour l'ouvrir, il ne bloque pas.</summary>
+            public bool cash;
+            public int gold;
+        }
+
+        /// <summary>
+        /// Retour de Pierre : « on gagne de l'or trop facilement » → plus de lignes de pièces à ramasser en courant :
+        /// un coffre à billets dans un couloir, avec sa résistance affichée, qu'il faut ouvrir en tirant dessus (comme Hell Escape).
+        /// Raté = rien. Résistance calée sur ta puissance de feu (≈1,3 s de tir de toute la bande).
+        /// </summary>
+        void SpawnCash(int lane, float z)
+        {
+            float heroRate = (gear[GSmg] ? 0.11f : gear[GPistol] ? Tuning.AutoPistolRate : Tuning.AutoBareRate) * RateK;
+            float dps = LootDmg * DmgK * (1f / heroRate + Crew / (MateRate * RateK));
+            int hp = Mathf.Max(4, Mathf.RoundToInt(dps * Random.Range(1.1f, 1.6f) * (1f + 0.15f * arcD)));
+            var b = new LootBox { lane = lane, z = z, hp = hp, max = hp, id = -1, cash = true, gold = Mathf.Clamp(2 + streetIdx / 2 + Random.Range(0, 3), 2, 10) };
+            b.tr = Art.Node(world, "cash", new Vector3((lane - 1) * Lane, 0f, z));
+            b.tr.localScale = new Vector3(Street.Narrow, 1f, 1f);
+            // coffre-fort vert foncé, poignée et liserés dorés, gros $ sur la face avant
+            Material body = Art.Mat(new Color(0.16f, 0.36f, 0.24f), 0.55f, 0.4f);
+            Material gold = Art.Glow(new Color(1f, 0.82f, 0.25f), new Color(1.3f, 0.95f, 0.25f), 0.6f);
+            Art.Part(b.tr, Art.Cube, body, new Vector3(0f, 0.65f, 0f), new Vector3(1.3f, 1.3f, 1.0f));
+            Art.Part(b.tr, Art.Cube, gold, new Vector3(0f, 1.31f, 0f), new Vector3(1.34f, 0.05f, 1.04f), default, false);
+            Art.Part(b.tr, Art.Cube, gold, new Vector3(0f, 0.01f, 0f), new Vector3(1.34f, 0.05f, 1.04f), default, false);
+            Art.Part(b.tr, Art.Cylinder, gold, new Vector3(0.42f, 0.65f, -0.52f), new Vector3(0.18f, 0.03f, 0.18f), new Vector3(90f, 0f, 0f), false);
+            Sprite dollar = GearIcons.Art("dollar");
+            if (dollar != null)
+                Art.Part(b.tr, Art.Quad, Art.Particle(dollar.texture, Color.white), new Vector3(-0.12f, 0.68f, -0.51f), new Vector3(0.75f, 0.75f, 1f), default, false);
+            loot.Add(b);
+            Rhythm.Place(z, "cash safe", Rhythm.Kind.Decision);
+        }
+
+        /// <summary>Coffres de la course : rebond quand on tire, disparition une fois dépassés (ils ne bloquent pas).</summary>
+        void CashTick(float dt)
+        {
+            for (int i = loot.Count - 1; i >= 0; i--)
+            {
+                LootBox b = loot[i];
+                if (!b.cash) continue;
+                if (b.broken || b.tr == null) { loot.RemoveAt(i); continue; }
+                if (b.punch > 0f)
+                {
+                    b.punch = Mathf.Max(0f, b.punch - dt * 6f);
+                    b.tr.localScale = new Vector3(Street.Narrow, 1f, 1f) * (1f + 0.15f * b.punch);
+                }
+                if (b.z < pz - 4f) { Destroy(b.tr.gameObject); loot.RemoveAt(i); }
+            }
         }
 
         /// <summary>Champ de cartons de la finale en cours : la bande se resserre derrière le héros pour passer par la même brèche.</summary>
-        bool InCrateField => finaleZ >= 0f && pz < lootEndZ + 3f && loot.Count > 0;
+        bool InCrateField => finaleZ >= 0f && pz < lootEndZ + 3f && loot.Exists(b => !b.cash);
 
         readonly List<LootBox> loot = new List<LootBox>();
         float lootEndZ = -1f;
@@ -82,7 +131,7 @@ namespace SamediRouge
         readonly List<Rig> parked = new List<Rig>();
 
         static int StepCost(int i) => i < 10 ? 1 : i < 20 ? 2 : 3;
-        static int StepMult(int stepsClimbed) => stepsClimbed >= StairSteps ? 5 : stepsClimbed >= 20 ? 3 : stepsClimbed >= 10 ? 2 : 1;
+        static int StepMult(int stepsClimbed) => stepsClimbed >= StairSteps ? 4 : stepsClimbed >= 20 ? 3 : stepsClimbed >= 10 ? 2 : 1;   // ×5 → ×4 au sommet (économie)
 
         /// <summary>Hauteur du sol à la profondeur z (marches de l'escalator, puis le palier du haut).</summary>
         float StairY(float z)
@@ -140,11 +189,11 @@ namespace SamediRouge
                 return;
             }
             int at = Mathf.FloorToInt((pz - stairZ0) / StairD);
-            if (climbStep == 0 && at >= 0 && finaleCrew == 0) finaleCrew = squad.Count + 1;
+            if (climbStep == 0 && at >= 0 && finaleCrew == 0) finaleCrew = Crew + 1;
             while (at >= climbStep && climbStep < StairSteps)
             {
                 int cost = StepCost(climbStep);
-                if (squad.Count < cost)
+                if (squad.Count + reserve < cost)
                 {
                     climbStopped = true;
                     stairMult = StepMult(climbStep);
@@ -155,6 +204,7 @@ namespace SamediRouge
                     return;
                 }
                 float sz = stairZ0 + (climbStep + 0.5f) * StairD, sy = (climbStep + 1) * StairRise;
+                if (reserve >= cost) { reserve -= cost; climbStep++; continue; }   // la réserve monte d'abord (invisible), la foule visible reste entière
                 for (int k = 0; k < cost; k++)
                 {
                     int idx = squad.Count - 1;
@@ -271,6 +321,11 @@ namespace SamediRouge
         static readonly Color GateGood = new Color(0.2f, 0.62f, 1f, 0.5f), GateBad = new Color(1f, 0.18f, 0.15f, 0.5f);
 
         /// <summary>Place d'un membre de la bande derrière le héros (au-delà des 10 places fixes : rangées de 5).</summary>
+        /// <summary>Largeur de la foule par rapport à l'origine (rue resserrée, persos plus grands).</summary>
+        static float CrowdK => Mathf.Min(Look.Size, Street.Narrow * 1.1f);
+        /// <summary>Rayon de contact des corps (persos plus grands = contact un peu plus large).</summary>
+        static float BodyK => Mathf.Max(1f, Look.Size);
+
         static Vector2[] blob;
         static int blobLook = -1;
         static Vector2 SlotAt(int i)
@@ -306,9 +361,37 @@ namespace SamediRouge
             return blob[Mathf.Min(i, blob.Length - 1)];
         }
 
+        bool firstGateDone, firstRowSmall;
+
+        /// <summary>
+        /// Ouverture écrite à la main (retours de Pierre : ennemis trop près au départ, puis trop d'attente, puis plus le temps
+        /// d'atteindre la bonne porte). Les ennemis foncent dès qu'ils sont à 45 m, d'où des distances calculées en temps :
+        /// ~6 s porte (le temps de se placer), ~8-9 s petit groupe dans un couloir (l'affronter ou l'éviter, pièces à côté),
+        /// ~13 s panneau d'arme à remplir en tirant, puis le parcours normal.
+        /// </summary>
+        void ArcadeOpening()
+        {
+            firstGateDone = true;
+            firstRowSmall = false;
+            SpawnGate(pz + 38f);
+            int side = Random.value < 0.5f ? 0 : 2;
+            SetPackHp(pz + 70f, 3, 1f);
+            SpawnPack(side, pz + 70f, 3);
+            arcPackHp = 0f;
+            Rhythm.Place(pz + 52f, "pack of 3 (opening)", Rhythm.Kind.Decision);   // ils foncent : le contact a lieu bien avant leur point de départ
+            for (int i = 0; i < 4; i++) Spawn(ET.Piece, 1, pz + 50f + i * 2.2f);
+            SpawnCraft(pz + 80f, 2 - side);
+            craftCount = 1;   // le prochain atelier sera l'armure
+            nextSpawnZ = pz + 100f;
+            nextGateZ = pz + 112f;
+            nextCrateZ = pz + 170f;
+        }
+
         void ArcadeStart()
         {
             blocked = false;
+            firstGateDone = false;
+            firstRowSmall = false;
             for (int i = 0; i < kindSeen.Length; i++) kindSeen[i] = false;
             tagCrowd = -1;
             if (store != null) Destroy(store);
@@ -355,6 +438,18 @@ namespace SamediRouge
             {
                 SpawnGate(z + 4f);
                 nextGateZ = z + Random.Range(55f, 72f);
+                // 1re porte de la course : les ennemis foncent vers toi dès qu'ils apparaissent → le 1er groupe part
+                // bien plus loin (retour : « au tout début on se fait directement rentrer dedans »)
+                // retour suivant : « un moment trop long » → écart réduit, une ligne de pièces juste après la porte,
+                // et le 1er groupe est petit (2 ennemis) : contact vers 6-7 s, quand la bande sort de la porte
+                if (!firstGateDone)
+                {
+                    firstGateDone = true;
+                    firstRowSmall = true;
+                    for (int i = 0; i < 4; i++) Spawn(ET.Piece, 1, z + 12f + i * 2.2f);
+                    Rhythm.Place(z + 12f, "coins", Rhythm.Kind.Passive);
+                    return 34f;
+                }
                 return 16f;
             }
             if (z >= nextBoonZ)
@@ -428,7 +523,7 @@ namespace SamediRouge
         {
             float dmg = runTier >= 3 ? 2f : 1f;
             float hero = dmg / (gear[GSmg] ? 0.11f : gear[GPistol] ? Tuning.AutoPistolRate : Tuning.AutoBareRate);
-            float mates = dmg * squad.Count / MateRate;   // chacun tire à son rythme
+            float mates = dmg * Crew / MateRate;   // chacun tire à son rythme
             return hero + mates;
         }
 
@@ -441,9 +536,10 @@ namespace SamediRouge
         void SetPackHp(float z, int n, float share)
         {
             float prog = Mathf.Clamp01((z - stageStartZ) / Mathf.Max(1f, StageLen));
-            float k = Mathf.Min(2.6f, 0.95f + 0.5f * arcD + 0.7f * prog);   // retour : on ne perdait presque plus personne → une partie du groupe doit atteindre la foule
+            // groupes plus petits : pression un peu plus forte pour que la même part du groupe arrive au contact
+            float k = Mathf.Min(2.8f, (0.95f + 0.5f * arcD + 0.7f * prog) * (streetIdx == 0 ? 1.1f : 1.3f));   // échange un pour un au contact : plus d'ennemis doivent atteindre la foule pour la même difficulté   // retour : on ne perdait presque plus personne → une partie du groupe doit atteindre la foule
             // grosse foule : pression un peu moindre (sinon chaque groupe la décimait : 97 → 34 en une rencontre)
-            k *= Mathf.Lerp(1f, 0.9f, Mathf.Clamp01((squad.Count - 20) / 79f));
+            k *= Mathf.Lerp(1f, 0.9f, Mathf.Clamp01((Crew - 20) / 79f));
             float t = 26f / Mathf.Max(6f, speed + 6f * Tuning.EnemyRush);   // temps entre l'entrée à portée et le contact
             // les ateliers et les bonus d'attaque comptent à moitié : on sent le gain, mais les groupes arrivent encore au contact
             float budget = k * t * ArcadePower() * Mathf.Sqrt(DmgK / RateK) * share;
@@ -454,7 +550,7 @@ namespace SamediRouge
         void SpawnGate(float z)
         {
             var g = new Gate { z = z };
-            int n = squad.Count + 1;
+            int n = Crew + 1;
             bool x2 = n >= 12 && n < 40 && Random.value < 0.15f;
             // trois choix : toujours au moins un bon et un mauvais
             var opts = new List<(int v, bool m)>
@@ -477,32 +573,131 @@ namespace SamediRouge
             g.go.transform.SetParent(world, false);
             g.go.transform.localPosition = new Vector3(0f, 0f, z);
             g.go.transform.localScale = new Vector3(Street.Narrow, 1f, 1f);   // rue resserrée : portes moins larges
-            Material post = Art.Mat(new Color(0.92f, 0.92f, 0.95f), 0.6f, 0.3f);
             for (int l = 0; l < 3; l++)
             {
-                float x = (l - 1) * Lane;
-                bool good = g.mul[l] || g.val[l] > 0;
-                // cadre lumineux (bleu = gain, rouge = perte) : on lit la porte de loin, sans lire le chiffre
-                Material fm = GateFrame(good);
-                g.frame[l] = new[]
-                {
-                    Art.Part(g.go.transform, Art.Cylinder, fm, new Vector3(x - 1.12f, 1.35f, 0f), new Vector3(0.16f, 1.35f, 0.16f), default, false),
-                    Art.Part(g.go.transform, Art.Cylinder, fm, new Vector3(x + 1.12f, 1.35f, 0f), new Vector3(0.16f, 1.35f, 0.16f), default, false),
-                    Art.Part(g.go.transform, Art.Cube, fm, new Vector3(x, 2.74f, 0f), new Vector3(2.44f, 0.2f, 0.2f), default, false),
-                };
-                MeshRenderer pr = Art.Part(g.go.transform, Art.Cube, Art.Particle(null, good ? GateGood : GateBad), new Vector3(x, 1.35f, 0f), new Vector3(2.1f, 2.6f, 0.04f), default, false);
-                g.panel[l] = pr.transform;
-                // jauge en bas du panneau : elle se remplit à chaque tir, le chiffre monte quand elle est pleine
-                Art.Part(g.go.transform, Art.Cube, Art.Mat(new Color(0.08f, 0.09f, 0.12f), 0.3f), new Vector3(x, 0.32f, -0.05f), new Vector3(1.84f, 0.2f, 0.04f), default, false);
-                g.fill[l] = Art.Node(g.go.transform, "fill", new Vector3(x - 0.9f, 0.32f, -0.08f));
-                Art.Part(g.fill[l], Art.Cube, Art.Glow(new Color(1f, 0.85f, 0.25f), new Color(1.4f, 1.0f, 0.2f), 0.5f), new Vector3(0.9f, 0f, 0f), new Vector3(1.8f, 0.14f, 0.03f), default, false);
-                g.fill[l].localScale = new Vector3(0.001f, 1f, 1f);
+                float x = (l - 1) * Street.Lane;   // la porte entière est déjà comprimée par Street.Narrow (sinon double resserrement : portes qui se chevauchent)
+                BuildGateLane(g, l, x, g.mul[l] || g.val[l] > 0);
             }
             gates.Add(g);
             Rhythm.Place(z, "gates " + GateText(g, 0) + " / " + GateText(g, 1) + " / " + GateText(g, 2), Rhythm.Kind.Decision);
         }
 
-        static readonly int[] CrewMilestones = { 5, 10, 20, 30, 50, 75, 99 };
+        static readonly int[] CrewMilestones = { 5, 10, 20, 30, 50, 75, 100, 150, 200, 300, 500, 1000 };
+
+        // ---------------------------------------------------------------- styles de portes (à comparer : commande de dev « gate N »)
+
+        /// <summary>0 verre néon (actuel), 1 arche à bandeau, 2 pancarte de soldes suspendue, 3 bulle holographique.</summary>
+        public static int GateStyle = 0;
+        public static readonly string[] GateStyleNames = { "Verre néon", "Arche à bandeau", "Pancarte de soldes", "Bulle holo" };
+
+        /// <summary>Hauteur du chiffre de la porte selon le style (sur le bandeau ou la pancarte).</summary>
+        static float GateTagY => GateStyle == 1 ? 2.78f : GateStyle == 2 ? 2.05f : 1.5f;
+
+        /// <summary>Couleur pleine et saturée (bandeau, pancarte) : bleu franc = gain, rouge franc = perte.</summary>
+        static Material GateSolid(bool good) => good ? Art.Glow(new Color(0.12f, 0.42f, 0.95f), new Color(0.05f, 0.18f, 0.5f), 0.55f)
+                                                     : Art.Glow(new Color(0.92f, 0.16f, 0.14f), new Color(0.45f, 0.05f, 0.04f), 0.55f);
+
+        static Material GatePanelMat(bool good)
+        {
+            if (GateStyle == 2) return GateSolid(good);
+            if (GateStyle == 3) return Art.Particle(null, good ? new Color(0.25f, 0.6f, 1f, 0.38f) : new Color(1f, 0.25f, 0.2f, 0.38f));
+            if (GateStyle == 1) return Art.Particle(null, good ? new Color(0.3f, 0.65f, 1f, 0.22f) : new Color(1f, 0.25f, 0.2f, 0.22f));
+            return Art.Particle(null, good ? GateGood : GateBad);
+        }
+
+        Transform gaugeParent;
+
+        void GateGauge(Gate g, int l, float x, float y, float w)
+        {
+            Transform gp = gaugeParent != null ? gaugeParent : g.go.transform;
+            Art.Part(gp, Art.Cube, Art.Mat(new Color(0.08f, 0.09f, 0.12f), 0.3f), new Vector3(x, y, -0.06f), new Vector3(w + 0.04f, 0.2f, 0.04f), default, false);
+            g.fill[l] = Art.Node(gp, "fill", new Vector3(x - w * 0.5f, y, -0.09f));
+            Art.Part(g.fill[l], Art.Cube, Art.Glow(new Color(1f, 0.85f, 0.25f), new Color(1.4f, 1.0f, 0.2f), 0.5f), new Vector3(w * 0.5f, 0f, 0f), new Vector3(w, 0.14f, 0.03f), default, false);
+            g.fill[l].localScale = new Vector3(0.001f, 1f, 1f);
+        }
+
+        /// <summary>Largeur d'une porte par rapport à son couloir (retour de Pierre : portes espacées, pas collées).</summary>
+        const float GateWidthK = 0.86f;   // espace entre portes réduit de moitié (0,72 → 0,86)
+
+        void BuildGateLane(Gate g, int l, float x, bool good)
+        {
+            // chaque porte dans son propre support, rétréci en largeur : un vrai espace entre les trois portes
+            Transform t = Art.Node(g.go.transform, "lane" + l, new Vector3(x, 0f, 0f));
+            t.localScale = new Vector3(GateWidthK, 1f, 1f);
+            x = 0f;
+            gaugeParent = t;
+            Material fm = GateStyle == 1 || GateStyle == 2 ? GateSolid(good) : GateFrame(good);
+            switch (GateStyle)
+            {
+                case 1:
+                {
+                    // arche à bandeau (à la Hell Escape) : piliers blancs à boules dorées, grand bandeau coloré qui porte le chiffre
+                    Material white = Art.Mat(new Color(0.95f, 0.95f, 0.97f), 0.7f, 0.2f);
+                    Material gold = Art.Glow(new Color(1f, 0.82f, 0.3f), new Color(1.2f, 0.85f, 0.2f), 0.6f);
+                    Art.Part(t, Art.Cube, white, new Vector3(x - 1.12f, 1.45f, 0f), new Vector3(0.26f, 2.9f, 0.26f), default, false);
+                    Art.Part(t, Art.Cube, white, new Vector3(x + 1.12f, 1.45f, 0f), new Vector3(0.26f, 2.9f, 0.26f), default, false);
+                    Art.Part(t, Art.Sphere, gold, new Vector3(x - 1.12f, 3.32f, 0f), Vector3.one * 0.34f, default, false);
+                    Art.Part(t, Art.Sphere, gold, new Vector3(x + 1.12f, 3.32f, 0f), Vector3.one * 0.34f, default, false);
+                    MeshRenderer banner = Art.Part(t, Art.Cube, fm, new Vector3(x, 2.78f, 0f), new Vector3(2.36f, 0.78f, 0.2f), default, false);
+                    Art.Part(t, Art.Cube, white, new Vector3(x, 2.78f, 0.04f), new Vector3(2.5f, 0.92f, 0.16f), default, false);
+                    g.frame[l] = new[] { banner };
+                    MeshRenderer pr = Art.Part(t, Art.Cube, GatePanelMat(good), new Vector3(x, 1.2f, 0f), new Vector3(1.98f, 2.0f, 0.04f), default, false);
+                    g.panel[l] = pr.transform;
+                    g.panelBase[l] = pr.transform.localScale;
+                    GateGauge(g, l, x, 0.3f, 1.7f);
+                    break;
+                }
+                case 2:
+                {
+                    // pancarte de soldes suspendue (étiquette de prix) au-dessus d'un tapis lumineux au sol
+                    Material cable = Art.Mat(new Color(0.15f, 0.15f, 0.17f), 0.5f, 0.6f);
+                    Art.Part(t, Art.Cylinder, cable, new Vector3(x - 0.75f, 3.5f, 0f), new Vector3(0.03f, 0.75f, 0.03f), default, false);
+                    Art.Part(t, Art.Cylinder, cable, new Vector3(x + 0.75f, 3.5f, 0f), new Vector3(0.03f, 0.75f, 0.03f), default, false);
+                    Art.Part(t, Art.Cube, Art.Mat(Color.white, 0.4f), new Vector3(x, 2.05f, 0.05f), new Vector3(2.12f, 1.38f, 0.1f), default, false);
+                    MeshRenderer sign = Art.Part(t, Art.Cube, fm, new Vector3(x, 2.05f, 0f), new Vector3(1.94f, 1.2f, 0.14f), default, false);
+                    // trou de l'étiquette
+                    Art.Part(t, Art.Cylinder, Art.Mat(new Color(0.9f, 0.9f, 0.9f), 0.5f), new Vector3(x - 0.78f, 2.48f, -0.08f), new Vector3(0.12f, 0.02f, 0.12f), new Vector3(90f, 0f, 0f), false);
+                    MeshRenderer floor = Art.Part(t, Art.Cube, Art.Particle(null, good ? new Color(0.3f, 0.65f, 1f, 0.45f) : new Color(1f, 0.25f, 0.2f, 0.45f)), new Vector3(x, 0.02f, -0.4f), new Vector3(2.0f, 0.02f, 1.8f), default, false);
+                    g.frame[l] = new[] { sign };
+                    g.panel[l] = sign.transform;
+                    g.panelBase[l] = sign.transform.localScale;
+                    g.floorMark[l] = floor;
+                    GateGauge(g, l, x, 1.28f, 1.6f);
+                    break;
+                }
+                case 3:
+                {
+                    // bulle holographique : ovale translucide, couronne de perles lumineuses
+                    MeshRenderer pr = Art.Part(t, Art.Sphere, GatePanelMat(good), new Vector3(x, 1.45f, 0f), new Vector3(2.0f, 2.5f, 0.12f), default, false);
+                    g.panel[l] = pr.transform;
+                    g.panelBase[l] = pr.transform.localScale;
+                    var beads = new MeshRenderer[14];
+                    for (int b = 0; b < beads.Length; b++)
+                    {
+                        float a = b / (float)beads.Length * Mathf.PI * 2f;
+                        beads[b] = Art.Part(t, Art.Sphere, fm, new Vector3(x + Mathf.Cos(a) * 1.05f, 1.45f + Mathf.Sin(a) * 1.3f, -0.02f), Vector3.one * 0.2f, default, false);
+                    }
+                    g.frame[l] = beads;
+                    GateGauge(g, l, x, 0.12f, 1.4f);
+                    break;
+                }
+                default:
+                {
+                    // verre néon : cadre lumineux (bleu = gain, rouge = perte), panneau de verre teinté
+                    g.frame[l] = new[]
+                    {
+                        Art.Part(t, Art.Cylinder, fm, new Vector3(x - 1.12f, 1.35f, 0f), new Vector3(0.16f, 1.35f, 0.16f), default, false),
+                        Art.Part(t, Art.Cylinder, fm, new Vector3(x + 1.12f, 1.35f, 0f), new Vector3(0.16f, 1.35f, 0.16f), default, false),
+                        Art.Part(t, Art.Cube, fm, new Vector3(x, 2.74f, 0f), new Vector3(2.44f, 0.2f, 0.2f), default, false),
+                    };
+                    MeshRenderer pr = Art.Part(t, Art.Cube, GatePanelMat(good), new Vector3(x, 1.35f, 0f), new Vector3(2.1f, 2.6f, 0.04f), default, false);
+                    g.panel[l] = pr.transform;
+                    g.panelBase[l] = pr.transform.localScale;
+                    GateGauge(g, l, x, 0.32f, 1.8f);
+                    break;
+                }
+            }
+        }
 
         static string GateText(Gate g, int l) => g.mul[l] ? "×" + g.val[l] : (g.val[l] > 0 ? "+" + g.val[l] : g.val[l].ToString());
 
@@ -551,6 +746,7 @@ namespace SamediRouge
             if (finaleZ >= 0f || climbStopped) ClimbTick(dt);
             if (st != St.Play) return;
             Rhythm.Tick(dt, pz);
+            CashTick(dt);
             MergeTick(dt);
             PropsTick(dt);
             BoonTick();
@@ -569,6 +765,9 @@ namespace SamediRouge
             // la bande tire toute seule : CHAQUE membre tire à son rythme sur l'adversaire le plus proche devant lui (retour YSO)
             // grosse foule : chacun tire moins souvent mais plus fort (même puissance de feu, beaucoup moins de projectiles à l'écran)
             int salvo = Mathf.Max(1, Mathf.CeilToInt(squad.Count / 24f));
+            // bande au-delà des 99 visibles : la réserve tire « à travers » eux (même puissance de feu que si tous étaient là)
+            float fill = squad.Count > 0 ? (float)(squad.Count + reserve) / squad.Count : 1f;
+            int salvoDmg = Mathf.Max(1, Mathf.RoundToInt(salvo * fill));
             foreach (Mate m in squad)
             {
                 m.shotT -= dt;
@@ -588,7 +787,7 @@ namespace SamediRouge
                 {
                     int nb = bolts.Count;
                     Shoot(best, true, new Vector3(m.x, 1.3f, m.z + 0.4f));
-                    if (bolts.Count > nb) bolts[bolts.Count - 1].mult = salvo;
+                    if (bolts.Count > nb) bolts[bolts.Count - 1].mult = salvoDmg;
                     m.shotT = MateRate * salvo * RateK * Random.Range(0.85f, 1.15f);
                 }
                 else if (loot.Count > 0)
@@ -599,8 +798,8 @@ namespace SamediRouge
                     {
                         Shoot(null, true, new Vector3(m.x, 1.3f, m.z + 0.4f));
                         bolts[bolts.Count - 1].loot = lb;
-                        bolts[bolts.Count - 1].mult = salvo;
-                        lb.pend += LootDmg * salvo;
+                        bolts[bolts.Count - 1].mult = salvoDmg;
+                        lb.pend += LootDmg * salvoDmg;
                         m.shotT = MateRate * salvo * RateK * Random.Range(0.85f, 1.15f);
                     }
                     else m.shotT = 0.15f;
@@ -611,10 +810,10 @@ namespace SamediRouge
 
         void ApplyGate(Gate g, int l)
         {
-            int before = squad.Count;
+            int before = Crew;
             string[] gopts = { GateText(g, 0), GateText(g, 1), GateText(g, 2) };
             lossCause = "bad gate";
-            if (g.mul[l]) AddMates((squad.Count + 1) * (g.val[l] - 1));
+            if (g.mul[l]) AddMates((Crew + 1) * (g.val[l] - 1));
             else if (g.val[l] > 0) AddMates(g.val[l]);
             else for (int k = 0; k < -g.val[l] && squad.Count > 0; k++) LoseMate(squad.Count - 1, new Vector3(Random.Range(-3f, 3f), 4f, 2f));
             bool good = g.mul[l] || g.val[l] > 0;
@@ -631,7 +830,7 @@ namespace SamediRouge
                 foreach (Mate m in squad) m.rig.Land(0.35f);
                 Haptics.Pulse(12);
                 // juice : micro-arrêt sur image, éclats dorés en couronne, flash d'autant plus fort que le gain est gros
-                int gain = squad.Count + pendingMates - before;   // les recrues arrivent sur quelques images (pendingMates)
+                int gain = Crew - before;   // les recrues arrivent sur quelques images (pendingMates)
                 hitStop = Mathf.Max(hitStop, gain >= 10 ? 0.07f : 0.035f);
                 for (int s = 0; s < 3; s++) Fx.Sparkle(p + new Vector3((s - 1) * 0.7f, 0.4f * s, 0f));
                 hud.Flash(Mathf.Clamp(0.08f + 0.01f * gain, 0.08f, 0.3f));
@@ -643,9 +842,8 @@ namespace SamediRouge
                 hud.Damage(0.3f);
                 Haptics.Pulse(25, true);
             }
-            if (squad.Count >= ArcadeMaxSquad && g.mul[l] && before < ArcadeMaxSquad) score += 200f;
             lossCause = "enemy";
-            int nowCrew = squad.Count + pendingMates + 1;
+            int nowCrew = Crew + 1;
             Rhythm.Gate(gopts, l, before + 1, nowCrew, good);
             // mesure du rythme : trop peu de moments forts (un toutes les ~27 s au niveau 1) → paliers de bande fêtés
             foreach (int ms in CrewMilestones)
@@ -870,11 +1068,23 @@ namespace SamediRouge
             // piste épurée (retours YSO) : des groupes d'ennemis, quelques pièces, et rien d'autre
             // (ni obstacles, ni trousses, ni recrues : la bande ne grossit que par les portes)
             float prog = Mathf.Clamp01((z - stageStartZ) / Mathf.Max(1f, StageLen));
-            int crowd = squad.Count + 1;
+            int crowd = Crew + 1;
             float r = Random.value;
+            if (firstRowSmall)
+            {
+                // tout premier groupe : 2 ennemis dans le couloir central, la bande les abat en sortant de la porte
+                firstRowSmall = false;
+                SetPackHp(z, 2, 1f);
+                SpawnPack(1, z, 2);
+                Rhythm.Place(z, "pack of 2", Rhythm.Kind.Decision);
+                arcPackHp = 0f;
+                for (int i = 0; i < 3; i++) Spawn(ET.Piece, lanes[2] == 1 ? 0 : lanes[2], z + 2f + i * 2.4f);
+                return 18f;
+            }
             if (r < 0.6f)
             {
-                int n = Mathf.Clamp(3 + Mathf.Min(crowd, 30) / 3 + Mathf.Max(0, crowd - 30) / 8 + Mathf.RoundToInt(prog * (3f + 2f * arcD) + arcD * 2f), 3, 22);
+                // retour : groupes parfois très grands → environ un tiers de moins (plafond 14), chacun un peu plus résistant (voir SetPackHp)
+                int n = Mathf.Clamp(2 + Mathf.Min(crowd, 30) / 4 + Mathf.Max(0, crowd - 30) / 12 + Mathf.RoundToInt(prog * (2f + 1.5f * arcD) + arcD * 1.5f), 2, 14);
                 SetPackHp(z, n, 1f);
                 SpawnPack(lanes[0], z, n);
                 Rhythm.Place(z, "pack of " + n, Rhythm.Kind.Decision);
@@ -886,7 +1096,7 @@ namespace SamediRouge
             if (r < 0.85f)
             {
                 // barrage : deux groupes côte à côte, un couloir libre
-                int n = Mathf.Clamp(2 + Mathf.Min(crowd, 30) / 4 + Mathf.Max(0, crowd - 30) / 10 + Mathf.RoundToInt(prog * (2f + 2f * arcD) + arcD), 2, 16);
+                int n = Mathf.Clamp(2 + Mathf.Min(crowd, 30) / 6 + Mathf.Max(0, crowd - 30) / 14 + Mathf.RoundToInt(prog * (1.5f + 1.5f * arcD) + arcD), 2, 10);
                 SetPackHp(z, n, 0.65f);   // deux groupes : on n'en affronte qu'un si on choisit bien son couloir
                 SpawnPack(lanes[0], z, n);
                 SpawnPack(lanes[1], z + 1.5f, n);
@@ -896,7 +1106,7 @@ namespace SamediRouge
                 for (int i = 0; i < 3; i++) Spawn(ET.Piece, lanes[2], z + 2f + i * 2.4f);
                 return 22f;
             }
-            // respiration : une ligne de pièces
+            // respiration : une ligne de pièces (les coffres à billets, SpawnCash, restent disponibles mais ne sont plus placés)
             for (int i = 0; i < 4; i++) Spawn(ET.Piece, lanes[1], z + i * 2.2f);
             Rhythm.Place(z, "coins", Rhythm.Kind.Passive);
             return 14f;
@@ -924,7 +1134,7 @@ namespace SamediRouge
             // résistance calée sur la puissance de feu réelle (arme, ateliers, taille de la bande) et le temps de traversée :
             // en restant dans un couloir, la bande peut abattre ~2 fois la résistance de ce couloir (petite ou grosse bande)
             float heroRate = (gear[GSmg] ? 0.11f : gear[GPistol] ? Tuning.AutoPistolRate : Tuning.AutoBareRate) * RateK;
-            float lootDps = LootDmg * DmgK * (1f / heroRate + squad.Count / (MateRate * RateK));
+            float lootDps = LootDmg * DmgK * (1f / heroRate + Crew / (MateRate * RateK));
             float crossT = (lootEndZ - pz) / Mathf.Max(4f, speed);
             // retour : il faut s'y reprendre à deux fois (comme Hell Escape) → à la première tentative on en casse environ la moitié,
             // les cartons cassés restent cassés, la deuxième passe
@@ -1112,7 +1322,7 @@ namespace SamediRouge
         bool LaneOpen(int lane, float z)
         {
             foreach (LootBox o in loot)
-                if (!o.broken && o.lane == lane && Mathf.Abs(o.z - z) < 1.6f) return false;
+                if (!o.broken && !o.cash && o.lane == lane && Mathf.Abs(o.z - z) < 1.6f) return false;
             return true;
         }
 
@@ -1161,8 +1371,9 @@ namespace SamediRouge
             b.punch = 1f;
             if (b.hp > 0) return;
             b.broken = true;
-            PlayerPrefs.SetInt(LootKey, PlayerPrefs.GetInt(LootKey, 0) | (1 << b.id));
-            int gain = b.max;
+            if (!b.cash) PlayerPrefs.SetInt(LootKey, PlayerPrefs.GetInt(LootKey, 0) | (1 << b.id));
+            int gain = b.cash ? b.gold : Mathf.Clamp(Mathf.RoundToInt(b.max * 0.3f), 1, 5);   // carton : avant = sa résistance entière (des centaines de $ par finale, multipliés par l'escalator)
+            if (b.cash) { Fx.Confetti(b.tr.position + Vector3.up * 1f); Rhythm.Event(Rhythm.Kind.Reward, "cash +" + gain); }
             coins += gain;
             Vector3 p = b.tr.position + Vector3.up * 0.8f;
             Fx.Debris(p);
@@ -1184,6 +1395,7 @@ namespace SamediRouge
             {
                 LootBox b = loot[i];
                 if (b.broken || b.tr == null) { loot.RemoveAt(i); continue; }
+                if (b.cash) continue;   // coffres de la course : gérés par CashTick, ils ne bloquent pas
                 if (b.punch > 0f)
                 {
                     b.punch = Mathf.Max(0f, b.punch - Time.deltaTime * 6f);
@@ -1240,9 +1452,10 @@ namespace SamediRouge
             if (g.panel[l] != null)
             {
                 MeshRenderer mr = g.panel[l].GetComponent<MeshRenderer>();
-                if (mr != null) mr.sharedMaterial = Art.Particle(null, good ? GateGood : GateBad);
+                if (mr != null) mr.sharedMaterial = GatePanelMat(good);
             }
-            if (g.frame[l] != null) foreach (MeshRenderer fr in g.frame[l]) if (fr != null) fr.sharedMaterial = GateFrame(good);
+            if (g.floorMark[l] != null) g.floorMark[l].sharedMaterial = Art.Particle(null, good ? new Color(0.3f, 0.65f, 1f, 0.45f) : new Color(1f, 0.25f, 0.2f, 0.45f));
+            if (g.frame[l] != null) foreach (MeshRenderer fr in g.frame[l]) if (fr != null) fr.sharedMaterial = GateStyle == 1 || GateStyle == 2 ? GateSolid(good) : GateFrame(good);
             if (g.fill[l] != null) g.fill[l].localScale = new Vector3(Mathf.Max(0.001f, Mathf.Clamp01(g.hits[l] / (float)GateNeed(g, l))), 1f, 1f);
             g.punch[l] = 1f;
             Fx.Sparkle(new Vector3((l - 1) * Lane, 1.6f, g.z));
@@ -1379,7 +1592,7 @@ namespace SamediRouge
                     if (g.punch[l] <= 0f || g.panel[l] == null) continue;
                     g.punch[l] = Mathf.Max(0f, g.punch[l] - dt * 6f);
                     float k = 1f + 0.18f * g.punch[l] + 0.15f * g.grow[l];
-                    g.panel[l].localScale = new Vector3(2.1f * k, 2.6f * k, 0.04f);
+                    g.panel[l].localScale = Vector3.Scale(g.panelBase[l], new Vector3(k, k, 1f));
                 }
             for (int i = crafts.Count - 1; i >= 0; i--)
             {
@@ -1406,7 +1619,7 @@ namespace SamediRouge
                 {
                     // le chiffre gonfle et passe au jaune quand il monte
                     float gr = g.grow[l];
-                    hud.Tag(new Vector3((l - 1) * Lane, 1.5f, g.z), GateText(g, l), Color.Lerp(Color.white, Hud.Yellow, gr), 2.2f * (1f + 0.55f * gr * gr));
+                    hud.Tag(new Vector3((l - 1) * Lane, GateTagY, g.z), GateText(g, l), Color.Lerp(Color.white, Hud.Yellow, gr), (GateStyle == 1 ? 1.7f : 2.2f) * (1f + 0.55f * gr * gr));
                 }
             }
             // carte d'arme fixe sur le bord droit (pas de texte dans la scène, comme Hell Escape)
@@ -1424,12 +1637,12 @@ namespace SamediRouge
             {
                 if (b.broken || b.z - pz >= 60f) continue;
                 // carton de ton couloir tout proche : chiffre rouge qui clignote (il va te bloquer)
-                bool danger = b.lane == myLane && b.z - pz < 12f && b.z > pz;
+                bool danger = !b.cash && b.lane == myLane && b.z - pz < 12f && b.z > pz;
                 float pulse = danger ? 1f + 0.25f * Mathf.Abs(Mathf.Sin(Time.time * 12f)) : 1f;
-                hud.Tag(new Vector3((b.lane - 1) * Lane, 1.9f, b.z), b.hp.ToString(), danger ? Hud.Bad : Color.white, 1.4f * pulse);
+                hud.Tag(new Vector3((b.lane - 1) * Lane, 1.9f, b.z), b.hp.ToString(), danger ? Hud.Bad : b.cash ? Hud.StarGold : Color.white, 1.4f * pulse);
             }
             // compteur de la bande : il gonfle quand elle grossit, rougit quand elle perd du monde
-            int crowd = squad.Count + 1 + pendingMates;
+            int crowd = Crew + 1;
             if (tagCrowd >= 0 && crowd > tagCrowd) crowdPop = 1f;
             if (tagCrowd >= 0 && crowd < tagCrowd) crowdHurt = 1f;
             tagCrowd = crowd;

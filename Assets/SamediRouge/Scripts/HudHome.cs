@@ -45,22 +45,7 @@ namespace SamediRouge
                 if (homeResetArm > 0f) { homeResetArm = -1f; homeResetLabel.text = "RESET"; onHomeReset?.Invoke(); }
                 else { homeResetArm = 3f; homeResetLabel.text = L("SURE?", "SÛR ?"); }
             }, out homeResetLabel);
-            // test des proportions (retour de Guillaume) : PROTO → A → B → C
-            Button(r, "LOOK " + Look.Names[Look.Preset], new Color(0.2f, 0.22f, 0.27f, 0.85f), new Vector2(0f, 1f), new Vector2(110f, -200f), new Vector2(170f, 76f), 28, () =>
-            {
-                onHomeLook?.Invoke();
-                homeLookLabel.text = "LOOK " + Look.Names[Look.Preset];
-            }, out homeLookLabel);
-            Button(r, "TOY " + (Look.Toy ? "ON" : "OFF"), new Color(0.2f, 0.22f, 0.27f, 0.85f), new Vector2(0f, 1f), new Vector2(110f, -290f), new Vector2(170f, 76f), 28, () =>
-            {
-                onHomeToy?.Invoke();
-                homeToyLabel.text = "TOY " + (Look.Toy ? "ON" : "OFF");
-            }, out homeToyLabel);
-            Button(r, "SHOPS " + (Look.SoftShops ? "ON" : "OFF"), new Color(0.2f, 0.22f, 0.27f, 0.85f), new Vector2(0f, 1f), new Vector2(110f, -380f), new Vector2(170f, 76f), 26, () =>
-            {
-                onHomeShops?.Invoke();
-                homeShopsLabel.text = "SHOPS " + (Look.SoftShops ? "ON" : "OFF");
-            }, out homeShopsLabel);
+            // (boutons LOOK / TOY / SHOPS retirés : réglages retenus C, jouet, vitrines — voir Look.cs)
 
             homeSwipe = Label(r, L("SWIPE TO PLAY", "GLISSE POUR JOUER"), 68, Color.white, TextAnchor.MiddleCenter, true);
             Shadowed(homeSwipe);

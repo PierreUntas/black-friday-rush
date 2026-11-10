@@ -327,6 +327,42 @@ namespace SamediRouge
             new Color(0.93f, 0.9f, 0.86f), new Color(0.88f, 0.9f, 0.93f), new Color(0.92f, 0.88f, 0.9f), new Color(0.89f, 0.92f, 0.88f)
         };
 
+        static readonly Color[] AwningColors =
+        {
+            new Color(0.78f, 0.24f, 0.24f), new Color(0.22f, 0.42f, 0.72f), new Color(0.24f, 0.56f, 0.38f),
+            new Color(0.86f, 0.62f, 0.2f), new Color(0.55f, 0.3f, 0.65f), new Color(0.2f, 0.55f, 0.6f)
+        };
+        static Texture2D saleTex;
+        static bool saleLoaded;
+
+        /// <summary>
+        /// Vraie vitrine en relief devant la devanture illustrée (retour de Pierre : « les vitrines comme on devait faire ») :
+        /// allège sombre en bas, cadre métallique, grande vitre qui reflète, store coloré incliné au-dessus, parfois une affiche de soldes.
+        /// </summary>
+        void ShopFront3D(Transform t, int s, float zc, float x, float y, int v)
+        {
+            float yaw = s < 0 ? -90f : 90f;
+            int k = ((v % AwningColors.Length) + AwningColors.Length) % AwningColors.Length;
+            // allège (bas de vitrine) et seuil
+            Art.Part(t, Art.Cube, Art.Mat(new Color(0.22f, 0.23f, 0.26f), 0.6f, 0.3f), new Vector3(s * (x - 0.18f), y + 0.32f, zc), new Vector3(0.36f, 0.64f, 8.7f));
+            // cadre : traverse haute, montants, meneau central
+            Art.Part(t, Art.Cube, frameMat, new Vector3(s * (x - 0.2f), y + 3.72f, zc), new Vector3(0.14f, 0.16f, 8.7f), default, false);
+            Art.Part(t, Art.Cube, frameMat, new Vector3(s * (x - 0.2f), y + 2.18f, zc - 4.3f), new Vector3(0.14f, 3.1f, 0.14f), default, false);
+            Art.Part(t, Art.Cube, frameMat, new Vector3(s * (x - 0.2f), y + 2.18f, zc + 4.3f), new Vector3(0.14f, 3.1f, 0.14f), default, false);
+            Art.Part(t, Art.Cube, frameMat, new Vector3(s * (x - 0.2f), y + 2.18f, zc), new Vector3(0.1f, 3.1f, 0.1f), default, false);
+            // vitre : légère, avec un reflet en diagonale
+            Art.Part(t, Art.Quad, Art.Particle(null, new Color(0.85f, 0.93f, 1f, 0.12f)), new Vector3(s * (x - 0.3f), y + 2.18f, zc), new Vector3(8.6f, 3.1f, 1f), new Vector3(0f, yaw, 0f), false);
+            Art.Part(t, Art.Quad, Art.Particle(null, new Color(1f, 1f, 1f, 0.16f)), new Vector3(s * (x - 0.31f), y + 2.6f, zc - 1.5f), new Vector3(0.5f, 3.6f, 1f), new Vector3(0f, yaw, s * 28f), false);
+            // store (auvent) incliné vers la rue, couleur de l'enseigne
+            Material awn = Art.Mat(AwningColors[k], 0.35f);
+            Art.Part(t, Art.Cube, awn, new Vector3(s * (x - 0.75f), y + 4.1f, zc), new Vector3(1.5f, 0.1f, 8.8f), new Vector3(0f, 0f, s * -22f), false);
+            Art.Part(t, Art.Cube, Art.Mat(AwningColors[k] * 0.75f, 0.3f), new Vector3(s * (x - 1.45f), y + 3.78f, zc), new Vector3(0.05f, 0.34f, 8.8f), default, false);
+            // affiche de soldes collée sur la vitre (une vitrine sur deux)
+            if (!saleLoaded) { saleLoaded = true; saleTex = Resources.Load<Texture2D>("SamediRouge/Art/sale_70"); }
+            if (saleTex != null && (v & 1) == 0)
+                Art.Part(t, Art.Quad, Art.Particle(saleTex, Color.white), new Vector3(s * (x - 0.33f), y + 2.5f, zc + 2.2f), new Vector3(1.3f, 1.3f, 1f), new Vector3(0f, yaw, 0f), false);
+        }
+
         void Store(Transform t, int s, float zc, float x, float y, int v)
         {
             if (Tuning.Arcade && Look.SoftShops && y < 0.1f && ShopArt(v) != null)
@@ -336,11 +372,12 @@ namespace SamediRouge
                 Texture2D shopTex = ShopArt(v);
                 Color pastel = PlainWall[((v % PlainWall.Length) + PlainWall.Length) % PlainWall.Length];
                 float yawS = s < 0 ? -90f : 90f;
-                Art.Part(t, Art.Quad, Art.Tex(shopTex, Vector2.one, 0.4f, shopTex, new Color(0.16f, 0.15f, 0.14f)), new Vector3(s * (x - 0.01f), y + 2.4f, zc), new Vector3(9f, 4.6f, 1f), new Vector3(0f, yawS, 0f), false);
-                Art.Part(t, Art.Quad, Art.Particle(null, new Color(pastel.r, pastel.g, pastel.b, 0.58f)), new Vector3(s * (x - 0.03f), y + 2.4f, zc), new Vector3(9f, 4.6f, 1f), new Vector3(0f, yawS, 0f), false);
+                Art.Part(t, Art.Quad, Art.Tex(shopTex, Vector2.one, 0.4f, shopTex, new Color(0.32f, 0.3f, 0.28f)), new Vector3(s * (x - 0.01f), y + 2.4f, zc), new Vector3(9f, 4.6f, 1f), new Vector3(0f, yawS, 0f), false);
+                Art.Part(t, Art.Quad, Art.Particle(null, new Color(pastel.r, pastel.g, pastel.b, 0.32f)), new Vector3(s * (x - 0.03f), y + 2.4f, zc), new Vector3(9f, 4.6f, 1f), new Vector3(0f, yawS, 0f), false);
                 Art.Part(t, Art.Cube, wall, new Vector3(s * (x + 0.3f), y + 2.4f, zc), new Vector3(0.6f, 4.8f, 9f));
                 Art.Part(t, Art.Cube, Art.Glow(new Color(1f, 0.92f, 0.78f), new Color(0.55f, 0.48f, 0.36f), 0.3f), new Vector3(s * (x - 0.06f), y + 4.75f, zc), new Vector3(0.06f, 0.12f, 8.6f), default, false);
                 Art.Part(t, Art.Cube, frameMat, new Vector3(s * (x - 0.05f), y + 2.4f, zc - 4.45f), new Vector3(0.12f, 4.8f, 0.12f), default, false);
+                ShopFront3D(t, s, zc, x, y, v);
                 return;
             }
             if (Tuning.Arcade)
